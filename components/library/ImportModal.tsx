@@ -15,6 +15,8 @@ export function ImportModal({ onClose }: ImportModalProps) {
     const [importing, setImporting] = useState(false);
     const [progress, setProgress] = useState({ current: 0, total: 0 });
     const [errors, setErrors] = useState<string[]>([]);
+    const [permissionRequired, setPermissionRequired] = useState(false);
+    const [pendingFiles, setPendingFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { addBook } = useLibraryStore();
 
@@ -100,15 +102,92 @@ export function ImportModal({ onClose }: ImportModalProps) {
             currentPosition: '',
             totalPages: bookData.totalPages,
             metadata: bookData.metadata || {},
+            status: 'reading' // Default to reading for imported books
         };
 
         await dbAddBook(newBook);
         addBook(newBook);
+
+        // Save to file system if configured
+        try {
+            console.log('Attempting to save to file system...');
+            const { getSettings } = await import('@/lib/db');
+            const { writeBookToFile, verifyPermission } = await import('@/lib/fileSystem');
+            const settings = await getSettings();
+            console.log('Settings retrieved. Handle exists:', !!settings.libraryHandle);
+
+            if (settings.libraryHandle) {
+                console.log('Verifying permission to write...');
+                const hasPermission = await verifyPermission(settings.libraryHandle, true);
+                console.log('Permission status:', hasPermission);
+
+                if (hasPermission) {
+                    await writeBookToFile(settings.libraryHandle, file);
+                    console.log('File written to system folder:', file.name);
+                    // alert(`Archivo guardado correctamente en: ${settings.libraryPath}`);
+                } else {
+                    console.warn('Permission denied for file system write');
+                    alert('No se pudo guardar el archivo en la carpeta: Permiso denegado.');
+                }
+            } else {
+                console.log('No library handle found in settings. Skipping write.');
+            }
+        } catch (e) {
+            console.error('Failed to save to file system:', e);
+            alert(`Error al guardar en la carpeta del sistema: ${(e as Error).message}`);
+        }
     };
 
     const handleFiles = useCallback(async (files: FileList | File[]) => {
         const fileArray = Array.from(files);
-        const validFiles = fileArray.filter(f => {
+
+        // Check permissions upfront
+        try {
+            const { getSettings } = await import('@/lib/db');
+            const { checkPermission } = await import('@/lib/fileSystem');
+            const settings = await getSettings();
+
+            if (settings.libraryHandle) {
+                const status = await checkPermission(settings.libraryHandle, true);
+                if (status === 'prompt' || status === 'denied') {
+                    setPendingFiles(fileArray);
+                    setPermissionRequired(true);
+                    return; // Stop here and wait for user action
+                }
+            }
+        } catch (e) {
+            console.error('Error checking permission upfront:', e);
+        }
+
+        await processFiles(fileArray);
+    }, []);
+
+    const grantPermission = async () => {
+        try {
+            const { getSettings } = await import('@/lib/db');
+            const { verifyPermission } = await import('@/lib/fileSystem');
+            const settings = await getSettings();
+
+            if (settings.libraryHandle) {
+                const granted = await verifyPermission(settings.libraryHandle, true);
+                if (granted) {
+                    setPermissionRequired(false);
+                    await processFiles(pendingFiles);
+                    setPendingFiles([]);
+                } else {
+                    alert('Permiso denegado. No se podrán guardar los archivos en la carpeta.');
+                    setPermissionRequired(false);
+                    await processFiles(pendingFiles); // Process anyway, just won't be saved to FS
+                }
+            }
+        } catch (e) {
+            console.error('Error granting permission:', e);
+            alert('Ocurrió un error al solicitar permisos.');
+        }
+    };
+
+    const processFiles = async (files: File[]) => {
+        const validFiles = files.filter(f => {
             const ext = f.name.split('.').pop()?.toLowerCase();
             return ext === 'epub' || ext === 'pdf';
         });
@@ -142,7 +221,7 @@ export function ImportModal({ onClose }: ImportModalProps) {
         if (newErrors.length === 0) {
             setTimeout(onClose, 500);
         }
-    }, [addBook, onClose]);
+    };
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -157,7 +236,9 @@ export function ImportModal({ onClose }: ImportModalProps) {
     const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
-        handleFiles(e.dataTransfer.files);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleFiles(e.dataTransfer.files);
+        }
     }, [handleFiles]);
 
     const handleClick = () => {
@@ -165,8 +246,12 @@ export function ImportModal({ onClose }: ImportModalProps) {
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
+        if (e.target.files && e.target.files.length > 0) {
             handleFiles(e.target.files);
+        }
+        // Reset input value to allow selecting the same file again
+        if (e.target) {
+            e.target.value = '';
         }
     };
 
@@ -188,7 +273,28 @@ export function ImportModal({ onClose }: ImportModalProps) {
                 </div>
 
                 <div className="modal-body">
-                    {importing ? (
+                    {permissionRequired ? (
+                        <div className="permission-request">
+                            <div className="permission-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="48" height="48">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                                    <line x1="12" y1="11" x2="12" y2="17" />
+                                    <line x1="9" y1="14" x2="15" y2="14" />
+                                </svg>
+                            </div>
+                            <h3>Se requiere permiso</h3>
+                            <p>Para guardar los libros en tu carpeta de biblioteca, necesitamos permiso de escritura.</p>
+                            <button className="btn btn-primary" onClick={grantPermission}>
+                                Conceder permiso
+                            </button>
+                            <button className="btn btn-ghost btn-sm" onClick={() => {
+                                setPermissionRequired(false);
+                                processFiles(pendingFiles);
+                            }}>
+                                Omitir (No guardar en carpeta)
+                            </button>
+                        </div>
+                    ) : importing ? (
                         <div className="import-progress">
                             <div className="progress-spinner" />
                             <p className="progress-text">
@@ -298,6 +404,20 @@ export function ImportModal({ onClose }: ImportModalProps) {
 
         .error-message:last-child {
           margin-bottom: 0;
+        }
+
+        .permission-request {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: var(--space-8);
+            gap: var(--space-4);
+        }
+
+        .permission-icon {
+            color: var(--color-accent);
+            margin-bottom: var(--space-2);
         }
 
         @keyframes spin {

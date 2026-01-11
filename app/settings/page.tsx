@@ -110,9 +110,35 @@ ${ann.note ? `**Nota:** ${ann.note}` : ''}
                                 readOnly
                                 style={{ maxWidth: '300px' }}
                             />
-                            <button className="btn btn-secondary" onClick={() => {
-                                // In a real app, this would open a file picker
-                                setLibraryPath('~/Documents/Lectro');
+                            <button className="btn btn-secondary" onClick={async () => {
+                                try {
+                                    // @ts-ignore - File System Access API
+                                    const dirHandle = await window.showDirectoryPicker();
+                                    if (dirHandle) {
+                                        setLibraryPath(dirHandle.name);
+
+                                        // Save handle and sync
+                                        const { updateSettings } = await import('@/lib/db');
+                                        const { syncLibraryWithFolder } = await import('@/lib/fileSystem');
+
+                                        await updateSettings({
+                                            libraryPath: dirHandle.name,
+                                            libraryHandle: dirHandle
+                                        });
+
+                                        const count = await syncLibraryWithFolder(dirHandle);
+                                        if (count > 0) {
+                                            alert(`Se importaron ${count} libros de la carpeta seleccionada.`);
+                                            // Refresh books if needed
+                                            window.location.reload();
+                                        }
+                                    }
+                                } catch (err) {
+                                    if ((err as Error).name !== 'AbortError') {
+                                        console.error('Error selecting folder:', err);
+                                        alert('Error al seleccionar carpeta: ' + (err as Error).message);
+                                    }
+                                }
                             }}>
                                 Cambiar
                             </button>

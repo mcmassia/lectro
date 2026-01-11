@@ -1,30 +1,30 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
-import { getAllBooks } from '@/lib/db';
+import { getAllBooks, Book } from '@/lib/db';
 import { BookCard } from '@/components/library/BookCard';
 import { ImportModal } from '@/components/library/ImportModal';
+import { BookDetailsModal } from '@/components/library/BookDetailsModal';
 
 const SortIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-        <line x1="4" y1="6" x2="16" y2="6" />
-        <line x1="4" y1="12" x2="12" y2="12" />
-        <line x1="4" y1="18" x2="8" y2="18" />
+        <path d="M11 5h10M11 9h10M11 13h10M5 5l-3 3 3 3" />
     </svg>
 );
 
 const GridIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-        <rect x="3" y="3" width="7" height="7" />
-        <rect x="14" y="3" width="7" height="7" />
-        <rect x="14" y="14" width="7" height="7" />
-        <rect x="3" y="14" width="7" height="7" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
     </svg>
 );
 
 const ListIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
         <line x1="8" y1="6" x2="21" y2="6" />
         <line x1="8" y1="12" x2="21" y2="12" />
         <line x1="8" y1="18" x2="21" y2="18" />
@@ -35,15 +35,27 @@ const ListIcon = () => (
 );
 
 const PlusIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-        <line x1="12" y1="5" x2="12" y2="19" />
-        <line x1="5" y1="12" x2="19" y2="12" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="24" height="24">
+        <path d="M12 5v14M5 12h14" />
     </svg>
 );
 
 export default function LibraryPage() {
-    const { books, setBooks, isLoading, setIsLoading, searchQuery, setSearchQuery, sortBy, setSortBy, filteredBooks } = useLibraryStore();
+    const {
+        books,
+        setBooks,
+        isLoading,
+        setIsLoading,
+        searchQuery,
+        setSearchQuery,
+        sortBy,
+        setSortBy,
+        activeCategory,
+        setActiveCategory,
+        filteredBooks
+    } = useLibraryStore();
     const [showImport, setShowImport] = useState(false);
+    const [selectedBook, setSelectedBook] = useState<Book | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
     useEffect(() => {
@@ -66,58 +78,109 @@ export default function LibraryPage() {
     return (
         <>
             <div className="page-container animate-fade-in">
-                <div className="page-header">
-                    <div className="header-row">
-                        <div>
-                            <h1 className="page-title">Biblioteca</h1>
-                            <p className="page-subtitle">{books.length} libros en tu colección</p>
-                        </div>
-                        <button className="btn btn-primary" onClick={() => setShowImport(true)}>
-                            <PlusIcon />
-                            Importar libros
+                {/* Header */}
+                <div className="library-header">
+                    <div className="header-top">
+                        <Link href="/" className="back-button">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24">
+                                <path d="M15 18l-6-6 6-6" />
+                            </svg>
+                        </Link>
+                        <h1 className="header-title">Biblioteca</h1>
+                        <button className="btn btn-icon btn-ghost">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                                <circle cx="12" cy="12" r="1" />
+                                <circle cx="19" cy="12" r="1" />
+                                <circle cx="5" cy="12" r="1" />
+                            </svg>
                         </button>
                     </div>
                 </div>
 
-                {/* Toolbar */}
-                <div className="library-toolbar">
-                    <div className="search-container">
-                        <input
-                            type="text"
-                            className="input search-input"
-                            placeholder="Buscar en tu biblioteca..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+                {/* Header & Toolbar merged */}
+                <div className="library-toolbar-combined">
+                    <div className="toolbar-section-left">
+                        <div className="category-tabs">
+                            <button
+                                className={`category-tab ${activeCategory === 'all' ? 'active' : ''}`}
+                                onClick={() => setActiveCategory('all')}
+                            >
+                                Todo
+                            </button>
+                            <button
+                                className={`category-tab ${activeCategory === 'favorites' ? 'active' : ''}`}
+                                onClick={() => setActiveCategory('favorites')}
+                            >
+                                Favoritos
+                            </button>
+                            <button
+                                className={`category-tab ${activeCategory === 'planToRead' ? 'active' : ''}`}
+                                onClick={() => setActiveCategory('planToRead')}
+                            >
+                                Por leer
+                            </button>
+                            <button
+                                className={`category-tab ${activeCategory === 'completed' ? 'active' : ''}`}
+                                onClick={() => setActiveCategory('completed')}
+                            >
+                                Completados
+                            </button>
+                        </div>
                     </div>
-                    <div className="toolbar-actions">
-                        <select
-                            className="input sort-select"
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value as any)}
-                        >
-                            <option value="lastRead">Última lectura</option>
-                            <option value="title">Título</option>
-                            <option value="author">Autor</option>
-                            <option value="addedDate">Fecha añadido</option>
-                            <option value="progress">Progreso</option>
-                        </select>
+
+                    <div className="toolbar-section-right">
+                        <div className="sort-container">
+                            <button className="btn btn-secondary sort-btn" onClick={() => {/* Toggle dropdown */ }}>
+                                <span className="sort-label">Ordenar</span>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                                    <path d="M6 9l6 6 6-6" />
+                                </svg>
+                            </button>
+                            <select
+                                className="sort-select-absolute"
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value as any)}
+                            >
+                                <option value="relevance">Relevancia</option>
+                                <option value="addedDate">Fecha</option>
+                                <option value="lastRead">Última lectura</option>
+                                <option value="author">Autor</option>
+                                <option value="title">Título</option>
+                                <option value="progress">Progreso</option>
+                                <option value="fileSize">Tamaño</option>
+                            </select>
+                        </div>
+
+                        <div className="search-container">
+                            <input
+                                type="text"
+                                className="input search-input"
+                                placeholder="Buscar..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+
                         <div className="view-toggle">
                             <button
                                 className={`btn btn-icon ${viewMode === 'grid' ? 'active' : ''}`}
                                 onClick={() => setViewMode('grid')}
-                                title="Vista cuadrícula"
+                                title="Cuadrícula"
                             >
                                 <GridIcon />
                             </button>
                             <button
                                 className={`btn btn-icon ${viewMode === 'list' ? 'active' : ''}`}
                                 onClick={() => setViewMode('list')}
-                                title="Vista lista"
+                                title="Lista"
                             >
                                 <ListIcon />
                             </button>
                         </div>
+
+                        <button className="btn btn-primary btn-import" onClick={() => setShowImport(true)} title="Importar libros">
+                            <PlusIcon />
+                        </button>
                     </div>
                 </div>
 
@@ -131,7 +194,12 @@ export default function LibraryPage() {
                 ) : displayBooks.length > 0 ? (
                     <div className={viewMode === 'grid' ? 'book-grid' : 'book-list'}>
                         {displayBooks.map((book) => (
-                            <BookCard key={book.id} book={book} viewMode={viewMode} />
+                            <BookCard
+                                key={book.id}
+                                book={book}
+                                viewMode={viewMode}
+                                onClick={setSelectedBook}
+                            />
                         ))}
                     </div>
                 ) : (
@@ -151,9 +219,11 @@ export default function LibraryPage() {
                             </>
                         ) : (
                             <>
-                                <h3 className="heading-4">Tu biblioteca está vacía</h3>
+                                <h3 className="heading-4">
+                                    {activeCategory === 'all' ? 'Tu biblioteca está vacía' : 'No hay libros en esta categoría'}
+                                </h3>
                                 <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)' }}>
-                                    Importa tus libros EPUB o PDF para comenzar
+                                    {activeCategory === 'all' ? 'Importa tus libros EPUB o PDF para comenzar' : 'Añade libros a esta lista para verlos aquí'}
                                 </p>
                                 <button className="btn btn-primary" onClick={() => setShowImport(true)}>
                                     <PlusIcon />
@@ -169,98 +239,216 @@ export default function LibraryPage() {
                 <ImportModal onClose={() => setShowImport(false)} />
             )}
 
+            {selectedBook && (
+                <BookDetailsModal
+                    book={selectedBook}
+                    onClose={() => setSelectedBook(null)}
+                />
+            )}
+
             <style jsx>{`
-        .header-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-        }
+                .page-container {
+                    max-width: 90vw !important;
+                }
 
-        .library-toolbar {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: var(--space-4);
-          margin-bottom: var(--space-6);
-        }
+                .library-header {
+                    margin-bottom: var(--space-6);
+                }
 
-        .search-container {
-          flex: 1;
-          max-width: 400px;
-        }
+                .header-top {
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: var(--space-6);
+                    gap: var(--space-4);
+                }
 
-        .search-input {
-          padding-left: var(--space-10);
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: var(--space-3) center;
-          background-size: 18px;
-        }
+                .back-button {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 50%;
+                    background: var(--color-bg-secondary);
+                    color: var(--color-text-primary);
+                    border: 1px solid var(--color-border);
+                    transition: all var(--transition-fast);
+                }
+                
+                .back-button:hover {
+                    background: var(--color-bg-tertiary);
+                }
 
-        .toolbar-actions {
-          display: flex;
-          align-items: center;
-          gap: var(--space-3);
-        }
+                .header-title {
+                    font-size: var(--text-2xl);
+                    font-weight: 700;
+                    margin: 0;
+                    flex: 1;
+                }
 
-        .sort-select {
-          width: auto;
-          padding-right: var(--space-8);
-        }
+                .library-toolbar-combined {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: var(--space-6);
+                    gap: var(--space-4);
+                    flex-wrap: wrap;
+                }
 
-        .view-toggle {
-          display: flex;
-          border: 1px solid var(--color-border);
-          border-radius: var(--radius-md);
-          overflow: hidden;
-        }
+                .toolbar-section-left {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--space-4);
+                }
 
-        .view-toggle .btn-icon {
-          border-radius: 0;
-          border: none;
-          background: transparent;
-        }
+                .toolbar-section-right {
+                     display: flex;
+                    align-items: center;
+                    gap: var(--space-3);
+                    flex: 1;
+                    justify-content: flex-end;
+                }
 
-        .view-toggle .btn-icon.active {
-          background: var(--color-accent-subtle);
-          color: var(--color-accent);
-        }
+                .category-tabs {
+                    display: flex;
+                    gap: var(--space-1);
+                    background: var(--color-bg-secondary);
+                    padding: 4px;
+                    border-radius: var(--radius-lg);
+                }
 
-        .book-list {
-          display: flex;
-          flex-direction: column;
-          gap: var(--space-3);
-        }
+                .category-tab {
+                    padding: 6px 16px;
+                    border-radius: var(--radius-md);
+                    font-size: var(--text-sm);
+                    font-weight: 500;
+                    color: var(--color-text-secondary);
+                    background: transparent;
+                    border: none;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
 
-        .empty-library {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: var(--space-16);
-          text-align: center;
-        }
+                .category-tab:hover {
+                    color: var(--color-text-primary);
+                }
 
-        .empty-icon {
-          color: var(--color-text-tertiary);
-          margin-bottom: var(--space-4);
-        }
+                .category-tab.active {
+                    background: var(--color-bg-tertiary);
+                    color: var(--color-text-primary);
+                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                }
 
-        @media (max-width: 768px) {
-          .library-toolbar {
-            flex-direction: column;
-            align-items: stretch;
-          }
+                .sort-container {
+                    position: relative;
+                }
+                
+                .sort-select-absolute {
+                    position: absolute;
+                    inset: 0;
+                    opacity: 0;
+                    cursor: pointer;
+                    width: 100%;
+                }
 
-          .search-container {
-            max-width: none;
-          }
+                .sort-btn {
+                    padding: 0 12px;
+                    height: 36px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: var(--text-sm);
+                }
 
-          .toolbar-actions {
-            justify-content: space-between;
-          }
-        }
-      `}</style>
+                .search-container {
+                    position: relative;
+                    width: 200px;
+                }
+
+                .search-input {
+                
+                /* Custom styling for search icon since input::before doesn't work on input directly */
+                .search-container::after {
+                    content: '';
+                    position: absolute;
+                    left: 12px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    width: 16px;
+                    height: 16px;
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+                    background-repeat: no-repeat;
+                    pointer-events: none;
+                }
+
+                .view-toggle {
+                    display: flex;
+                    background: var(--color-bg-secondary);
+                    border-radius: var(--radius-md);
+                    padding: 2px;
+                    gap: 2px;
+                }
+
+                .view-toggle .btn-icon {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: var(--radius-sm);
+                    color: var(--color-text-tertiary);
+                }
+
+                .view-toggle .btn-icon.active {
+                    background: var(--color-bg-elevated);
+                    color: var(--color-accent);
+                    box-shadow: var(--shadow-sm);
+                }
+                
+                .btn-import {
+                    width: 40px;
+                    height: 40px;
+                    padding: 0;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+
+                .book-list {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--space-3);
+                }
+
+                .empty-library {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    padding: var(--space-20) 0;
+                    text-align: center;
+                }
+
+                .empty-icon {
+                    color: var(--color-text-tertiary);
+                    margin-bottom: var(--space-6);
+                    opacity: 0.5;
+                }
+                
+                @media (max-width: 768px) {
+                    .library-toolbar {
+                        flex-direction: column;
+                        align-items: stretch;
+                        gap: var(--space-4);
+                    }
+                    
+                    .toolbar-right {
+                        justify-content: space-between;
+                    }
+                    
+                    .search-container {
+                        max-width: none;
+                    }
+                }
+            `}</style>
         </>
     );
 }

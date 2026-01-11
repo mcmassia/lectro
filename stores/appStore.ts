@@ -126,7 +126,8 @@ interface LibraryState {
     books: Book[];
     isLoading: boolean;
     searchQuery: string;
-    sortBy: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress';
+    sortBy: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress' | 'fileSize' | 'relevance';
+    activeCategory: 'all' | 'favorites' | 'planToRead' | 'completed';
     sortOrder: 'asc' | 'desc';
 
     setBooks: (books: Book[]) => void;
@@ -134,7 +135,8 @@ interface LibraryState {
     updateBook: (id: string, updates: Partial<Book>) => void;
     removeBook: (id: string) => void;
     setSearchQuery: (query: string) => void;
-    setSortBy: (sort: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress') => void;
+    setSortBy: (sort: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress' | 'fileSize' | 'relevance') => void;
+    setActiveCategory: (category: 'all' | 'favorites' | 'planToRead' | 'completed') => void;
     setSortOrder: (order: 'asc' | 'desc') => void;
     setIsLoading: (loading: boolean) => void;
 
@@ -146,7 +148,8 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     books: [],
     isLoading: true,
     searchQuery: '',
-    sortBy: 'lastRead',
+    sortBy: 'relevance',
+    activeCategory: 'all',
     sortOrder: 'desc',
 
     setBooks: (books) => set({ books, isLoading: false }),
@@ -157,15 +160,26 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     removeBook: (id) => set((state) => ({
         books: state.books.filter((b) => b.id !== id)
     })),
-    setSearchQuery: (query) => set({ searchQuery: query }),
+    setSearchQuery: (query: string) => set({ searchQuery: query }),
     setSortBy: (sort) => set({ sortBy: sort }),
+    setActiveCategory: (category) => set({ activeCategory: category }),
     setSortOrder: (order) => set({ sortOrder: order }),
     setIsLoading: (loading) => set({ isLoading: loading }),
 
     filteredBooks: () => {
-        const { books, searchQuery, sortBy, sortOrder } = get();
+        const { books, searchQuery, sortBy, sortOrder, activeCategory } = get();
 
         let filtered = books;
+
+        // Filter by category
+        if (activeCategory !== 'all') {
+            filtered = filtered.filter((b) => {
+                if (activeCategory === 'favorites') return b.status === 'favorite';
+                if (activeCategory === 'planToRead') return b.status === 'planToRead';
+                if (activeCategory === 'completed') return b.status === 'completed';
+                return true;
+            });
+        }
 
         // Filter by search
         if (searchQuery.trim()) {
@@ -197,6 +211,15 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
                     break;
                 case 'progress':
                     comparison = a.progress - b.progress;
+                    break;
+                case 'fileSize':
+                    comparison = a.fileSize - b.fileSize;
+                    break;
+                case 'relevance':
+                    // Simple relevance fallback to last read
+                    const rTimeA = a.lastReadAt?.getTime() || 0;
+                    const rTimeB = b.lastReadAt?.getTime() || 0;
+                    comparison = rTimeA - rTimeB;
                     break;
             }
 

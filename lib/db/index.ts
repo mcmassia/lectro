@@ -20,6 +20,7 @@ export interface Book {
   totalPages?: number;
   currentPage?: number;
   metadata: BookMetadata;
+  status: 'reading' | 'planToRead' | 'completed' | 'favorite';
 }
 
 export interface BookMetadata {
@@ -31,6 +32,7 @@ export interface BookMetadata {
   subjects?: string[];
   series?: string;
   seriesIndex?: number;
+  tags?: string[];
 }
 
 export interface Annotation {
@@ -106,6 +108,7 @@ export interface BookSummary {
 export interface AppSettings {
   id: string;
   libraryPath?: string;
+  libraryHandle?: FileSystemDirectoryHandle;
   theme: 'light' | 'dark' | 'system';
   readerSettings: ReaderSettings;
   readingGoal: number; // Pages per day
@@ -165,13 +168,17 @@ export class LectroDB extends Dexie {
     super('LectroDB');
 
     this.version(1).stores({
-      books: 'id, title, author, format, addedAt, lastReadAt, progress',
+      books: 'id, title, author, format, addedAt, lastReadAt, progress, status',
       annotations: 'id, bookId, createdAt, color, chapterIndex',
       readingSessions: 'id, bookId, startTime, endTime',
       vectorChunks: 'id, bookId, chapterIndex',
       xrayData: 'id, bookId',
       summaries: 'id, bookId, type, chapterIndex',
       settings: 'id',
+    });
+
+    this.version(2).stores({
+      books: 'id, title, author, format, addedAt, lastReadAt, progress, status, fileName',
     });
   }
 }
@@ -196,7 +203,9 @@ export async function getBook(id: string): Promise<Book | undefined> {
 }
 
 export async function getAllBooks(): Promise<Book[]> {
-  return db.books.orderBy('lastReadAt').reverse().toArray();
+  // Use toArray() directly to ensure we get all books, including those without lastReadAt
+  // Sorting is handled in the store
+  return db.books.toArray();
 }
 
 export async function updateBook(id: string, updates: Partial<Book>): Promise<number> {
