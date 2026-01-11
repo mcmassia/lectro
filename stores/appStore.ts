@@ -127,7 +127,7 @@ interface LibraryState {
     isLoading: boolean;
     searchQuery: string;
     sortBy: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress' | 'fileSize' | 'relevance';
-    activeCategory: 'all' | 'favorites' | 'planToRead' | 'completed';
+    activeCategory: 'all' | 'favorites' | 'planToRead' | 'completed' | 'authors';
     sortOrder: 'asc' | 'desc';
 
     setBooks: (books: Book[]) => void;
@@ -136,7 +136,7 @@ interface LibraryState {
     removeBook: (id: string) => void;
     setSearchQuery: (query: string) => void;
     setSortBy: (sort: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress' | 'fileSize' | 'relevance') => void;
-    setActiveCategory: (category: 'all' | 'favorites' | 'planToRead' | 'completed') => void;
+    setActiveCategory: (category: 'all' | 'favorites' | 'planToRead' | 'completed' | 'authors') => void;
     setSortOrder: (order: 'asc' | 'desc') => void;
     setIsLoading: (loading: boolean) => void;
 

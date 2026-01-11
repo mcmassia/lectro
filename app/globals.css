@@ -4,7 +4,9 @@
    =================================== */
 
 /* CSS Reset & Base */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -21,30 +23,30 @@
   --color-bg-tertiary: #e8e8ed;
   --color-bg-elevated: #ffffff;
   --color-bg-glass: rgba(255, 255, 255, 0.72);
-  
+
   --color-text-primary: #1d1d1f;
   --color-text-secondary: #6e6e73;
   --color-text-tertiary: #86868b;
   --color-text-inverse: #ffffff;
-  
+
   --color-accent: #007aff;
   --color-accent-hover: #0066d6;
   --color-accent-subtle: rgba(0, 122, 255, 0.1);
-  
+
   --color-success: #30d158;
   --color-warning: #ff9f0a;
   --color-error: #ff453a;
-  
+
   --color-border: rgba(0, 0, 0, 0.08);
   --color-border-strong: rgba(0, 0, 0, 0.15);
   --color-divider: rgba(0, 0, 0, 0.05);
-  
+
   /* Gradients */
   --gradient-accent: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
   --gradient-warm: linear-gradient(135deg, #ff6b6b 0%, #ffa500 100%);
   --gradient-cool: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%);
-  
+  --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+
   /* Shadows */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -52,12 +54,12 @@
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
   --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.16);
   --shadow-glow: 0 0 40px rgba(0, 122, 255, 0.15);
-  
+
   /* Typography */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-serif: 'Merriweather', Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-  
+
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -67,15 +69,15 @@
   --text-3xl: 2rem;
   --text-4xl: 2.5rem;
   --text-5xl: 3rem;
-  
+
   --line-height-tight: 1.25;
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.75;
-  
+
   --letter-spacing-tight: -0.025em;
   --letter-spacing-normal: 0;
   --letter-spacing-wide: 0.025em;
-  
+
   /* Spacing */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -88,20 +90,20 @@
   --space-12: 3rem;
   --space-16: 4rem;
   --space-20: 5rem;
-  
+
   /* Border Radius */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-xl: 24px;
   --radius-full: 9999px;
-  
+
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
-  
+
   /* Z-Index */
   --z-base: 0;
   --z-dropdown: 100;
@@ -109,7 +111,7 @@
   --z-modal: 300;
   --z-toast: 400;
   --z-tooltip: 500;
-  
+
   /* Layout */
   --sidebar-width: 260px;
   --sidebar-collapsed-width: 72px;
@@ -128,22 +130,22 @@
   --color-bg-tertiary: #141414;
   --color-bg-elevated: #1c1c1e;
   --color-bg-glass: rgba(28, 28, 30, 0.85);
-  
+
   --color-text-primary: #f5f5f7;
   --color-text-secondary: #a1a1a6;
   --color-text-tertiary: #6e6e73;
   --color-text-inverse: #1d1d1f;
-  
+
   --color-accent: #0a84ff;
   --color-accent-hover: #409cff;
   --color-accent-subtle: rgba(10, 132, 255, 0.15);
-  
+
   --color-border: rgba(255, 255, 255, 0.08);
   --color-border-strong: rgba(255, 255, 255, 0.15);
   --color-divider: rgba(255, 255, 255, 0.05);
-  
-  --gradient-card: linear-gradient(145deg, rgba(28,28,30,0.95) 0%, rgba(28,28,30,0.8) 100%);
-  
+
+  --gradient-card: linear-gradient(145deg, rgba(28, 28, 30, 0.95) 0%, rgba(28, 28, 30, 0.8) 100%);
+
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
@@ -457,18 +459,52 @@ body {
   opacity: 0.8;
 }
 
-.main-content {
-  flex: 1;
-  margin-left: var(--sidebar-width);
-  min-height: 100vh;
-  background: var(--color-bg-primary);
+/* Global Overrides for Links */
+a {
+  text-decoration: none;
+  color: inherit;
 }
 
-.page-container {
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  padding: var(--space-8);
+.app-container {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
 }
+
+.main-content {
+  flex: 1;
+  margin-left: 0;
+  min-height: 100vh;
+  background: var(--color-bg-primary);
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  /* Prevent horizontal scroll */
+}
+
+/* Ensure page content really takes full width */
+.page-container {
+  width: 100%;
+  max-width: 100%;
+  padding: var(--space-6);
+  /* Reduce padding slightly */
+  margin: 0;
+}
+
+/* Force removal of underlines on specific components if needed */
+.continue-card,
+.continue-card:hover,
+.continue-card:visited,
+.continue-card:active,
+.continue-card h3,
+.continue-card p,
+.filter-card,
+.filter-card:hover,
+.filter-card:visited,
+.filter-card:active {
+  text-decoration: none !important;
+}
+
 
 .page-header {
   margin-bottom: var(--space-8);
@@ -520,7 +556,7 @@ body {
 .book-card-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 50%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 50%);
   opacity: 0;
   transition: opacity var(--transition-fast);
 }
@@ -567,7 +603,7 @@ body {
   left: 0;
   right: 0;
   height: 3px;
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .book-card-progress-bar {
@@ -859,45 +895,69 @@ body {
    =================================== */
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { 
+  from {
     opacity: 0;
     transform: translateY(20px);
   }
-  to { 
+
+  to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
 @keyframes slideIn {
-  from { 
+  from {
     opacity: 0;
     transform: translateX(-20px);
   }
-  to { 
+
+  to {
     opacity: 1;
     transform: translateX(0);
   }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .animate-fade-in {
@@ -921,12 +981,10 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--color-bg-tertiary) 25%,
-    var(--color-bg-secondary) 50%,
-    var(--color-bg-tertiary) 75%
-  );
+  background: linear-gradient(90deg,
+      var(--color-bg-tertiary) 25%,
+      var(--color-bg-secondary) 50%,
+      var(--color-bg-tertiary) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -1056,7 +1114,8 @@ body {
   flex-wrap: wrap;
 }
 
-.toolbar-left, .toolbar-right {
+.toolbar-left,
+.toolbar-right {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -1090,30 +1149,30 @@ body {
 }
 
 .btn-import {
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .status-indicator {
-    position: absolute;
-    right: var(--space-2);
-    top: var(--space-2);
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.6);
-    backdrop-filter: blur(4px);
-    z-index: 10;
+  position: absolute;
+  right: var(--space-2);
+  top: var(--space-2);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 10;
 }
 
 .status-indicator.favorite {
-    color: #FFD700;
+  color: #FFD700;
 }
