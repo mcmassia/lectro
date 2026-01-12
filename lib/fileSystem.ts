@@ -178,7 +178,8 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
 
         const response = await fetch('/api/library/scan', { headers });
         if (!response.ok) {
-            throw new Error('Failed to scan server library');
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Failed to scan server library: ${response.status} ${response.statusText}`);
         }
         const data = await response.json();
         const serverFiles: ServerFile[] = data.files || [];

@@ -5,11 +5,28 @@ import path from 'path';
 export async function GET(req: NextRequest) {
     try {
         const customPath = req.headers.get('x-library-path');
-        const libraryPath = customPath || process.env.LIBRARY_PATH;
+        let libraryPath = customPath || process.env.LIBRARY_PATH;
+
+        if (!libraryPath) {
+            // Fallback for local development
+            if (process.env.NODE_ENV === 'development') {
+                const defaultPath = path.join(process.cwd(), 'library');
+                if (!fs.existsSync(defaultPath)) {
+                    try {
+                        fs.mkdirSync(defaultPath, { recursive: true });
+                    } catch (e) {
+                        console.error('Failed to create default library path:', e);
+                    }
+                }
+                if (fs.existsSync(defaultPath)) {
+                    libraryPath = defaultPath;
+                }
+            }
+        }
 
         if (!libraryPath) {
             return NextResponse.json(
-                { error: 'LIBRARY_PATH environment variable not set' },
+                { error: 'LIBRARY_PATH environment variable not set. Please configure the Server Path in Settings or set the env var.' },
                 { status: 500 }
             );
         }
@@ -20,7 +37,7 @@ export async function GET(req: NextRequest) {
                 fs.mkdirSync(libraryPath, { recursive: true });
             } catch (err) {
                 return NextResponse.json(
-                    { error: 'Library directory does not exist and could not be created' },
+                    { error: `Library directory does not exist and could not be created at ${libraryPath}` },
                     { status: 500 }
                 );
             }
@@ -46,7 +63,10 @@ export async function GET(req: NextRequest) {
     } catch (error) {
         console.error('Error scanning library:', error);
         return NextResponse.json(
-            { error: 'Failed to scan library directory' },
+            {
+                error: `Failed to scan library directory: ${(error as Error).message}`,
+                details: error
+            },
             { status: 500 }
         );
     }

@@ -15,10 +15,27 @@ export async function GET(
 ) {
     try {
         const customPath = req.headers.get('x-library-path');
-        const libraryPath = customPath || process.env.LIBRARY_PATH;
+        let libraryPath = customPath || process.env.LIBRARY_PATH;
 
         // Await params as per Next.js 15+ requirements
         const { filename } = await params;
+
+        if (!libraryPath) {
+            // Fallback for local development
+            if (process.env.NODE_ENV === 'development') {
+                const defaultPath = path.join(process.cwd(), 'library');
+                if (!fs.existsSync(defaultPath)) {
+                    try {
+                        fs.mkdirSync(defaultPath, { recursive: true });
+                    } catch (e) {
+                        console.error('Failed to create default library path:', e);
+                    }
+                }
+                if (fs.existsSync(defaultPath)) {
+                    libraryPath = defaultPath;
+                }
+            }
+        }
 
         if (!libraryPath) {
             return NextResponse.json(
@@ -68,10 +85,27 @@ export async function POST(
 ) {
     try {
         const customPath = req.headers.get('x-library-path');
-        const libraryPath = customPath || process.env.LIBRARY_PATH;
+        let libraryPath = customPath || process.env.LIBRARY_PATH;
 
         // Await params as per Next.js 15+ requirements
         const { filename } = await params;
+
+        if (!libraryPath) {
+            // Fallback for local development
+            if (process.env.NODE_ENV === 'development') {
+                const defaultPath = path.join(process.cwd(), 'library');
+                if (!fs.existsSync(defaultPath)) {
+                    try {
+                        fs.mkdirSync(defaultPath, { recursive: true });
+                    } catch (e) {
+                        console.error('Failed to create default library path:', e);
+                    }
+                }
+                if (fs.existsSync(defaultPath)) {
+                    libraryPath = defaultPath;
+                }
+            }
+        }
 
         if (!libraryPath) {
             return NextResponse.json(
