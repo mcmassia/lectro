@@ -55,8 +55,7 @@ export default function Home() {
 
   // Handle Sync
   const handleSync = async () => {
-    console.log('--- SYNC BUTTON CLICKED ---');
-    alert('DEBUG: Sync Button Clicked. Starting...');
+    // console.log('--- SYNC BUTTON CLICKED ---');
     setIsSyncing(true);
     setShowSyncReport(true);
     try {
@@ -67,9 +66,13 @@ export default function Home() {
       // Refresh library
       const allBooks = await getAllBooks();
       setBooks(allBooks);
+
+      alert(`Sync Complete!\nAdded: ${results.added}\nRemoved: ${results.removed}\nErrors: ${results.errors.length}`);
     } catch (error) {
       console.error('Sync failed:', error);
-      setSyncResults({ added: 0, removed: 0, errors: [(error as Error).message || 'Unknown error'] });
+      const msg = (error as Error).message || 'Unknown error';
+      setSyncResults({ added: 0, removed: 0, errors: [msg] });
+      alert('Sync ERROR:\n' + msg);
     } finally {
       setIsSyncing(false);
     }
