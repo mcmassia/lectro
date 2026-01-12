@@ -48,7 +48,7 @@ export default function ReaderPage() {
                 setIsLoading(true);
                 const bookData = await getBook(bookId);
                 if (!bookData) {
-                    router.push('/library');
+                    router.push('/');
                     return;
                 }
                 setBook(bookData);
@@ -60,7 +60,7 @@ export default function ReaderPage() {
                 await updateBook(bookId, { lastReadAt: new Date() });
             } catch (error) {
                 console.error('Failed to load book:', error);
-                router.push('/library');
+                router.push('/');
             } finally {
                 setIsLoading(false);
             }
@@ -315,8 +315,7 @@ export default function ReaderPage() {
           display: flex;
           height: 100vh;
           background: var(--color-bg-primary);
-          margin-left: calc(-1 * var(--sidebar-width));
-          width: calc(100% + var(--sidebar-width));
+          width: 100%;
           position: relative;
         }
 

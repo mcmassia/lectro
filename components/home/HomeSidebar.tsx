@@ -32,6 +32,11 @@ export function RightSidebar() {
         }
     };
 
+    // Hide sidebar in reader view
+    if (pathname?.startsWith('/reader')) {
+        return null;
+    }
+
     return (
         <aside className="right-sidebar">
             {/* Quick Filters */}
