@@ -43,21 +43,34 @@ export async function GET(req: NextRequest) {
             }
         }
 
-        const files = fs.readdirSync(libraryPath);
-        const fileList = files
-            .filter(file => {
-                const ext = path.extname(file).toLowerCase();
-                return ext === '.epub' || ext === '.pdf';
-            })
-            .map(file => {
-                const filePath = path.join(libraryPath, file);
-                const stats = fs.statSync(filePath);
-                return {
-                    name: file,
-                    size: stats.size,
-                    modifiedTime: stats.mtime.toISOString(),
-                };
-            });
+        const getFilesRecursively = (dir: string, baseDir: string, currentDepth: number = 0, maxDepth: number = 3): { name: string, relativePath: string, size: number, modifiedTime: string }[] => {
+            if (currentDepth > maxDepth) return [];
+
+            let results: { name: string, relativePath: string, size: number, modifiedTime: string }[] = [];
+            const list = fs.readdirSync(dir);
+
+            for (const file of list) {
+                const filePath = path.join(dir, file);
+                const stat = fs.statSync(filePath);
+
+                if (stat && stat.isDirectory()) {
+                    results = results.concat(getFilesRecursively(filePath, baseDir, currentDepth + 1, maxDepth));
+                } else {
+                    const ext = path.extname(file).toLowerCase();
+                    if (ext === '.epub' || ext === '.pdf') {
+                        results.push({
+                            name: file,
+                            relativePath: path.relative(baseDir, filePath),
+                            size: stat.size,
+                            modifiedTime: stat.mtime.toISOString(),
+                        });
+                    }
+                }
+            }
+            return results;
+        };
+
+        const fileList = getFilesRecursively(libraryPath, libraryPath);
 
         return NextResponse.json({ files: fileList });
     } catch (error) {

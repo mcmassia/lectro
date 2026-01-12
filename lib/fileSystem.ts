@@ -170,12 +170,13 @@ export async function syncLibraryWithFolder(dirHandle: FileSystemDirectoryHandle
 
 export interface ServerFile {
     name: string;
+    relativePath?: string; // Added relative path support
     size: number;
     modifiedTime: string;
 }
 
 export async function syncWithServer(): Promise<{ added: number; removed: number; errors: string[] }> {
-    const addedCount = 0;
+    let added = 0;
     const errors: string[] = [];
 
     try {
@@ -197,11 +198,9 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
         console.log('Server files found:', serverFiles.length);
 
         // 2. Process each file
-        let added = 0;
         for (const fileInfo of serverFiles) {
             try {
                 // Check uniqueness by fileName for now (could be improved)
-                // Check uniqueness by fileName
                 const existing = await db.books.where('fileName').equals(fileInfo.name).first();
                 if (existing) {
                     // Update existing book to be marked as on server if not already
@@ -213,7 +212,19 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
                 }
 
                 console.log('Downloading from server:', fileInfo.name);
-                const fileRes = await fetch(`/api/library/file/${encodeURIComponent(fileInfo.name)}`, { headers });
+                // Use relativePath if available (for nested files), otherwise fallback to name
+                const targetPath = fileInfo.relativePath || fileInfo.name;
+                // Encode path components properly (slashes must be preserved if using path param, or encoded if using filename)
+                // Our API implementation now uses query param 'path' for relative paths.
+
+                let downloadUrl = `/api/library/file/${encodeURIComponent(fileInfo.name)}`;
+                if (fileInfo.relativePath) {
+                    // Use path param for nested files
+                    downloadUrl += `?path=${encodeURIComponent(fileInfo.relativePath)}`;
+                }
+
+                const fileRes = await fetch(downloadUrl, { headers });
+
                 if (!fileRes.ok) {
                     console.error('Failed to download:', fileInfo.name);
                     errors.push(`Failed to download ${fileInfo.name}`);
@@ -235,6 +246,7 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
                 const book = await processFileBlob(file);
 
                 if (book) {
+                    // Ensure author is set efficiently if we can derive it from path (optional, epub metadata usually better)
                     await addBook(book);
                     added++;
                 }
@@ -411,6 +423,14 @@ export async function uploadBookToServer(book: Book): Promise<boolean> {
         const headers: HeadersInit = {};
         if (customPath) {
             headers['x-library-path'] = customPath;
+        }
+
+        // Add metadata headers for structured storage
+        if (book.author) {
+            headers['x-book-author'] = book.author;
+        }
+        if (book.title) {
+            headers['x-book-title'] = book.title;
         }
 
         // 1. Get file blob from DB is not directly stored in 'books' table in full, 
