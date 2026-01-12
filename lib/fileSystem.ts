@@ -164,7 +164,7 @@ export interface ServerFile {
     modifiedTime: string;
 }
 
-export async function syncWithServer(): Promise<{ added: number; errors: string[] }> {
+export async function syncWithServer(): Promise<{ added: number; removed: number; errors: string[] }> {
     const addedCount = 0;
     const errors: string[] = [];
 
@@ -228,12 +228,45 @@ export async function syncWithServer(): Promise<{ added: number; errors: string[
             }
         }
 
-        return { added, errors };
+        // 3. Handle deletions
+        const removed = await handleDeletions(serverFiles, errors);
+
+        return { added, removed, errors };
 
     } catch (err) {
         console.error('Server sync failed:', err);
         throw err;
     }
+}
+
+async function handleDeletions(serverFiles: ServerFile[], errors: string[]): Promise<number> {
+    let removed = 0;
+    try {
+        const localServerBooks = await db.books.filter(b => !!b.isOnServer).toArray();
+        const serverFileNames = new Set(serverFiles.map(f => f.name));
+
+        for (const book of localServerBooks) {
+            if (!serverFileNames.has(book.fileName)) {
+                console.log('Removing local book not on server:', book.title);
+                try {
+                    await db.transaction('rw', [db.books, db.annotations, db.vectorChunks, db.xrayData, db.summaries], async () => {
+                        await db.books.delete(book.id);
+                        await db.annotations.where('bookId').equals(book.id).delete();
+                        await db.vectorChunks.where('bookId').equals(book.id).delete();
+                        await db.xrayData.where('bookId').equals(book.id).delete();
+                        await db.summaries.where('bookId').equals(book.id).delete();
+                    });
+                    removed++;
+                } catch (e) {
+                    console.error('Failed to remove local book:', book.title, e);
+                    errors.push(`Failed to remove ${book.title}`);
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Error handling deletions:', e);
+    }
+    return removed;
 }
 
 // Reuse logic from processFileEntry but for a direct File object

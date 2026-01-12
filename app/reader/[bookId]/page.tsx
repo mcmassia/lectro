@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useReaderStore, useAppStore } from '@/stores/appStore';
 import { getBook, updateBook, getAnnotationsForBook, addAnnotation, updateAnnotation, deleteAnnotation, Annotation, Book, HighlightColor } from '@/lib/db';
 import { EpubReader, EpubReaderRef, TocItem } from '@/components/reader/EpubReader';
+import { PdfReader } from '@/components/reader/PdfReader';
 import { ReaderToolbar } from '@/components/reader/ReaderToolbar';
 import { ReaderSidebar } from '@/components/reader/ReaderSidebar';
 import { v4 as uuid } from 'uuid';
@@ -225,9 +226,13 @@ export default function ReaderPage() {
                             settings={readerSettings}
                         />
                     ) : (
-                        <div className="pdf-placeholder">
-                            <p>Visor PDF próximamente</p>
-                        </div>
+                        <PdfReader
+                            book={book}
+                            onLocationChange={handleLocationChange}
+                            annotations={annotations}
+                            settings={readerSettings}
+                            ref={epubReaderRef as any} // Cast if refs incompatible, ideally define a union type.
+                        />
                     )}
                 </div>
             </div>

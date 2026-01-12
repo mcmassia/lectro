@@ -127,6 +127,30 @@ export default function HomePage() {
                   <button className={`btn btn-icon ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')}><ListIcon /></button>
                 </div>
 
+                <button className="btn btn-secondary btn-icon" onClick={async () => {
+                  const { syncWithServer } = await import('@/lib/fileSystem');
+                  try {
+                    // Ideally show loading state here
+                    alert('Iniciando sincronización...');
+                    const result = await syncWithServer();
+
+                    // Refresh library view
+                    const { getAllBooks } = await import('@/lib/db');
+                    const books = await getAllBooks();
+                    useLibraryStore.getState().setBooks(books);
+
+                    alert(`Sincronización completada.\nAgregados: ${result.added}\nEliminados: ${result.removed}`);
+                  } catch (e) {
+                    alert('Error al sincronizar: ' + (e as Error).message);
+                  }
+                }} title="Sincronizar con servidor">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+                    <line x1="16" y1="3" x2="21" y2="3" />
+                    <line x1="21" y1="3" x2="21" y2="8" />
+                    <line x1="21" y1="3" x2="10" y2="14" />
+                  </svg>
+                </button>
                 <button className="btn btn-primary btn-import" onClick={() => setShowImport(true)} title="Importar">
                   <PlusIcon />
                 </button>
