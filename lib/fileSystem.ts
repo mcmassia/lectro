@@ -166,7 +166,13 @@ export async function syncWithServer(): Promise<{ added: number; errors: string[
 
     try {
         // 1. Fetch list of files from server
-        const response = await fetch('/api/library/scan');
+        const customPath = localStorage.getItem('lectro_server_path');
+        const headers: HeadersInit = {};
+        if (customPath) {
+            headers['x-library-path'] = customPath;
+        }
+
+        const response = await fetch('/api/library/scan', { headers });
         if (!response.ok) {
             throw new Error('Failed to scan server library');
         }
@@ -186,7 +192,7 @@ export async function syncWithServer(): Promise<{ added: number; errors: string[
                 }
 
                 console.log('Downloading from server:', fileInfo.name);
-                const fileRes = await fetch(`/api/library/file/${encodeURIComponent(fileInfo.name)}`);
+                const fileRes = await fetch(`/api/library/file/${encodeURIComponent(fileInfo.name)}`, { headers });
                 if (!fileRes.ok) {
                     console.error('Failed to download:', fileInfo.name);
                     errors.push(`Failed to download ${fileInfo.name}`);

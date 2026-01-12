@@ -4,7 +4,8 @@ import path from 'path';
 
 export async function GET(req: NextRequest) {
     try {
-        const libraryPath = process.env.LIBRARY_PATH;
+        const customPath = req.headers.get('x-library-path');
+        const libraryPath = customPath || process.env.LIBRARY_PATH;
 
         if (!libraryPath) {
             return NextResponse.json(

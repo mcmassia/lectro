@@ -14,7 +14,8 @@ export async function GET(
     { params }: Props
 ) {
     try {
-        const libraryPath = process.env.LIBRARY_PATH;
+        const customPath = req.headers.get('x-library-path');
+        const libraryPath = customPath || process.env.LIBRARY_PATH;
 
         // Await params as per Next.js 15+ requirements
         const { filename } = await params;

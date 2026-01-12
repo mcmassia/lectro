@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '@/stores/appStore';
 import { db } from '@/lib/db';
 
@@ -15,6 +15,39 @@ export default function SettingsPage() {
         dailyReadingGoal,
         setDailyReadingGoal,
     } = useAppStore();
+
+    // Server Path State
+    const [serverPath, setServerPath] = useState('');
+    const [envPath, setEnvPath] = useState('');
+    const [isSavingPath, setIsSavingPath] = useState(false);
+
+    // Load server config
+    const loadServerConfig = async () => {
+        try {
+            const res = await fetch('/api/library/config');
+            const data = await res.json();
+            if (data.path) setEnvPath(data.path);
+
+            // Load override from local storage
+            const stored = localStorage.getItem('lectro_server_path');
+            if (stored) setServerPath(stored);
+            else if (data.path) setServerPath(data.path);
+        } catch (e) {
+            console.error('Failed to load config', e);
+        }
+    };
+
+    useEffect(() => {
+        loadServerConfig();
+    }, []);
+
+    const handleSaveServerPath = () => {
+        setIsSavingPath(true);
+        localStorage.setItem('lectro_server_path', serverPath);
+        // Simulate save delay
+        setTimeout(() => setIsSavingPath(false), 500);
+        alert('Ruta del servidor actualizada. Usase esta ruta para sincronizar.');
+    };
 
     const [showClearConfirm, setShowClearConfirm] = useState(false);
 
@@ -99,16 +132,46 @@ ${ann.note ? `**Nota:** ${ann.note}` : ''}
 
                     <div className="setting-item">
                         <div className="setting-info">
-                            <h3>Carpeta de biblioteca</h3>
-                            <p>Ubicación donde se guardan tus libros</p>
+                            <h3>Ruta del Servidor</h3>
+                            <p>Ubicación en el servidor (Docker/Coolify)</p>
+                            {envPath && <p className="text-xs text-muted" style={{ fontSize: '0.8em', opacity: 0.7 }}>Detectado (Env): {envPath}</p>}
                         </div>
-                        <div className="setting-control">
+                        <div className="setting-control" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <input
+                                    type="text"
+                                    className="input"
+                                    value={serverPath}
+                                    onChange={(e) => setServerPath(e.target.value)}
+                                    placeholder="/app/library"
+                                    style={{ width: '250px' }}
+                                />
+                                <button
+                                    className="btn btn-secondary"
+                                    onClick={handleSaveServerPath}
+                                    disabled={isSavingPath}
+                                >
+                                    {isSavingPath ? 'Guardando...' : 'Guardar'}
+                                </button>
+                            </div>
+                            <p style={{ fontSize: '0.75em', color: 'var(--color-text-tertiary)' }}>
+                                Ruta absoluta en el servidor o contenedor
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <h3>Carpeta Local (Legacy)</h3>
+                            <p>Ubicación local (File System Access API)</p>
+                        </div>
+                        <div className="setting-control column">
                             <input
                                 type="text"
                                 className="input"
                                 value={libraryPath || 'No configurada'}
                                 readOnly
-                                style={{ maxWidth: '300px' }}
+                                style={{ maxWidth: '300px', marginBottom: '8px' }}
                             />
                             <button className="btn btn-secondary" onClick={async () => {
                                 try {
@@ -272,7 +335,7 @@ ${ann.note ? `**Nota:** ${ann.note}` : ''}
                         </p>
                     </div>
                 </section>
-            </div>
+            </div >
 
             <style jsx>{`
         .settings-grid {
@@ -415,6 +478,6 @@ ${ann.note ? `**Nota:** ${ann.note}` : ''}
           line-height: 1.6;
         }
       `}</style>
-        </div>
+        </div >
     );
 }
