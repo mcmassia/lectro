@@ -204,18 +204,12 @@ export function ImportModal({ onClose }: ImportModalProps) {
 
             if (result.added > 0) {
                 // Refresh library view
-                // We might need to reload books from DB into store
                 const { getAllBooks } = await import('@/lib/db');
                 const books = await getAllBooks();
-                // This assumes useLibraryStore has a setBooks or we just rely on live live query if used
-                // But useLibraryStore has addBook. Ideally we reload all.
-                // For now, let's just alert or close.
-                // Ideally we should update the store.
-                // Let's assume the user will refresh or we can trigger a reload if the store supports it.
-                // Checking store... useLibraryStore likely needs a refresh.
-                // We can just close and let the main page refresh if it uses SWR or useEffect.
-                // But simply calling window.location.reload() might be aggressive.
-                // Let's just show success.
+
+                // Update the store
+                useLibraryStore.getState().setBooks(books);
+
                 alert(`Sincronización completada. Se añadieron ${result.added} libros.`);
                 if (result.errors.length === 0) {
                     setTimeout(onClose, 500);

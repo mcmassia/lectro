@@ -1,6 +1,10 @@
-import { db, Book, addBook } from './db';
+import { db, Book, addBook, updateBook } from './db';
 import { v4 as uuid } from 'uuid';
 import ePub from 'epubjs';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configurar el worker de PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 // Convert blob to base64
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -298,6 +302,34 @@ async function processFileBlob(file: File): Promise<Book | null> {
             // Return basic info if parsing fails? 
             // Better to return null or basic info. Let's return basic info so at least it appears.
         }
+    } else if (extension === 'pdf') {
+        // Generate PDF Thumbnail
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+            const pdf = await loadingTask.promise;
+            const page = await pdf.getPage(1);
+
+            const scale = 1.0;
+            const viewport = page.getViewport({ scale });
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            if (context) {
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({
+                    canvasContext: context,
+                    viewport: viewport,
+                    canvas: canvas as any // Cast to any to satisfy the type definition if needed
+                } as any).promise;
+
+                bookData.cover = canvas.toDataURL('image/jpeg', 0.8);
+            }
+        } catch (e) {
+            console.error('Error generating PDF thumbnail:', e);
+        }
     }
 
     return {
@@ -314,7 +346,8 @@ async function processFileBlob(file: File): Promise<Book | null> {
         currentPosition: '',
         totalPages: 0,
         metadata: bookData.metadata || {},
-        status: 'planToRead'
+        status: 'planToRead',
+        isOnServer: true // Since this function is used by syncWithServer
     };
 
 }
@@ -351,6 +384,9 @@ export async function uploadBookToServer(book: Book): Promise<boolean> {
         if (!response.ok) {
             throw new Error('Upload failed');
         }
+
+        // Update local book to mark as on server
+        await updateBook(book.id, { isOnServer: true });
 
         return true;
     } catch (error) {

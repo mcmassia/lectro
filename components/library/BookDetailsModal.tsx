@@ -129,19 +129,25 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                             <button className="btn btn-primary btn-read" onClick={handleRead}>
                                 Read
                             </button>
-                            <button className="btn btn-secondary btn-download" onClick={async () => {
-                                try {
-                                    if (confirm('¿Subir este libro al servidor?')) {
-                                        const { uploadBookToServer } = await import('@/lib/fileSystem');
-                                        await uploadBookToServer(book);
-                                        alert('Libro subido correctamente al servidor.');
+                            {!book.isOnServer && (
+                                <button className="btn btn-secondary btn-download" onClick={async () => {
+                                    try {
+                                        if (confirm('¿Subir este libro al servidor?')) {
+                                            const { uploadBookToServer } = await import('@/lib/fileSystem');
+                                            await uploadBookToServer(book);
+                                            // Update local state to hide button immediately
+                                            // We might need to mutate the book object or refetch
+                                            // For now, let's just alert and re-open or let the user close
+                                            alert('Libro subido correctamente al servidor.');
+                                            onClose(); // Close modal to force refresh when re-opening? Or trigger a refresh callback?
+                                        }
+                                    } catch (e) {
+                                        alert('Error al subir libro: ' + (e as Error).message);
                                     }
-                                } catch (e) {
-                                    alert('Error al subir libro: ' + (e as Error).message);
-                                }
-                            }}>
-                                Subir a Cloud
-                            </button>
+                                }}>
+                                    Subir a Cloud
+                                </button>
+                            )}
                             <button className="btn btn-secondary btn-download" onClick={handleDownload}>
                                 Download ({formatFileSize(book.fileSize)})
                             </button>
