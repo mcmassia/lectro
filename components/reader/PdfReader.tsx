@@ -7,7 +7,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { TocItem } from './EpubReader';
 
-// Configure worker locally or via CDN
+// Use unpkg for worker to avoid build complexity with webpack/files
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 interface PdfReaderProps {
@@ -40,11 +40,16 @@ export const PdfReader = forwardRef<PdfReaderRef, PdfReaderProps>(({ book, onLoc
     useEffect(() => {
         const updateWidth = () => {
             if (containerRef.current) {
-                setPageWidth(containerRef.current.clientWidth - 40); // 40px padding
+                const width = containerRef.current.clientWidth - 40; // 40px padding
+                if (width > 0) {
+                    setPageWidth(width);
+                }
             }
         };
 
         // Initial sizing
+        // setTimeout to ensure layout (sometimes clientWidth is 0 immediately on mount)
+        const timer = setTimeout(updateWidth, 100);
         updateWidth();
 
         const observer = new ResizeObserver(() => {
@@ -55,7 +60,10 @@ export const PdfReader = forwardRef<PdfReaderRef, PdfReaderProps>(({ book, onLoc
             observer.observe(containerRef.current);
         }
 
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            clearTimeout(timer);
+        };
     }, []);
 
     useImperativeHandle(ref, () => ({

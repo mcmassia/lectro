@@ -55,9 +55,12 @@ export default function Home() {
 
   // Handle Sync
   const handleSync = async () => {
+    console.log('--- SYNC BUTTON CLICKED ---');
+    alert('DEBUG: Sync Button Clicked. Starting...');
     setIsSyncing(true);
     setShowSyncReport(true);
     try {
+      console.log('Calling syncWithServer...');
       const results = await syncWithServer();
       setSyncResults(results);
 
