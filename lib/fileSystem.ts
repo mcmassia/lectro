@@ -317,7 +317,46 @@ async function processFileBlob(file: File): Promise<Book | null> {
         status: 'planToRead'
     };
 
+}
 
+export async function uploadBookToServer(book: Book): Promise<boolean> {
+    try {
+        const customPath = localStorage.getItem('lectro_server_path');
+        const headers: HeadersInit = {};
+        if (customPath) {
+            headers['x-library-path'] = customPath;
+        }
+
+        // 1. Get file blob from DB is not directly stored in 'books' table in full, 
+        // usually we might need to re-fetch if we stored the handle, but here we likely have the binary 
+        // or need to handle how the book data is accessible.
+        // Assuming we have the file data or can get it. 
+        // Wait, the current schema stores 'data' (ArrayBuffer) in 'books' table? 
+        // Let's check db/index.ts. If it's just metadata, we might need the original file.
+        // Actually, for imported books, we store the full ArrayBuffer in `book.data`.
+
+        if (!book.fileBlob) {
+            throw new Error('No book data available to upload');
+        }
+
+        const response = await fetch(`/api/library/file/${encodeURIComponent(book.fileName)}`, {
+            method: 'POST',
+            headers: {
+                ...headers,
+                'Content-Type': 'application/octet-stream'
+            },
+            body: book.fileBlob
+        });
+
+        if (!response.ok) {
+            throw new Error('Upload failed');
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error uploading book:', error);
+        throw error;
+    }
 }
 
 export async function writeBookToFile(

@@ -129,6 +129,19 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                             <button className="btn btn-primary btn-read" onClick={handleRead}>
                                 Read
                             </button>
+                            <button className="btn btn-secondary btn-download" onClick={async () => {
+                                try {
+                                    if (confirm('¿Subir este libro al servidor?')) {
+                                        const { uploadBookToServer } = await import('@/lib/fileSystem');
+                                        await uploadBookToServer(book);
+                                        alert('Libro subido correctamente al servidor.');
+                                    }
+                                } catch (e) {
+                                    alert('Error al subir libro: ' + (e as Error).message);
+                                }
+                            }}>
+                                Subir a Cloud
+                            </button>
                             <button className="btn btn-secondary btn-download" onClick={handleDownload}>
                                 Download ({formatFileSize(book.fileSize)})
                             </button>
