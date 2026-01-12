@@ -6,10 +6,18 @@ interface BookCardProps {
   book: Book;
   viewMode: 'grid' | 'list';
   onClick: (book: Book) => void;
+  onDelete?: (book: Book) => void;
 }
 
-export function BookCard({ book, viewMode, onClick }: BookCardProps) {
+export function BookCard({ book, viewMode, onClick, onDelete }: BookCardProps) {
   const progressPercent = book.progress || 0;
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onDelete && confirm(`¿Estás seguro de que quieres eliminar "${book.title}" de tu biblioteca?`)) {
+      onDelete(book);
+    }
+  };
 
   if (viewMode === 'list') {
     return (
@@ -34,9 +42,32 @@ export function BookCard({ book, viewMode, onClick }: BookCardProps) {
           <div className="progress-pill">
             {Math.round(progressPercent)}%
           </div>
+          {onDelete && (
+            <button className="delete-btn-list" onClick={handleDelete} title="Eliminar libro">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          )}
         </div>
 
         <style jsx>{`
+          .delete-btn-list {
+               background: none;
+               border: none;
+               color: var(--color-text-tertiary);
+               cursor: pointer;
+               padding: 4px;
+               border-radius: 4px;
+               display: flex;
+               align-items: center;
+               justify-content: center;
+               transition: color 0.2s, background 0.2s;
+          }
+          .delete-btn-list:hover {
+               color: #ef4444;
+               background: rgba(239, 68, 68, 0.1);
+          }
           .book-list-item {
             display: flex;
             align-items: center;
@@ -132,6 +163,14 @@ export function BookCard({ book, viewMode, onClick }: BookCardProps) {
           <div className="book-placeholder-grid">
             <span className="book-initial">{book.title[0]}</span>
           </div>
+        )}
+
+        {onDelete && (
+          <button className="delete-btn-grid" onClick={handleDelete} title="Eliminar libro">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
         )}
 
         {progressPercent > 0 && (
@@ -258,6 +297,34 @@ export function BookCard({ book, viewMode, onClick }: BookCardProps) {
                     right: 0;
                     top: -2px;
                     color: var(--color-warning);
+                }
+                
+                .delete-btn-grid {
+                    position: absolute;
+                    top: 4px;
+                    right: 4px;
+                    background: rgba(0,0,0,0.5);
+                    border: none;
+                    color: white;
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    opacity: 0;
+                    transition: all 0.2s;
+                    z-index: 10;
+                }
+                
+                .delete-btn-grid:hover {
+                    background: #ef4444;
+                    transform: scale(1.1);
+                }
+                
+                .book-card-container:hover .delete-btn-grid {
+                    opacity: 1;
                 }
             `}</style>
     </div>

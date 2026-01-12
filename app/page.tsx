@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
-import { getAllBooks, Book } from '@/lib/db';
+import { getAllBooks, Book, deleteBook } from '@/lib/db';
 import { OnboardingModal } from '@/components/library/OnboardingModal';
 import { BookCard } from '@/components/library/BookCard';
 import { ContinueReadingPanel } from '@/components/home/ContinueReadingPanel';
@@ -13,6 +13,8 @@ import { BookDetailsModal } from '@/components/library/BookDetailsModal';
 import { syncWithServer } from '@/lib/fileSystem';
 
 import { SyncReportModal } from '@/components/library/SyncReportModal';
+
+// ... icons omitted for brevity, keeping existing
 
 const GridIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
@@ -55,7 +57,6 @@ export default function Home() {
 
   // Handle Sync
   const handleSync = async () => {
-    // console.log('--- SYNC BUTTON CLICKED ---');
     setIsSyncing(true);
     setShowSyncReport(true);
     try {
@@ -66,15 +67,27 @@ export default function Home() {
       // Refresh library
       const allBooks = await getAllBooks();
       setBooks(allBooks);
-
-      alert(`Sync Complete!\nAdded: ${results.added}\nRemoved: ${results.removed}\nErrors: ${results.errors.length}`);
     } catch (error) {
       console.error('Sync failed:', error);
       const msg = (error as Error).message || 'Unknown error';
       setSyncResults({ added: 0, removed: 0, errors: [msg] });
-      alert('Sync ERROR:\n' + msg);
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteBook = async (book: Book) => {
+    // BookCard handles the confirm dialog now, but we can double check or just call delete
+    // Actually, BookCard calling onDelete is enough signal to delete.
+    // If BookCard logic includes confirm, we don't need it here.
+    // Checking BookCard logic: yes, it has `confirm`.
+    try {
+      await deleteBook(book.id);
+      const updatedBooks = await getAllBooks();
+      setBooks(updatedBooks);
+    } catch (error) {
+      console.error('Failed to delete book:', error);
+      alert('Error al eliminar el libro.');
     }
   };
 
@@ -216,7 +229,7 @@ export default function Home() {
                     <h3 className="heading-4 author-name">{author}</h3>
                     <div className="book-grid">
                       {authorBooks.map(book => (
-                        <BookCard key={book.id} book={book} viewMode="grid" onClick={setSelectedBook} />
+                        <BookCard key={book.id} book={book} viewMode="grid" onClick={setSelectedBook} onDelete={handleDeleteBook} />
                       ))}
                     </div>
                   </div>
@@ -230,6 +243,7 @@ export default function Home() {
                     book={book}
                     viewMode={viewMode}
                     onClick={setSelectedBook}
+                    onDelete={handleDeleteBook}
                   />
                 ))}
               </div>
