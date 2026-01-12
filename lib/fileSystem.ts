@@ -1,10 +1,20 @@
 import { db, Book, addBook, updateBook } from './db';
 import { v4 as uuid } from 'uuid';
 import ePub from 'epubjs';
-import * as pdfjsLib from 'pdfjs-dist';
+
+// Remove top-level pdfjs import to prevent SSR issues
+// import * as pdfjsLib from 'pdfjs-dist';
 
 // Configurar el worker de PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+// Helper to get PDFjs on client side only
+async function getPdfJs() {
+    if (typeof window === 'undefined') return null;
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    return pdfjsLib;
+}
 
 // Convert blob to base64
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -345,27 +355,30 @@ async function processFileBlob(file: File): Promise<Book | null> {
     } else if (extension === 'pdf') {
         // Generate PDF Thumbnail
         try {
-            const arrayBuffer = await file.arrayBuffer();
-            const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-            const pdf = await loadingTask.promise;
-            const page = await pdf.getPage(1);
+            const pdfjsLib = await getPdfJs();
+            if (pdfjsLib) {
+                const arrayBuffer = await file.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                const pdf = await loadingTask.promise;
+                const page = await pdf.getPage(1);
 
-            const scale = 1.0;
-            const viewport = page.getViewport({ scale });
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
+                const scale = 1.0;
+                const viewport = page.getViewport({ scale });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
 
-            if (context) {
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
+                if (context) {
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
 
-                await page.render({
-                    canvasContext: context,
-                    viewport: viewport,
-                    canvas: canvas as any // Cast to any to satisfy the type definition if needed
-                } as any).promise;
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport,
+                        canvas: canvas as any // Cast to any to satisfy the type definition if needed
+                    } as any).promise;
 
-                bookData.cover = canvas.toDataURL('image/jpeg', 0.8);
+                    bookData.cover = canvas.toDataURL('image/jpeg', 0.8);
+                }
             }
         } catch (e) {
             console.error('Error generating PDF thumbnail:', e);
