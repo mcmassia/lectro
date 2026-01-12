@@ -154,6 +154,166 @@ export async function syncLibraryWithFolder(dirHandle: FileSystemDirectoryHandle
     return addedCount;
 }
 
+export interface ServerFile {
+    name: string;
+    size: number;
+    modifiedTime: string;
+}
+
+export async function syncWithServer(): Promise<{ added: number; errors: string[] }> {
+    const addedCount = 0;
+    const errors: string[] = [];
+
+    try {
+        // 1. Fetch list of files from server
+        const response = await fetch('/api/library/scan');
+        if (!response.ok) {
+            throw new Error('Failed to scan server library');
+        }
+        const data = await response.json();
+        const serverFiles: ServerFile[] = data.files || [];
+
+        console.log('Server files found:', serverFiles.length);
+
+        // 2. Process each file
+        let added = 0;
+        for (const fileInfo of serverFiles) {
+            try {
+                // Check uniqueness by fileName for now (could be improved)
+                const existing = await db.books.where('fileName').equals(fileInfo.name).first();
+                if (existing) {
+                    continue; // Skip existing
+                }
+
+                console.log('Downloading from server:', fileInfo.name);
+                const fileRes = await fetch(`/api/library/file/${encodeURIComponent(fileInfo.name)}`);
+                if (!fileRes.ok) {
+                    console.error('Failed to download:', fileInfo.name);
+                    errors.push(`Failed to download ${fileInfo.name}`);
+                    continue;
+                }
+
+                const blob = await fileRes.blob();
+                // Create a File object from Blob to reuse existing logic if possible, 
+                // or just pass to a helper. 
+                // We'll mimic a File object since our logic often expects name/lastModified
+                const file = new File([blob], fileInfo.name, {
+                    type: fileInfo.name.endsWith('.epub') ? 'application/epub+zip' : 'application/pdf',
+                    lastModified: new Date(fileInfo.modifiedTime).getTime()
+                });
+
+                // Reuse logic similar to processFileEntry but we don't have a Handle
+                // We can extract the core logic of processFileEntry into a helper or just duplicate the minimal needed parts here.
+                // Refactoring processFileEntry to share logic is cleaner.
+                const book = await processFileBlob(file);
+
+                if (book) {
+                    await addBook(book);
+                    added++;
+                }
+
+            } catch (err) {
+                console.error('Error processing server file:', fileInfo.name, err);
+                errors.push(`Error processing ${fileInfo.name}: ${(err as Error).message}`);
+            }
+        }
+
+        return { added, errors };
+
+    } catch (err) {
+        console.error('Server sync failed:', err);
+        throw err;
+    }
+}
+
+// Reuse logic from processFileEntry but for a direct File object
+async function processFileBlob(file: File): Promise<Book | null> {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+
+    if (extension !== 'epub' && extension !== 'pdf') {
+        return null;
+    }
+
+    // Double check DB (redundant but safe)
+    const existingBooks = await db.books.where('fileName').equals(file.name).toArray();
+    if (existingBooks.length > 0) {
+        return null;
+    }
+
+    let bookData: Partial<Book> = {
+        title: file.name,
+        author: 'Unknown',
+        format: extension as 'epub' | 'pdf',
+    };
+
+    if (extension === 'epub') {
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const book = ePub(arrayBuffer);
+            await book.ready;
+            const metadata = await book.loaded.metadata;
+            const coverUrl = await book.coverUrl();
+
+            let coverBase64;
+            if (coverUrl) {
+                const response = await fetch(coverUrl);
+                const blob = await response.blob();
+                coverBase64 = await blobToBase64(blob);
+            }
+
+            bookData = {
+                title: metadata.title || file.name.replace(/\.epub$/i, ''),
+                author: metadata.creator || 'Autor desconocido',
+                cover: coverBase64,
+                format: 'epub',
+                metadata: {
+                    publisher: metadata.publisher,
+                    language: metadata.language,
+                    description: metadata.description,
+                }
+            };
+            book.destroy();
+
+            // Check title duplicate
+            const titleMatch = await db.books.where('title').equals(bookData.title!).first();
+            if (titleMatch) {
+                // Link file to existing book entry if matching title found?
+                // For now, let's just skip to avoid duplicates or overwrite?
+                // The implementation in processFileEntry updates the filename.
+                await db.books.update(titleMatch.id, {
+                    fileName: file.name,
+                    fileSize: file.size,
+                });
+                return null;
+            }
+
+        } catch (e) {
+            console.error('Error processing EPUB blob:', file.name, e);
+            // Return basic info if parsing fails? 
+            // Better to return null or basic info. Let's return basic info so at least it appears.
+        }
+    }
+
+    return {
+        id: uuid(),
+        title: bookData.title || file.name,
+        author: bookData.author || 'Autor desconocido',
+        cover: bookData.cover,
+        format: bookData.format || 'epub',
+        fileName: file.name,
+        fileBlob: file,
+        fileSize: file.size,
+        addedAt: new Date(),
+        progress: 0,
+        currentPosition: '',
+        totalPages: 0,
+        metadata: bookData.metadata || {},
+        status: 'planToRead'
+    };
+
+
+}
+
 export async function writeBookToFile(
     dirHandle: FileSystemDirectoryHandle,
     file: File
