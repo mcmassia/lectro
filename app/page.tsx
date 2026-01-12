@@ -10,6 +10,7 @@ import { ContinueReadingPanel } from '@/components/home/ContinueReadingPanel';
 // import { HomeSidebar } from '@/components/home/HomeSidebar';
 import { ImportModal } from '@/components/library/ImportModal';
 import { BookDetailsModal } from '@/components/library/BookDetailsModal';
+import { syncWithServer } from '@/lib/fileSystem';
 
 import { SyncReportModal } from '@/components/library/SyncReportModal';
 
@@ -57,7 +58,6 @@ export default function Home() {
     setIsSyncing(true);
     setShowSyncReport(true);
     try {
-      const { syncWithServer } = await import('@/lib/fileSystem');
       const results = await syncWithServer();
       setSyncResults(results);
 
