@@ -5,6 +5,7 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import { Book, Annotation, ReaderSettings } from '@/lib/db';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+import { TocItem } from './EpubReader';
 
 // Configure worker locally or via CDN
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -14,17 +15,19 @@ interface PdfReaderProps {
     onLocationChange: (cfi: string, page: number, total: number, chapter: string) => void;
     annotations: Annotation[];
     settings: ReaderSettings;
+    onTocLoaded?: (toc: TocItem[]) => void;
 }
 
 export interface PdfReaderRef {
-    navigateTo: (pageNumber: number) => void;
+    navigateTo: (dest: string | number) => void;
 }
 
-export const PdfReader = forwardRef<PdfReaderRef, PdfReaderProps>(({ book, onLocationChange, settings }, ref) => {
+export const PdfReader = forwardRef<PdfReaderRef, PdfReaderProps>(({ book, onLocationChange, settings, onTocLoaded }, ref) => {
     const [numPages, setNumPages] = useState<number>(0);
     const [pageNumber, setPageNumber] = useState<number>(1);
     const [scale, setScale] = useState(1.0);
     const containerRef = useRef<HTMLDivElement>(null);
+    const [pageWidth, setPageWidth] = useState<number | undefined>(undefined);
 
     // Initial load of saved position
     useEffect(() => {
@@ -33,24 +36,98 @@ export const PdfReader = forwardRef<PdfReaderRef, PdfReaderProps>(({ book, onLoc
         }
     }, [book.currentPage]);
 
+    // Handle Resize
+    useEffect(() => {
+        const updateWidth = () => {
+            if (containerRef.current) {
+                setPageWidth(containerRef.current.clientWidth - 40); // 40px padding
+            }
+        };
+
+        // Initial sizing
+        updateWidth();
+
+        const observer = new ResizeObserver(() => {
+            updateWidth();
+        });
+
+        if (containerRef.current) {
+            observer.observe(containerRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, []);
+
     useImperativeHandle(ref, () => ({
-        navigateTo: (page: number) => {
+        navigateTo: (dest: string | number) => {
+            let page = 1;
+            if (typeof dest === 'number') {
+                page = dest;
+            } else if (typeof dest === 'string') {
+                const parsed = parseInt(dest, 10);
+                if (!isNaN(parsed)) {
+                    page = parsed;
+                } else {
+                    console.warn('PdfReader: Could not parse navigation destination:', dest);
+                    return;
+                }
+            }
             const p = Math.max(1, Math.min(page, numPages));
             setPageNumber(p);
             notifyLocationChange(p, numPages);
         }
     }));
 
-    function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
-        setNumPages(numPages);
+    function onDocumentLoadSuccess(pdf: any) {
+        setNumPages(pdf.numPages);
         const initialPage = book.currentPage || 1;
         setPageNumber(initialPage);
-        notifyLocationChange(initialPage, numPages);
+        notifyLocationChange(initialPage, pdf.numPages);
+
+        // Load TOC
+        pdf.getOutline().then((outline: any[]) => {
+            if (outline && outline.length > 0) {
+                const convertOutline = (items: any[]): TocItem[] => {
+                    return items.map(item => ({
+                        label: item.title,
+                        href: JSON.stringify(item.dest), // Store dest as string to parse later or handle
+                        subitems: item.items && item.items.length > 0 ? convertOutline(item.items) : undefined
+                    }));
+                };
+                const toc = convertOutline(outline);
+                if (onTocLoaded) {
+                    onTocLoaded(toc);
+                }
+            }
+        });
     }
+
+    // Handle text selection
+    useEffect(() => {
+        const handleSelection = () => {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed) return;
+
+            // Check if selection is within our container
+            if (containerRef.current && containerRef.current.contains(selection.anchorNode)) {
+                const text = selection.toString();
+                if (text) {
+                    // We don't have CFI in PDF, use page number + exact text as locator?
+                    // Or just generic "Page X" location.
+                    console.log('PDF Text Selected:', text);
+                    // PDF annotations are tricky without exact coordinates relative to PDF canvas.
+                    // For now, simpler implementation:
+                }
+            }
+        };
+
+        document.addEventListener('selectionchange', handleSelection);
+        return () => document.removeEventListener('selectionchange', handleSelection);
+    }, []);
 
     function notifyLocationChange(page: number, total: number) {
         // PDF doesn't have CFIs, so we use stringified page number as "CFI"
-        onLocationChange(page.toString(), page, total, `Page ${page}`);
+        onLocationChange(page.toString(), page, total, `Página ${page}`);
     }
 
     function changePage(offset: number) {
@@ -61,9 +138,21 @@ export const PdfReader = forwardRef<PdfReaderRef, PdfReaderProps>(({ book, onLoc
         });
     }
 
+    // Determine filter for themes
+    const getThemeStyle = () => {
+        switch (settings.theme) {
+            case 'dark':
+                return { filter: 'invert(1) hue-rotate(180deg) contrast(0.8)' };
+            case 'sepia':
+                return { filter: 'sepia(0.3) contrast(0.95) brightness(0.95)' };
+            default:
+                return {};
+        }
+    };
+
     return (
         <div className="pdf-reader-container" ref={containerRef}>
-            <div className="pdf-document-wrapper">
+            <div className="pdf-document-wrapper" style={getThemeStyle()}>
                 <Document
                     file={book.fileBlob || book.cover} // book.fileBlob should be the file object/blob
                     onLoadSuccess={onDocumentLoadSuccess}
@@ -77,7 +166,7 @@ export const PdfReader = forwardRef<PdfReaderRef, PdfReaderProps>(({ book, onLoc
                         renderTextLayer={true}
                         renderAnnotationLayer={true}
                         className="pdf-page"
-                        width={containerRef.current?.clientWidth ? containerRef.current.clientWidth - 40 : undefined}
+                        width={pageWidth}
                     />
                 </Document>
             </div>

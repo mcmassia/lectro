@@ -190,9 +190,15 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
         for (const fileInfo of serverFiles) {
             try {
                 // Check uniqueness by fileName for now (could be improved)
+                // Check uniqueness by fileName
                 const existing = await db.books.where('fileName').equals(fileInfo.name).first();
                 if (existing) {
-                    continue; // Skip existing
+                    // Update existing book to be marked as on server if not already
+                    if (!existing.isOnServer) {
+                        console.log('Marking existing book as on server:', existing.title);
+                        await db.books.update(existing.id, { isOnServer: true });
+                    }
+                    continue; // Skip download
                 }
 
                 console.log('Downloading from server:', fileInfo.name);

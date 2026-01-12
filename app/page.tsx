@@ -11,6 +11,8 @@ import { ContinueReadingPanel } from '@/components/home/ContinueReadingPanel';
 import { ImportModal } from '@/components/library/ImportModal';
 import { BookDetailsModal } from '@/components/library/BookDetailsModal';
 
+import { SyncReportModal } from '@/components/library/SyncReportModal';
+
 const GridIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
     <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -37,28 +39,76 @@ const PlusIcon = () => (
   </svg>
 );
 
-export default function HomePage() {
-  const {
-    books,
-    setBooks,
-    isLoading,
-    setIsLoading,
-    searchQuery,
-    setSearchQuery,
-    sortBy,
-    setSortBy,
-    activeCategory,
-    setActiveCategory,
-    filteredBooks,
-    sortOrder,
-    setSortOrder
-  } = useLibraryStore();
-
+export default function Home() {
+  const { books, isLoading, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, sortOrder, setSortOrder } = useLibraryStore();
   const { onboardingComplete } = useAppStore();
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showSyncReport, setShowSyncReport] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResults, setSyncResults] = useState<{ added: number; removed: number; errors: string[] } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
+
+  // Handle Sync
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setShowSyncReport(true);
+    try {
+      const { syncWithServer } = await import('@/lib/fileSystem');
+      const results = await syncWithServer();
+      setSyncResults(results);
+
+      // Refresh library
+      const allBooks = await getAllBooks();
+      setBooks(allBooks);
+    } catch (error) {
+      console.error('Sync failed:', error);
+      setSyncResults({ added: 0, removed: 0, errors: [(error as Error).message || 'Unknown error'] });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Filter books logic...
+  useEffect(() => {
+    let booksToFilter = books;
+
+    // Category filter
+    if (activeCategory === 'favorites') {
+      booksToFilter = booksToFilter.filter(book => book.status === 'favorite');
+    } else if (activeCategory === 'planToRead') {
+      booksToFilter = booksToFilter.filter(book => book.status === 'planToRead');
+    }
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      booksToFilter = booksToFilter.filter(book =>
+        book.title.toLowerCase().includes(query) ||
+        book.author.toLowerCase().includes(query) ||
+        (book.metadata.tags && book.metadata.tags.some(tag => tag.toLowerCase().includes(query)))
+      );
+    }
+
+    // Sort
+    booksToFilter.sort((a, b) => {
+      if (sortBy === 'title') {
+        return sortOrder === 'asc' ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title);
+      } else if (sortBy === 'author') {
+        return sortOrder === 'asc' ? a.author.localeCompare(b.author) : b.author.localeCompare(a.author);
+      } else if (sortBy === 'lastRead') {
+        const dateA = a.lastReadAt?.getTime() || 0;
+        const dateB = b.lastReadAt?.getTime() || 0;
+        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+      return 0;
+    });
+
+    setFilteredBooks(booksToFilter);
+  }, [books, searchQuery, activeCategory, sortBy, sortOrder]);
 
   useEffect(() => {
     if (!onboardingComplete) {
@@ -84,7 +134,7 @@ export default function HomePage() {
     .sort((a, b) => (b.lastReadAt?.getTime() || 0) - (a.lastReadAt?.getTime() || 0))
     .slice(0, 4);
 
-  const displayBooks = filteredBooks();
+  const displayBooks = filteredBooks;
 
   return (
     <>
@@ -127,23 +177,7 @@ export default function HomePage() {
                   <button className={`btn btn-icon ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')}><ListIcon /></button>
                 </div>
 
-                <button className="btn btn-secondary btn-icon" onClick={async () => {
-                  const { syncWithServer } = await import('@/lib/fileSystem');
-                  try {
-                    // Ideally show loading state here
-                    alert('Iniciando sincronización...');
-                    const result = await syncWithServer();
-
-                    // Refresh library view
-                    const { getAllBooks } = await import('@/lib/db');
-                    const books = await getAllBooks();
-                    useLibraryStore.getState().setBooks(books);
-
-                    alert(`Sincronización completada.\nAgregados: ${result.added}\nEliminados: ${result.removed}`);
-                  } catch (e) {
-                    alert('Error al sincronizar: ' + (e as Error).message);
-                  }
-                }} title="Sincronizar con servidor">
+                <button className="btn btn-secondary btn-icon" onClick={handleSync} title="Sincronizar con servidor">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
                     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
                     <line x1="16" y1="3" x2="21" y2="3" />
@@ -207,8 +241,23 @@ export default function HomePage() {
       </div>
 
       {showOnboarding && <OnboardingModal onComplete={() => setShowOnboarding(false)} />}
-      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
-      {selectedBook && <BookDetailsModal book={selectedBook} onClose={() => setSelectedBook(null)} />}
+      {showImport && (
+        <ImportModal onClose={() => setShowImport(false)} />
+      )}
+
+      <SyncReportModal
+        isOpen={showSyncReport}
+        onClose={() => setShowSyncReport(false)}
+        results={syncResults}
+        isLoading={isSyncing}
+      />
+
+      {selectedBook && (
+        <BookDetailsModal
+          book={selectedBook}
+          onClose={() => setSelectedBook(null)}
+        />
+      )}
 
       <style jsx>{`
         .main-layout {

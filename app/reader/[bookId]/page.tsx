@@ -231,6 +231,7 @@ export default function ReaderPage() {
                             onLocationChange={handleLocationChange}
                             annotations={annotations}
                             settings={readerSettings}
+                            onTocLoaded={handleTocLoaded}
                             ref={epubReaderRef as any} // Cast if refs incompatible, ideally define a union type.
                         />
                     )}
