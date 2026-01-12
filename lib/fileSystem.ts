@@ -98,24 +98,24 @@ async function processFileEntry(fileHandle: FileSystemFileHandle): Promise<Book 
 }
 
 export async function checkPermission(fileHandle: FileSystemDirectoryHandle, readWrite = false): Promise<PermissionState> {
-    const options: FileSystemHandlePermissionDescriptor = {
+    const options = {
         mode: readWrite ? 'readwrite' : 'read'
     };
-    return await fileHandle.queryPermission(options);
+    return await (fileHandle as any).queryPermission(options);
 }
 
 export async function verifyPermission(fileHandle: FileSystemDirectoryHandle, readWrite = false) {
-    const options: FileSystemHandlePermissionDescriptor = {
+    const options = {
         mode: readWrite ? 'readwrite' : 'read'
     };
 
     // Check if permission was already granted. If so, return true.
-    if ((await fileHandle.queryPermission(options)) === 'granted') {
+    if ((await (fileHandle as any).queryPermission(options)) === 'granted') {
         return true;
     }
 
     // Request permission. If the user grants permission, return true.
-    if ((await fileHandle.requestPermission(options)) === 'granted') {
+    if ((await (fileHandle as any).requestPermission(options)) === 'granted') {
         return true;
     }
 

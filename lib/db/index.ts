@@ -276,7 +276,8 @@ export async function getAllVectorChunks(): Promise<VectorChunk[]> {
 export async function saveXRayData(data: XRayData): Promise<string> {
   const existing = await db.xrayData.where('bookId').equals(data.bookId).first();
   if (existing) {
-    await db.xrayData.update(existing.id, data);
+    // Preserve the existing ID but update all other fields
+    await db.xrayData.put({ ...data, id: existing.id });
     return existing.id;
   }
   return db.xrayData.add(data);
