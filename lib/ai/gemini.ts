@@ -244,35 +244,18 @@ Provide a helpful, well-structured response.`;
 
 // Note: For production, you'd want to use a proper embedding model
 // This is a simplified approach using Gemini for context
+// Note: For production, you'd want to use a proper embedding model
+// This is a simplified approach using Gemini for context
 export async function generateEmbedding(text: string): Promise<number[]> {
-    // Gemini doesn't have a direct embedding API like OpenAI
-    // For now, we'll use a simple hash-based approach for demo
-    // In production, consider using a local embedding model or Vertex AI
-
-    const hash = simpleHash(text);
-    const embedding: number[] = [];
-
-    // Create a pseudo-embedding based on text characteristics
-    for (let i = 0; i < 384; i++) {
-        embedding.push(Math.sin(hash + i) * Math.cos(hash * i));
+    try {
+        const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
+        const result = await model.embedContent(text);
+        return result.embedding.values;
+    } catch (error) {
+        console.error('Embedding generation failed:', error);
+        // Fallback or rethrow? 
+        throw error;
     }
-
-    return normalizeVector(embedding);
-}
-
-function simpleHash(str: string): number {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    return hash;
-}
-
-function normalizeVector(vec: number[]): number[] {
-    const magnitude = Math.sqrt(vec.reduce((sum, val) => sum + val * val, 0));
-    return vec.map(val => val / magnitude);
 }
 
 export function cosineSimilarity(a: number[], b: number[]): number {

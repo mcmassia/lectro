@@ -56,26 +56,63 @@ export default function InsightsPage() {
 
         try {
             // Get vector chunks for context
+            // Get vector chunks for context
             const chunks = await getAllVectorChunks();
-
-            // For demo, we'll create contexts from books if no chunks exist
             let contexts: RagContext[] = [];
 
             if (chunks.length > 0) {
-                // Use actual vector search (simplified for demo)
-                contexts = chunks.slice(0, 5).map(chunk => {
-                    const book = books.find(b => b.id === chunk.bookId);
-                    return {
-                        bookId: chunk.bookId,
-                        bookTitle: book?.title || 'Libro',
-                        chapterTitle: chunk.chapterTitle || 'Capítulo',
-                        content: chunk.text,
-                        cfi: chunk.startCfi,
-                    };
-                });
+                // Generate embedding for user query
+                const { generateEmbeddingAction } = await import('@/app/actions/ai');
+                const { cosineSimilarity } = await import('@/lib/ai/gemini');
+
+                const embeddingResult = await generateEmbeddingAction(input.trim());
+
+                if (embeddingResult.success && embeddingResult.embedding) {
+                    const queryEmbedding = embeddingResult.embedding;
+
+                    // Calculate similarity for all chunks
+                    const rankedChunks = chunks.map(chunk => ({
+                        ...chunk,
+                        similarity: cosineSimilarity(queryEmbedding, chunk.embedding)
+                    }))
+                        .sort((a, b) => b.similarity - a.similarity)
+                        .slice(0, 10); // Take top 10 most relevant chunks
+
+                    contexts = rankedChunks.map(chunk => {
+                        const book = books.find(b => b.id === chunk.bookId);
+                        return {
+                            bookId: chunk.bookId,
+                            bookTitle: book?.title || 'Libro',
+                            chapterTitle: chunk.chapterTitle || 'Capítulo',
+                            content: chunk.text,
+                            cfi: chunk.startCfi,
+                        };
+                    });
+                } else {
+                    console.error('Failed to generate query embedding:', embeddingResult.error);
+                    // Fallback to random/first chunks if embedding fails
+                    contexts = chunks.slice(0, 5).map(chunk => {
+                        const book = books.find(b => b.id === chunk.bookId);
+                        return {
+                            bookId: chunk.bookId,
+                            bookTitle: book?.title || 'Libro',
+                            chapterTitle: chunk.chapterTitle || 'Capítulo',
+                            content: chunk.text,
+                            cfi: chunk.startCfi,
+                        };
+                    });
+                }
             } else {
                 // Demo context from book metadata
-                contexts = books.slice(0, 3).map(book => ({
+                // Add explicit warning in chat that indexing is needed
+                addRagMessage({
+                    id: uuid(),
+                    role: 'assistant',
+                    content: '⚠️ Tu biblioteca no está indexada. Para que pueda consultar todos tus libros, necesitas generar el índice vectorial. Por ahora, solo puedo ver los títulos y autores.',
+                    timestamp: new Date(),
+                });
+
+                contexts = books.slice(0, 5).map(book => ({
                     bookId: book.id,
                     bookTitle: book.title,
                     chapterTitle: 'Metadatos',

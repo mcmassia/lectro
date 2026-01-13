@@ -23,3 +23,18 @@ export async function getRagResponseAction(
         return { success: false, error: error.message || 'Failed to generate response' };
     }
 }
+
+export async function generateEmbeddingAction(text: string): Promise<{ success: boolean; embedding?: number[]; error?: string }> {
+    if (!process.env.GEMINI_API_KEY) {
+        return { success: false, error: 'Configuration Error: Gemini API Key is missing.' };
+    }
+
+    try {
+        const { generateEmbedding } = await import('@/lib/ai/gemini');
+        const embedding = await generateEmbedding(text);
+        return { success: true, embedding };
+    } catch (error: any) {
+        console.error('Embedding error:', error);
+        return { success: false, error: error.message || 'Failed to generate embedding' };
+    }
+}
