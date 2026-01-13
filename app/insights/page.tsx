@@ -119,12 +119,12 @@ export default function InsightsPage() {
             };
 
             addRagMessage(assistantMessage);
-        } catch (error) {
+        } catch (error: any) {
             console.error('RAG error:', error);
             addRagMessage({
                 id: uuid(),
                 role: 'assistant',
-                content: 'Lo siento, hubo un error al procesar tu pregunta. Por favor, intenta de nuevo.',
+                content: error.message || 'Lo siento, hubo un error al procesar tu pregunta. Por favor, intenta de nuevo.',
                 timestamp: new Date(),
             });
         } finally {
