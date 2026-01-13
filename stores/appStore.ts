@@ -128,6 +128,7 @@ interface LibraryState {
     searchQuery: string;
     sortBy: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress' | 'fileSize' | 'relevance';
     activeCategory: 'all' | 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read' | 'favorites' | 'authors';
+    activeFormat: 'all' | 'epub' | 'pdf';
     sortOrder: 'asc' | 'desc';
 
     setBooks: (books: Book[]) => void;
@@ -137,6 +138,7 @@ interface LibraryState {
     setSearchQuery: (query: string) => void;
     setSortBy: (sort: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress' | 'fileSize' | 'relevance') => void;
     setActiveCategory: (category: 'all' | 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read' | 'favorites' | 'authors') => void;
+    setActiveFormat: (format: 'all' | 'epub' | 'pdf') => void;
     setSortOrder: (order: 'asc' | 'desc') => void;
     setIsLoading: (loading: boolean) => void;
 
@@ -150,6 +152,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     searchQuery: '',
     sortBy: 'relevance',
     activeCategory: 'all',
+    activeFormat: 'all',
     sortOrder: 'desc',
 
     setBooks: (books) => set({ books, isLoading: false }),
@@ -163,11 +166,12 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     setSearchQuery: (query: string) => set({ searchQuery: query }),
     setSortBy: (sort) => set({ sortBy: sort }),
     setActiveCategory: (category) => set({ activeCategory: category }),
+    setActiveFormat: (format) => set({ activeFormat: format }),
     setSortOrder: (order) => set({ sortOrder: order }),
     setIsLoading: (loading) => set({ isLoading: loading }),
 
     filteredBooks: () => {
-        const { books, searchQuery, sortBy, sortOrder, activeCategory } = get();
+        const { books, searchQuery, sortBy, sortOrder, activeCategory, activeFormat } = get();
 
         let filtered = books;
 
@@ -183,6 +187,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
                 if (activeCategory === 're_read') return b.status === 're_read';
                 return true;
             });
+        }
+
+        // Filter by format
+        if (activeFormat !== 'all') {
+            filtered = filtered.filter((b) => b.format === activeFormat);
         }
 
         // Filter by search

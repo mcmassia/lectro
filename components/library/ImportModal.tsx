@@ -103,7 +103,7 @@ export function ImportModal({ onClose }: ImportModalProps) {
             currentPosition: '',
             totalPages: bookData.totalPages,
             metadata: bookData.metadata || {},
-            status: 'reading' // Default to reading for imported books
+            status: 'unread' // Default to unread for imported books
         };
 
         await dbAddBook(newBook);

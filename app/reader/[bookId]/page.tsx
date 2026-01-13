@@ -229,6 +229,7 @@ export default function ReaderPage() {
                         <PdfReader
                             book={book}
                             onLocationChange={handleLocationChange}
+                            onTextSelect={handleTextSelect}
                             annotations={annotations}
                             settings={readerSettings}
                             onTocLoaded={handleTocLoaded}

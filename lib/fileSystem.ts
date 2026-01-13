@@ -411,7 +411,7 @@ async function processFileBlob(file: File): Promise<Book | null> {
         currentPosition: '',
         totalPages: 0,
         metadata: bookData.metadata || {},
-        status: 'planToRead',
+        status: 'unread',
         isOnServer: true // Since this function is used by syncWithServer
     };
 

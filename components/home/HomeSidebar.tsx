@@ -8,7 +8,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ActivityRings } from '@/components/dashboard/ActivityRings';
 
 export function RightSidebar() {
-    const { books, activeCategory, setActiveCategory } = useLibraryStore();
+    const { books, activeCategory, setActiveCategory, activeFormat, setActiveFormat } = useLibraryStore();
     const { dailyReadingGoal } = useAppStore();
     const pathname = usePathname();
     const router = useRouter();
@@ -138,6 +138,35 @@ export function RightSidebar() {
                         <span className="state-label">Reading</span>
                         <span className="state-count">{readingStates.reading}</span>
                     </div>
+                </div>
+            </div>
+
+
+            {/* Formats - List */}
+            <div className="sidebar-section">
+                <h3 className="section-title">Formatos</h3>
+                <div className="reading-states-list">
+                    <button
+                        className={`state-item btn-format ${activeFormat === 'all' ? 'active' : ''}`}
+                        onClick={() => setActiveFormat('all')}
+                    >
+                        <span className="state-label">Todos</span>
+                        <span className="state-count">{books.length}</span>
+                    </button>
+                    <button
+                        className={`state-item btn-format ${activeFormat === 'epub' ? 'active' : ''}`}
+                        onClick={() => setActiveFormat('epub')}
+                    >
+                        <span className="state-label">EPUB</span>
+                        <span className="state-count">{books.filter(b => b.format === 'epub').length}</span>
+                    </button>
+                    <button
+                        className={`state-item btn-format ${activeFormat === 'pdf' ? 'active' : ''}`}
+                        onClick={() => setActiveFormat('pdf')}
+                    >
+                        <span className="state-label">PDF</span>
+                        <span className="state-count">{books.filter(b => b.format === 'pdf').length}</span>
+                    </button>
                 </div>
             </div>
 
@@ -284,6 +313,25 @@ export function RightSidebar() {
             color: var(--color-text-secondary);
             padding: 4px 0;
         }
+        .btn-format {
+            background: none;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            text-align: left;
+            border-radius: var(--radius-sm);
+            padding: 4px 8px;
+            margin: 0 -8px;
+        }
+        .btn-format:hover {
+            background: var(--color-bg-tertiary);
+            color: var(--color-text-primary);
+        }
+        .btn-format.active {
+            background: var(--color-bg-elevated);
+            color: var(--color-accent);
+            font-weight: 500;
+        }
         .state-dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid currentColor; margin-right: 8px; }
         .state-icon { margin-right: 6px; }
         .state-count { margin-left: auto; font-variant-numeric: tabular-nums; opacity: 0.7; }
@@ -297,6 +345,6 @@ export function RightSidebar() {
             }
         }
       `}</style>
-        </aside>
+        </aside >
     );
 }
