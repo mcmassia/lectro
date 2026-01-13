@@ -341,6 +341,20 @@ export default function InsightsPage() {
                                             Procesando: {indexingStatus.currentBook}
                                         </p>
                                     )}
+                                    {indexingStatus.errors && indexingStatus.errors.length > 0 && (
+                                        <div style={{ marginTop: 'var(--space-2)', maxHeight: '100px', overflowY: 'auto', background: 'var(--color-bg-primary)', padding: 'var(--space-1)', borderRadius: 'var(--radius-sm)' }}>
+                                            {indexingStatus.errors.slice(-3).map((err: string, i: number) => (
+                                                <p key={i} className="body-xs" style={{ color: 'var(--color-danger)', fontSize: '10px' }}>
+                                                    {err}
+                                                </p>
+                                            ))}
+                                            {indexingStatus.errors.length > 3 && (
+                                                <p className="body-xs" style={{ color: 'var(--color-text-tertiary)', fontSize: '10px' }}>
+                                                    ...y {indexingStatus.errors.length - 3} errores más
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <p className="body-xs" style={{ color: 'var(--color-text-tertiary)' }}>
