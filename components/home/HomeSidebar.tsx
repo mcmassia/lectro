@@ -79,7 +79,7 @@ export function RightSidebar() {
                             </div>
                             <div className="filter-info">
                                 <span className="filter-label">Insights</span>
-                                <span className="filter-count">{books.filter(b => b.status === 'favorite').length}</span>
+                                <span className="filter-count">{books.filter(b => b.isFavorite).length}</span>
                             </div>
                         </div>
                     </div>
