@@ -303,79 +303,77 @@ export default function InsightsPage() {
                     </form>
                 </div>
 
-            </div>
+                {/* Indexing Sidebar Panel */}
+                <div className="insights-sidebar">
+                    <div className="card">
+                        <h3 className="heading-4">Tu biblioteca</h3>
+                        <p className="body-small" style={{ marginTop: 'var(--space-2)' }}>
+                            {books.length} libros disponibles
+                        </p>
 
-            {/* Indexing Sidebar Panel */}
-            <div className="insights-sidebar">
-                <div className="card">
-                    <h3 className="heading-4">Tu biblioteca</h3>
-                    <p className="body-small" style={{ marginTop: 'var(--space-2)' }}>
-                        {books.length} libros disponibles
-                    </p>
-                    
-                     {/* Indexing Status */}
-                    <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-                            <span className="body-small font-bold">Estado del Índice</span>
-                            <span className={`status-dot ${isIndexing ? 'active' : ''}`} />
+                        {/* Indexing Status */}
+                        <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
+                                <span className="body-small font-bold">Estado del Índice</span>
+                                <span className={`status-dot ${isIndexing ? 'active' : ''}`} />
+                            </div>
+
+                            {indexingStatus ? (
+                                <div className="indexing-progress">
+                                    <div className="progress-bar">
+                                        <div
+                                            className="progress-fill"
+                                            style={{ width: `${(indexingStatus.processedBooks / indexingStatus.totalBooks) * 100}%` }}
+                                        />
+                                    </div>
+                                    <div className="body-xs" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-1)' }}>
+                                        <span>{indexingStatus.processedBooks} / {indexingStatus.totalBooks}</span>
+                                        <span>{Math.round((indexingStatus.processedBooks / indexingStatus.totalBooks) * 100)}%</span>
+                                    </div>
+                                    {indexingStatus.currentBook && (
+                                        <p className="body-xs truncate" style={{ marginTop: 'var(--space-2)', color: 'var(--color-text-tertiary)' }}>
+                                            Procesando: {indexingStatus.currentBook}
+                                        </p>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="body-xs" style={{ color: 'var(--color-text-tertiary)' }}>
+                                    Biblioteca no indexada o parcialmente indexada.
+                                </p>
+                            )}
+
+                            <button
+                                className={`btn btn-sm ${isIndexing ? 'btn-danger' : 'btn-primary'}`}
+                                style={{ width: '100%', marginTop: 'var(--space-3)' }}
+                                onClick={handleToggleIndexing}
+                            >
+                                {isIndexing ? 'Detener Indexación' : 'Indexar Biblioteca'}
+                            </button>
                         </div>
-                        
-                        {indexingStatus ? (
-                            <div className="indexing-progress">
-                                <div className="progress-bar">
-                                    <div 
-                                        className="progress-fill" 
-                                        style={{ width: `${(indexingStatus.processedBooks / indexingStatus.totalBooks) * 100}%` }}
-                                    />
+
+                        <div className="library-preview">
+                            {books.slice(0, 5).map((book) => (
+                                <div key={book.id} className="library-item">
+                                    <BookIcon />
+                                    <span className="truncate">{book.title}</span>
                                 </div>
-                                <div className="body-xs" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-1)' }}>
-                                    <span>{indexingStatus.processedBooks} / {indexingStatus.totalBooks}</span>
-                                    <span>{Math.round((indexingStatus.processedBooks / indexingStatus.totalBooks) * 100)}%</span>
-                                </div>
-                                {indexingStatus.currentBook && (
-                                    <p className="body-xs truncate" style={{ marginTop: 'var(--space-2)', color: 'var(--color-text-tertiary)' }}>
-                                        Procesando: {indexingStatus.currentBook}
-                                    </p>
-                                )}
-                            </div>
-                        ) : (
-                             <p className="body-xs" style={{ color: 'var(--color-text-tertiary)' }}>
-                                Biblioteca no indexada o parcialmente indexada.
-                             </p>
-                        )}
-                        
-                        <button 
-                            className={`btn btn-sm ${isIndexing ? 'btn-danger' : 'btn-primary'}`}
-                            style={{ width: '100%', marginTop: 'var(--space-3)' }}
-                            onClick={handleToggleIndexing}
+                            ))}
+                        </div>
+                    </div>
+
+                    {ragMessages.length > 0 && (
+                        <button
+                            className="btn btn-ghost"
+                            onClick={clearRagMessages}
+                            style={{ width: '100%' }}
                         >
-                            {isIndexing ? 'Detener Indexación' : 'Indexar Biblioteca'}
+                            Limpiar conversación
                         </button>
-                    </div>
-
-                    <div className="library-preview">
-                        {books.slice(0, 5).map((book) => (
-                            <div key={book.id} className="library-item">
-                                <BookIcon />
-                                <span className="truncate">{book.title}</span>
-                            </div>
-                        ))}
-                    </div>
+                    )}
                 </div>
-
-                {ragMessages.length > 0 && (
-                    <button
-                        className="btn btn-ghost"
-                        onClick={clearRagMessages}
-                        style={{ width: '100%' }}
-                    >
-                        Limpiar conversación
-                    </button>
-                )}
             </div>
-        </div>
 
-        <style jsx>{`
+            <style jsx>{`
          .status-dot {
             width: 8px;
             height: 8px;
