@@ -43,7 +43,7 @@ const PlusIcon = () => (
 );
 
 export default function Home() {
-  const { books, isLoading, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, sortOrder, setSortOrder } = useLibraryStore();
+  const { books, isLoading, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, activeFormat, sortOrder, setSortOrder } = useLibraryStore();
   const { onboardingComplete } = useAppStore();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   // const [showOnboarding, setShowOnboarding] = useState(false);
@@ -95,6 +95,11 @@ export default function Home() {
   useEffect(() => {
     let booksToFilter = books;
 
+    // Format filter
+    if (activeFormat !== 'all') {
+      booksToFilter = booksToFilter.filter(book => book.format === activeFormat);
+    }
+
     // Category filter
     if (activeCategory === 'favorites') {
       booksToFilter = booksToFilter.filter(book => book.isFavorite);
@@ -133,7 +138,7 @@ export default function Home() {
     });
 
     setFilteredBooks(booksToFilter);
-  }, [books, searchQuery, activeCategory, sortBy, sortOrder]);
+  }, [books, searchQuery, activeCategory, activeFormat, sortBy, sortOrder]);
 
   useEffect(() => {
     // Onboarding removed
