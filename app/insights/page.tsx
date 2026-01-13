@@ -22,7 +22,7 @@ const BookIcon = () => (
 );
 
 export default function InsightsPage() {
-    const { ragMessages, addRagMessage, isGenerating, setIsGenerating, clearRagMessages } = useAIStore();
+    const { ragMessages, addRagMessage, isGenerating, setIsGenerating, clearRagMessages, aiModel } = useAIStore();
     const [input, setInput] = useState('');
     const [books, setBooks] = useState<Book[]>([]);
     const chatEndRef = useRef<HTMLDivElement>(null);
@@ -92,7 +92,8 @@ export default function InsightsPage() {
             const result = await getRagResponseAction(
                 userMessage.content,
                 contexts,
-                history
+                history,
+                aiModel || 'gemini-2.5-flash'
             );
 
             if (!result.success || !result.data) {

@@ -192,8 +192,10 @@ export interface RagContext {
 export async function generateRagResponse(
     query: string,
     contexts: RagContext[],
-    conversationHistory: { role: 'user' | 'assistant'; content: string }[] = []
+    conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [],
+    modelName: string = 'gemini-1.5-flash'
 ): Promise<{ response: string; usedSources: RagContext[] }> {
+    const gemini = genAI.getGenerativeModel({ model: modelName });
     const contextText = contexts.map((ctx, i) =>
         `[Source ${i + 1} - "${ctx.bookTitle}", ${ctx.chapterTitle}]:\n${ctx.content}`
     ).join('\n\n');
@@ -221,7 +223,7 @@ Instructions:
 Provide a helpful, well-structured response.`;
 
     try {
-        const result = await geminiPro.generateContent(prompt);
+        const result = await gemini.generateContent(prompt);
         const response = result.response.text();
 
         // Determine which sources were actually used (simple heuristic)

@@ -14,6 +14,8 @@ export default function SettingsPage() {
         updateReaderSettings,
         dailyReadingGoal,
         setDailyReadingGoal,
+        aiModel,
+        setAIModel,
     } = useAppStore();
 
     // Server Path State
@@ -123,6 +125,30 @@ ${ann.note ? `**Nota:** ${ann.note}` : ''}
                                 </button>
                             ))}
                         </div>
+                    </div>
+                </section>
+
+                {/* AI Settings */}
+                <section className="settings-section card">
+                    <h2 className="section-title">Inteligencia Artificial</h2>
+
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <h3>Modelo de IA</h3>
+                            <p>Selecciona el modelo de Gemini para usar</p>
+                        </div>
+                        <select
+                            className="input"
+                            value={aiModel || 'gemini-2.5-flash'}
+                            onChange={(e) => setAIModel(e.target.value)}
+                            style={{ maxWidth: '250px' }}
+                        >
+                            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Predeterminado)</option>
+                            <option value="gemini-3-flash">Gemini 3 Flash</option>
+                            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
+                            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                        </select>
                     </div>
                 </section>
 

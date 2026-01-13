@@ -48,6 +48,10 @@ interface AppState {
     readerSidebarTab: 'toc' | 'annotations' | 'xray' | 'settings';
     setReaderSidebarOpen: (open: boolean) => void;
     setReaderSidebarTab: (tab: 'toc' | 'annotations' | 'xray' | 'settings') => void;
+
+    // AI Settings
+    aiModel: string;
+    setAIModel: (model: string) => void;
 }
 
 // ===================================
@@ -101,6 +105,10 @@ export const useAppStore = create<AppState>()(
             readerSidebarTab: 'toc',
             setReaderSidebarOpen: (open) => set({ readerSidebarOpen: open }),
             setReaderSidebarTab: (tab) => set({ readerSidebarTab: tab }),
+
+            // AI Settings
+            aiModel: 'gemini-2.5-flash',
+            setAIModel: (model) => set({ aiModel: model }),
         }),
         {
             name: 'lectro-storage',
@@ -113,6 +121,7 @@ export const useAppStore = create<AppState>()(
                 sidebarCollapsed: state.sidebarCollapsed,
                 readerSidebarOpen: state.readerSidebarOpen,
                 readerSidebarTab: state.readerSidebarTab,
+                aiModel: state.aiModel,
             }),
         }
     )
@@ -307,6 +316,7 @@ interface AIState {
     isGenerating: boolean;
     currentTask: string | null;
     ragMessages: RagMessage[];
+    aiModel?: string;
 
     setIsGenerating: (generating: boolean) => void;
     setCurrentTask: (task: string | null) => void;
