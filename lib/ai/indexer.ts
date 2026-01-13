@@ -57,11 +57,17 @@ export class LibraryIndexer {
 
                 const textChunks = await this.extractAndChunkBook(book);
 
-                // Process chunks in batches to respect rate limits
-                await this.processChunks(book.id, textChunks);
+                if (textChunks.length === 0) {
+                    console.warn(`No text chunks found for book: ${book.title}`);
+                    status.errors.push(`Warning: No text extracted from ${book.title}`);
+                }
 
-                // Mark as indexed (we could utilize a flag in DB or just existence of chunks)
-                // For now, let's rely on existence of chunks, but maybe we should add 'lastIndexedAt' to book
+                // Process chunks in batches to respect rate limits
+                const chunksAdded = await this.processChunks(book.id, textChunks, status);
+
+                if (chunksAdded === 0 && textChunks.length > 0) {
+                    status.errors.push(`Failed to generate embeddings for ${book.title}`);
+                }
 
             } catch (error: any) {
                 console.error(`Error indexing book ${book.title}:`, error);
@@ -162,8 +168,9 @@ export class LibraryIndexer {
         return chunks;
     }
 
-    private async processChunks(bookId: string, chunks: { text: string, chapterTitle: string, cfi: string }[]) {
+    private async processChunks(bookId: string, chunks: { text: string, chapterTitle: string, cfi: string }[], status: IndexingStatus): Promise<number> {
         const vectorChunks: VectorChunk[] = [];
+        let totalAdded = 0;
 
         for (const chunk of chunks) {
             if (this.isCancelled) break;
@@ -185,11 +192,17 @@ export class LibraryIndexer {
                 });
             } else {
                 console.warn('Failed to generate embedding for chunk', result.error);
+                // Don't spam errors but maybe add one generic one
+                if (!status.errors.includes(`Embedding error: ${result.error}`)) {
+                    status.errors.push(`Embedding error: ${result.error}`);
+                    this.onProgress({ ...status });
+                }
             }
 
             // Save in batches of 5 to avoid memory issues but not too frequent DB writes
             if (vectorChunks.length >= 5) {
                 await addVectorChunks(vectorChunks);
+                totalAdded += vectorChunks.length;
                 vectorChunks.length = 0;
             }
         }
@@ -197,6 +210,9 @@ export class LibraryIndexer {
         // Save remaining
         if (vectorChunks.length > 0) {
             await addVectorChunks(vectorChunks);
+            totalAdded += vectorChunks.length;
         }
+
+        return totalAdded;
     }
 }
