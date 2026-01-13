@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Book, getReadingSessionsForBook } from '@/lib/db';
+import { Book, getReadingSessionsForBook, updateBook } from '@/lib/db';
+import { useLibraryStore } from '@/stores/appStore';
 
 interface ContinueReadingPanelProps {
   books: Book[];
+  onOpenDetails: (book: Book) => void;
 }
 
-export function ContinueReadingPanel({ books }: ContinueReadingPanelProps) {
+export function ContinueReadingPanel({ books, onOpenDetails }: ContinueReadingPanelProps) {
   return (
     <section className="dashboard-section animate-slide-up">
       <div className="section-header">
@@ -16,12 +18,16 @@ export function ContinueReadingPanel({ books }: ContinueReadingPanelProps) {
       </div>
       <div className="continue-reading-grid">
         {books.map((book) => (
-          <ContinueReadingCard key={book.id} book={book} />
+          <ContinueReadingCard key={book.id} book={book} onOpenDetails={onOpenDetails} />
         ))}
       </div>
       <style jsx>{`
         .dashboard-section {
           margin-bottom: var(--space-8);
+          background: #f5f5f5; /* Light gray background */
+          padding: var(--space-6);
+          border-radius: var(--radius-xl);
+          border: 1px solid var(--color-border);
         }
         .section-header {
           margin-bottom: var(--space-2); /* Reduced from space-4 */
@@ -36,8 +42,16 @@ export function ContinueReadingPanel({ books }: ContinueReadingPanelProps) {
   );
 }
 
-function ContinueReadingCard({ book }: { book: Book }) {
+function ContinueReadingCard({ book, onOpenDetails }: { book: Book; onOpenDetails: (book: Book) => void }) {
   const [hoursRead, setHoursRead] = useState(0);
+  const { updateBook: updateBookInStore } = useLibraryStore();
+
+  // Details handler replaces Remove handler
+  const handleDetails = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onOpenDetails(book);
+  };
 
   useEffect(() => {
     async function loadStats() {
@@ -60,53 +74,99 @@ function ContinueReadingCard({ book }: { book: Book }) {
   const totalPages = book.totalPages || 100;
 
   return (
-    <Link href={`/reader/${book.id}`} className="continue-card">
-      <div className="card-cover">
-        {book.cover ? (
-          <img src={book.cover} alt={book.title} />
-        ) : (
-          <div className="placeholder-cover">
-            {book.title[0]}
-          </div>
-        )}
-      </div>
-      <div className="card-content">
-        <div className="card-info">
-          <h3 className="card-title" title={book.title}>{book.title}</h3>
-          <p className="card-author">{book.author}</p>
-        </div>
+    <div className="continue-card-wrapper">
+      <button
+        className="details-btn"
+        onClick={handleDetails}
+        title="Ver detalles"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="16" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+      </button>
 
-        <div className="card-stats">
-          <div className="stat-row">
-            <span>Pág {currentPage} / {totalPages}</span>
-            <span className="stat-separator">•</span>
-            <span>{Math.round(progress)}%</span>
+      <Link href={`/reader/${book.id}`} className="continue-card-content">
+        <div className="card-cover">
+          {book.cover ? (
+            <img src={book.cover} alt={book.title} />
+          ) : (
+            <div className="placeholder-cover">
+              {book.title[0]}
+            </div>
+          )}
+        </div>
+        <div className="card-content">
+          <div className="card-info">
+            <h3 className="card-title" title={book.title}>{book.title}</h3>
+            <p className="card-author">{book.author}</p>
           </div>
-          <div className="stat-row-secondary">
-            <span>{hoursRead}h leídas</span>
+
+          <div className="card-stats">
+            <div className="stat-row">
+              <span>Pág {currentPage} / {totalPages}</span>
+              <span className="stat-separator">•</span>
+              <span>{Math.round(progress)}%</span>
+            </div>
+            <div className="stat-row-secondary">
+              <span>{hoursRead}h leídas</span>
+            </div>
           </div>
         </div>
-      </div>
+      </Link>
 
       <style jsx>{`
-        .continue-card {
-          display: flex;
-          gap: var(--space-4);
-          padding: var(--space-4);
+        .continue-card-wrapper {
+          position: relative;
           background: var(--color-bg-secondary);
           border-radius: var(--radius-lg);
           border: 1px solid var(--color-border);
-          text-decoration: none !important;
-          color: inherit;
           transition: all var(--transition-fast);
         }
-        
-        /* Force override any child elements */
-        .continue-card * {
-            text-decoration: none !important;
+
+        .continue-card-content {
+          display: flex;
+          gap: var(--space-4);
+          padding: var(--space-4);
+          text-decoration: none !important;
+          color: inherit;
+          width: 100%;
+          height: 100%;
         }
 
-        .continue-card:hover {
+        .details-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 1;
+            transition: all 0.2s;
+            z-index: 20;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .continue-card-wrapper:hover .details-btn {
+            opacity: 1;
+        }
+
+        .details-btn:hover {
+            background: var(--color-accent);
+            border-color: var(--color-accent);
+            transform: scale(1.1);
+        }
+        
+        .continue-card-wrapper:hover {
           background: var(--color-bg-tertiary);
           transform: translateY(-2px);
           box-shadow: var(--shadow-md);
@@ -196,6 +256,6 @@ function ContinueReadingCard({ book }: { book: Book }) {
             color: var(--color-text-tertiary);
         }
       `}</style>
-    </Link>
+    </div>
   );
 }

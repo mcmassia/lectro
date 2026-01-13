@@ -46,7 +46,7 @@ export default function Home() {
   const { books, isLoading, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, sortOrder, setSortOrder } = useLibraryStore();
   const { onboardingComplete } = useAppStore();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  // const [showOnboarding, setShowOnboarding] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showSyncReport, setShowSyncReport] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -97,9 +97,15 @@ export default function Home() {
 
     // Category filter
     if (activeCategory === 'favorites') {
-      booksToFilter = booksToFilter.filter(book => book.status === 'favorite');
+      booksToFilter = booksToFilter.filter(book => book.isFavorite);
     } else if (activeCategory === 'planToRead') {
       booksToFilter = booksToFilter.filter(book => book.status === 'planToRead');
+    } else if (activeCategory === 'interesting') {
+      booksToFilter = booksToFilter.filter(book => book.status === 'interesting');
+    } else if (activeCategory === 'completed') {
+      booksToFilter = booksToFilter.filter(book => book.status === 'completed');
+    } else if (activeCategory === 're_read') {
+      booksToFilter = booksToFilter.filter(book => book.status === 're_read');
     }
 
     // Search filter
@@ -130,9 +136,10 @@ export default function Home() {
   }, [books, searchQuery, activeCategory, sortBy, sortOrder]);
 
   useEffect(() => {
-    if (!onboardingComplete) {
-      setShowOnboarding(true);
-    }
+    // Onboarding removed
+    // if (!onboardingComplete) {
+    //   setShowOnboarding(true);
+    // }
 
     async function loadBooks() {
       try {
@@ -149,7 +156,7 @@ export default function Home() {
   }, [onboardingComplete, setBooks, setIsLoading]);
 
   const recentBooks = books
-    .filter(b => b.lastReadAt)
+    .filter(b => b.status === 'reading')
     .sort((a, b) => (b.lastReadAt?.getTime() || 0) - (a.lastReadAt?.getTime() || 0))
     .slice(0, 4);
 
@@ -160,9 +167,9 @@ export default function Home() {
       <div className="page-container animate-fade-in full-width">
         <div className="main-layout">
           <div className="main-content">
-            {/* Continue Reading Panel */}
-            {activeCategory === 'all' && recentBooks.length > 0 && (
-              <ContinueReadingPanel books={recentBooks} />
+            {/* Continue Reading Panel - Always visible */}
+            {recentBooks.length > 0 && (
+              <ContinueReadingPanel books={recentBooks} onOpenDetails={setSelectedBook} />
             )}
 
             {/* Library Header & Toolbar */}
@@ -173,9 +180,12 @@ export default function Home() {
                 </h2>
                 {activeCategory !== 'authors' && (
                   <div className="category-tabs">
-                    <button className={`category-tab ${activeCategory === 'all' ? 'active' : ''}`} onClick={() => setActiveCategory('all')}>Todo</button>
+                    <button className={`category-tab ${activeCategory === 'all' ? 'active' : ''}`} onClick={() => setActiveCategory('all')}>Todos</button>
                     <button className={`category-tab ${activeCategory === 'favorites' ? 'active' : ''}`} onClick={() => setActiveCategory('favorites')}>Favoritos</button>
-                    <button className={`category-tab ${activeCategory === 'planToRead' ? 'active' : ''}`} onClick={() => setActiveCategory('planToRead')}>Por leer</button>
+                    <button className={`category-tab ${activeCategory === 'interesting' ? 'active' : ''}`} onClick={() => setActiveCategory('interesting')}>Interesante</button>
+                    <button className={`category-tab ${activeCategory === 'planToRead' ? 'active' : ''}`} onClick={() => setActiveCategory('planToRead')}>Para leer</button>
+                    <button className={`category-tab ${activeCategory === 'completed' ? 'active' : ''}`} onClick={() => setActiveCategory('completed')}>Leído</button>
+                    <button className={`category-tab ${activeCategory === 're_read' ? 'active' : ''}`} onClick={() => setActiveCategory('re_read')}>Releer</button>
                   </div>
                 )}
               </div>
@@ -260,7 +270,7 @@ export default function Home() {
         </div>
       </div>
 
-      {showOnboarding && <OnboardingModal onComplete={() => setShowOnboarding(false)} />}
+      {/* {showOnboarding && <OnboardingModal onComplete={() => setShowOnboarding(false)} />} */}
       {showImport && (
         <ImportModal onClose={() => setShowImport(false)} />
       )}

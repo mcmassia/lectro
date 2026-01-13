@@ -20,8 +20,9 @@ export interface Book {
   totalPages?: number;
   currentPage?: number;
   metadata: BookMetadata;
-  status: 'reading' | 'planToRead' | 'completed' | 'favorite';
+  status: 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read';
   isOnServer?: boolean;
+  isFavorite?: boolean;
 }
 
 
@@ -186,6 +187,10 @@ export class LectroDB extends Dexie {
 
     this.version(3).stores({
       books: 'id, title, author, format, addedAt, lastReadAt, progress, status, fileName, isOnServer',
+    });
+
+    this.version(4).stores({
+      books: 'id, title, author, format, addedAt, lastReadAt, progress, status, fileName, isOnServer, isFavorite',
     });
   }
 }

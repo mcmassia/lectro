@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Book, updateBook } from '@/lib/db';
 import { useLibraryStore } from '@/stores/appStore';
 import { useRouter } from 'next/navigation';
+import { searchGoogleBooks, findCover } from '@/lib/metadata';
 
 interface BookDetailsModalProps {
     book: Book;
@@ -35,6 +36,77 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
             setBook({ ...book, status });
         } catch (error) {
             console.error('Failed to update status:', error);
+        }
+    };
+
+    const toggleFavorite = async () => {
+        try {
+            const newIsFavorite = !book.isFavorite;
+            await updateBook(book.id, { isFavorite: newIsFavorite });
+            updateBookInStore(book.id, { isFavorite: newIsFavorite });
+            setBook({ ...book, isFavorite: newIsFavorite });
+        } catch (error) {
+            console.error('Failed to update favorite:', error);
+        }
+    };
+
+    const handleAutoMetadata = async () => {
+        if (!confirm('Search internet for metadata? This will overwrite current fields if found.')) return;
+
+        try {
+            const query = `${book.title} ${book.author}`;
+            const results = await searchGoogleBooks(query);
+
+            if (results && results.length > 0) {
+                const bestMatch = results[0];
+                const updates: Partial<Book> = {
+                    author: bestMatch.author || book.author,
+                    // keep title as is or ask? usually better to keep user title or update if missing
+                    metadata: {
+                        ...book.metadata,
+                        description: bestMatch.description || book.metadata.description,
+                        publisher: bestMatch.publisher || book.metadata.publisher,
+                        publishedDate: bestMatch.publishedDate || book.metadata.publishedDate,
+                        language: bestMatch.language || book.metadata.language,
+                        tags: bestMatch.tags || book.metadata.tags
+                    }
+                };
+
+                if (bestMatch.cover && !book.cover) {
+                    updates.cover = bestMatch.cover;
+                }
+
+                await updateBook(book.id, updates);
+                updateBookInStore(book.id, updates);
+                setBook({ ...book, ...updates });
+                setIsEditing(true); // Let user review changes
+            } else {
+                alert('No metadata found.');
+            }
+        } catch (error) {
+            console.error('Metadata search failed:', error);
+            alert('Failed to search metadata.');
+        }
+    };
+
+    const handlePaste = async (e: React.ClipboardEvent) => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const blob = items[i].getAsFile();
+                if (blob) {
+                    const reader = new FileReader();
+                    reader.onload = async (event) => {
+                        const base64 = event.target?.result as string;
+                        if (base64) {
+                            await updateBook(book.id, { cover: base64 });
+                            updateBookInStore(book.id, { cover: base64 });
+                            setBook({ ...book, cover: base64 });
+                        }
+                    };
+                    reader.readAsDataURL(blob);
+                }
+            }
         }
     };
 
@@ -88,7 +160,12 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                 </button>
 
                 <div className="modal-content">
-                    <div className="cover-section">
+                    <div
+                        className="cover-section"
+                        onPaste={handlePaste}
+                        tabIndex={0}
+                        title="Paste image to update cover"
+                    >
                         <div className="book-cover-wrapper">
                             {book.cover ? (
                                 <img src={book.cover} alt={book.title} className="book-cover" />
@@ -97,6 +174,9 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                     <span>{book.title[0]}</span>
                                 </div>
                             )}
+                            <div className="cover-overlay">
+                                <span>Paste image (Ctrl+V)</span>
+                            </div>
                         </div>
                     </div>
 
@@ -260,20 +340,34 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                             value={book.status || 'planToRead'}
                             onChange={(e) => handleStatusChange(e.target.value as Book['status'])}
                         >
-                            <option value="reading">Currently Reading</option>
-                            <option value="planToRead">Plan to Read</option>
-                            <option value="completed">Completed</option>
+                            <option value="unread">No leído</option>
+                            <option value="interesting">Interesante</option>
+                            <option value="planToRead">Para leer</option>
+                            <option value="reading">Leyendo</option>
+                            <option value="completed">Leído</option>
+                            <option value="re_read">Volver a leer</option>
                         </select>
                     </div>
 
                     <div className="footer-actions">
                         <button
-                            className={`btn-icon ${book.status === 'favorite' ? 'active-fav' : ''}`}
-                            onClick={() => handleStatusChange(book.status === 'favorite' ? 'planToRead' : 'favorite')}
+                            className={`btn-icon ${book.isFavorite ? 'active-fav' : ''}`}
+                            onClick={toggleFavorite}
                             title="Toggle Favorite"
                         >
-                            <svg viewBox="0 0 24 24" fill={book.status === 'favorite' ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" width="20" height="20">
+                            <svg viewBox="0 0 24 24" fill={book.isFavorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" width="20" height="20">
                                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                            </svg>
+                        </button>
+                        <button
+                            className="btn-icon"
+                            onClick={handleAutoMetadata}
+                            title="Auto-fetch Metadata"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                                <path d="M21 5c0 1.66-4 3-9 3s-9-1.34-9-3" />
                             </svg>
                         </button>
                         <button
@@ -397,6 +491,32 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     width: 100%;
                     height: 100%;
                     object-fit: cover;
+                }
+
+                .cover-section:focus {
+                    outline: none;
+                }
+                
+                .cover-section:focus .book-cover-wrapper {
+                     box-shadow: 0 0 0 2px var(--color-accent);
+                }
+
+                .cover-overlay {
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    background: rgba(0,0,0,0.6);
+                    padding: 4px;
+                    text-align: center;
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                    color: white;
+                    font-size: 10px;
+                }
+
+                .book-cover-wrapper:hover .cover-overlay {
+                    opacity: 1;
                 }
 
                 .book-cover-placeholder {

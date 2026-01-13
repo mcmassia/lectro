@@ -127,7 +127,7 @@ interface LibraryState {
     isLoading: boolean;
     searchQuery: string;
     sortBy: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress' | 'fileSize' | 'relevance';
-    activeCategory: 'all' | 'favorites' | 'planToRead' | 'completed' | 'authors';
+    activeCategory: 'all' | 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read' | 'favorites' | 'authors';
     sortOrder: 'asc' | 'desc';
 
     setBooks: (books: Book[]) => void;
@@ -136,7 +136,7 @@ interface LibraryState {
     removeBook: (id: string) => void;
     setSearchQuery: (query: string) => void;
     setSortBy: (sort: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress' | 'fileSize' | 'relevance') => void;
-    setActiveCategory: (category: 'all' | 'favorites' | 'planToRead' | 'completed' | 'authors') => void;
+    setActiveCategory: (category: 'all' | 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read' | 'favorites' | 'authors') => void;
     setSortOrder: (order: 'asc' | 'desc') => void;
     setIsLoading: (loading: boolean) => void;
 
@@ -174,9 +174,13 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         // Filter by category
         if (activeCategory !== 'all') {
             filtered = filtered.filter((b) => {
-                if (activeCategory === 'favorites') return b.status === 'favorite';
+                if (activeCategory === 'favorites') return b.isFavorite;
+                if (activeCategory === 'unread') return b.status === 'unread';
+                if (activeCategory === 'interesting') return b.status === 'interesting';
                 if (activeCategory === 'planToRead') return b.status === 'planToRead';
+                if (activeCategory === 'reading') return b.status === 'reading';
                 if (activeCategory === 'completed') return b.status === 'completed';
+                if (activeCategory === 're_read') return b.status === 're_read';
                 return true;
             });
         }
