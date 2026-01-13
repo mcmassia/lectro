@@ -107,7 +107,7 @@ export class LibraryIndexer {
 
         // Iterate over spine items (chapters)
         // @ts-ignore
-        const spine = book.spine;
+        const spine = book.spine as any;
 
         for (const item of spine.items) {
             if (this.isCancelled) break;
