@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAIStore, RagMessage, RagSource } from '@/stores/appStore';
-import { generateRagResponse, RagContext } from '@/lib/ai/gemini';
+import type { RagContext } from '@/lib/ai/gemini';
+import { getRagResponseAction } from '@/app/actions/ai';
 import { getAllVectorChunks, getAllBooks, Book } from '@/lib/db';
 import { v4 as uuid } from 'uuid';
 
@@ -88,11 +89,17 @@ export default function InsightsPage() {
                 content: msg.content,
             }));
 
-            const { response, usedSources } = await generateRagResponse(
+            const result = await getRagResponseAction(
                 userMessage.content,
                 contexts,
                 history
             );
+
+            if (!result.success || !result.data) {
+                throw new Error(result.error || 'Failed to generate response');
+            }
+
+            const { response, usedSources } = result.data;
 
             const sources: RagSource[] = usedSources.map(src => ({
                 bookId: src.bookId,

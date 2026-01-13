@@ -4,7 +4,7 @@ import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 // Gemini Client Configuration
 // ===================================
 
-const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+const API_KEY = process.env.GEMINI_API_KEY || '';
 
 if (!API_KEY) {
     console.warn('Gemini API key not found. AI features will be disabled.');
