@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAIStore, RagMessage, RagSource } from '@/stores/appStore';
 import type { RagContext } from '@/lib/ai/gemini';
 import { getRagResponseAction } from '@/app/actions/ai';
-import { getAllVectorChunks, getAllBooks, Book } from '@/lib/db';
+import { getAllVectorChunks, getAllBooks, Book, db } from '@/lib/db';
 import { v4 as uuid } from 'uuid';
 
 const SendIcon = () => (
@@ -25,17 +25,20 @@ export default function InsightsPage() {
     const { ragMessages, addRagMessage, isGenerating, setIsGenerating, clearRagMessages, aiModel } = useAIStore();
     const [input, setInput] = useState('');
     const [books, setBooks] = useState<Book[]>([]);
+    const [chunkCount, setChunkCount] = useState<number>(0);
     const [indexingStatus, setIndexingStatus] = useState<any>(null); // Use proper type
     const [isIndexing, setIsIndexing] = useState(false);
     const indexerRef = useRef<any>(null); // To store indexer instance
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        async function loadBooks() {
+        async function loadData() {
             const allBooks = await getAllBooks();
             setBooks(allBooks);
+            const count = await db.vectorChunks.count();
+            setChunkCount(count);
         }
-        loadBooks();
+        loadData();
 
         return () => {
             if (indexerRef.current) {
@@ -309,6 +312,9 @@ export default function InsightsPage() {
                         <h3 className="heading-4">Tu biblioteca</h3>
                         <p className="body-small" style={{ marginTop: 'var(--space-2)' }}>
                             {books.length} libros disponibles
+                        </p>
+                        <p className="body-xs" style={{ marginTop: 'var(--space-1)', color: 'var(--color-text-tertiary)' }}>
+                            {chunkCount} fragmentos vectoriales
                         </p>
 
                         {/* Indexing Status */}
