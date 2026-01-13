@@ -395,7 +395,7 @@ export default function InsightsPage() {
             background: var(--color-accent);
             transition: width 0.3s ease;
          }
-         /* ... existing styles ... code snippet truncated for brevity but structure maintained */
+        
         .insights-container {
           display: grid;
           grid-template-columns: 1fr 280px;
@@ -403,16 +403,181 @@ export default function InsightsPage() {
           height: calc(100vh - 200px);
         }
 
-        /* ... existing styles ... */
-        
         .chat-container {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          overflow: hidden;
         }
 
-        /* ... rest of styles ... */
+        .chat-messages {
+          flex: 1;
+          overflow-y: auto;
+          padding: var(--space-4);
+        }
+
+        .chat-empty {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          text-align: center;
+          color: var(--color-text-secondary);
+        }
+
+        .empty-icon {
+          color: var(--color-text-tertiary);
+          margin-bottom: var(--space-4);
+        }
+
+        .chat-empty h3 {
+          font-size: var(--text-xl);
+          color: var(--color-text-primary);
+          margin-bottom: var(--space-2);
+        }
+
+        .suggested-queries {
+          display: flex;
+          flex-wrap: wrap;
+          gap: var(--space-2);
+          justify-content: center;
+          margin-top: var(--space-6);
+          max-width: 500px;
+        }
+
+        .suggested-query {
+          padding: var(--space-2) var(--space-4);
+          font-size: var(--text-sm);
+          background: var(--color-accent-subtle);
+          color: var(--color-accent);
+          border: 1px solid var(--color-accent);
+          border-radius: var(--radius-full);
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+
+        .suggested-query:hover {
+          background: var(--color-accent);
+          color: white;
+        }
+
+        .message {
+          display: flex;
+          margin-bottom: var(--space-4);
+        }
+
+        .message.user {
+          justify-content: flex-end;
+        }
+
+        .message-content {
+          max-width: 80%;
+          padding: var(--space-3) var(--space-4);
+          border-radius: var(--radius-lg);
+        }
+
+        .message.user .message-content {
+          background: var(--gradient-accent);
+          color: white;
+          border-bottom-right-radius: var(--radius-sm);
+        }
+
+        .message.assistant .message-content {
+          background: var(--color-bg-secondary);
+          border: 1px solid var(--color-border);
+          border-bottom-left-radius: var(--radius-sm);
+        }
+
+        .message-content p {
+          line-height: 1.6;
+          white-space: pre-wrap;
+        }
+
+        .message-sources {
+          display: flex;
+          flex-wrap: wrap;
+          gap: var(--space-2);
+          margin-top: var(--space-3);
+          padding-top: var(--space-3);
+          border-top: 1px solid var(--color-border);
+        }
+
+        .sources-label {
+          font-size: var(--text-xs);
+          color: var(--color-text-tertiary);
+          width: 100%;
+        }
+
+        .source-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: var(--space-1);
+          padding: var(--space-1) var(--space-2);
+          font-size: var(--text-xs);
+          background: var(--color-accent-subtle);
+          color: var(--color-accent);
+          border-radius: var(--radius-sm);
+        }
+
+        .message-content.typing {
+          display: flex;
+          gap: var(--space-1);
+          padding: var(--space-4);
+        }
+
+        .dot {
+          width: 8px;
+          height: 8px;
+          background: var(--color-text-tertiary);
+          border-radius: 50%;
+          animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+          0%, 80%, 100% { transform: scale(0); }
+          40% { transform: scale(1); }
+        }
+
+        .chat-input-container {
+          display: flex;
+          gap: var(--space-3);
+          padding: var(--space-4);
+          border-top: 1px solid var(--color-border);
+        }
+
+        .chat-input {
+          flex: 1;
+        }
+
+        .insights-sidebar {
+          display: flex;
+          flex-direction: column;
+          gap: var(--space-4);
+        }
+
+        .library-preview {
+          margin-top: var(--space-4);
+        }
+
+        .library-item {
+          display: flex;
+          align-items: center;
+          gap: var(--space-2);
+          padding: var(--space-2);
+          font-size: var(--text-sm);
+          color: var(--color-text-secondary);
+          border-radius: var(--radius-md);
+          transition: all var(--transition-fast);
+        }
+
+        .library-item:hover {
+          background: var(--color-bg-tertiary);
+          color: var(--color-text-primary);
+        }
 
         @media (max-width: 768px) {
           .insights-container {
