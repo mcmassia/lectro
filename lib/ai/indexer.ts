@@ -127,32 +127,54 @@ export class LibraryIndexer {
 
                 // We need to parse the HTML properly
                 const tempDiv = document.createElement('div');
-                // doc is typically an XML document or HTML string depending on implementation
-                // epub.js item.load returns a Document
+
                 if (doc instanceof Document) {
-                    tempDiv.innerHTML = doc.body.innerHTML;
-                } else {
-                    // fallback if it returns string
-                    tempDiv.innerHTML = String(doc);
+                    // Start with body if available (HTML), else documentElement (XHTML/XML)
+                    const root = doc.body || doc.documentElement;
+                    if (root) {
+                        // textContent extracts text from all nodes. 
+                        // To avoid scripts/styles, we should ideally sanitize, but for now let's grab plain text.
+                        // innerText is better but might trigger reflows or need attachment. 
+                        // Let's try to get innerHTML and put it in a div to rely on browser's innerText behavior which handles style/script tags better usually.
+                        tempDiv.innerHTML = root.innerHTML;
+                    } else {
+                        console.warn('Document has no body or documentElement', item.href);
+                    }
+                } else if (typeof doc === 'string') {
+                    tempDiv.innerHTML = doc;
                 }
 
-                const text = tempDiv.innerText || tempDiv.textContent || '';
+                // Get text and basic cleaning
+                const text = (tempDiv.innerText || tempDiv.textContent || '')
+                    .replace(/\s+/g, ' ') // Collapse whitespace
+                    .trim();
 
-                // Split into chunks
-                const textParts = this.splitText(text);
+                if (!text) {
+                    // Diagnostic logging
+                    // console.warn(`Empty text for chapter ${item.href}`);
+                    if (doc instanceof Document && !doc.body) {
+                        // It was XML without body
+                    }
+                }
 
-                textParts.forEach((part, index) => {
-                    chunks.push({
-                        text: part,
-                        chapterTitle: item.href, // Or try to find TOC title
-                        cfi: item.cfiBase // Approximate CFI
+                if (text.length > 50) { // arbitrary min length to skip empty/nav pages
+                    // Split into chunks
+                    const textParts = this.splitText(text);
+
+                    textParts.forEach((part, index) => {
+                        chunks.push({
+                            text: part,
+                            chapterTitle: item.href, // Or try to find TOC title
+                            cfi: item.cfiBase // Approximate CFI
+                        });
                     });
-                });
+                }
 
                 // Unload to free memory
                 item.unload();
-            } catch (e) {
+            } catch (e: any) {
                 console.error('Error processing chapter:', e);
+                // We might want to see this in UI if all fail
             }
         }
 
