@@ -1,6 +1,7 @@
 'use server';
 
 import { generateRagResponse, RagContext } from '@/lib/ai/gemini';
+import { XRayResult } from '@/lib/ai/gemini';
 
 export async function getRagResponseAction(
     query: string,
@@ -36,5 +37,20 @@ export async function generateEmbeddingAction(text: string): Promise<{ success: 
     } catch (error: any) {
         console.error('Embedding error:', error);
         return { success: false, error: error.message || 'Failed to generate embedding' };
+    }
+}
+
+export async function generateXRayAction(content: string, title: string): Promise<{ success: boolean; data?: XRayResult; error?: string }> {
+    if (!process.env.GEMINI_API_KEY) {
+        return { success: false, error: 'Configuration Error: Gemini API Key is missing.' };
+    }
+
+    try {
+        const { generateXRay } = await import('@/lib/ai/gemini');
+        const data = await generateXRay(content, title);
+        return { success: true, data };
+    } catch (error: any) {
+        console.error('X-Ray error:', error);
+        return { success: false, error: error.message || 'Failed to generate X-Ray' };
     }
 }

@@ -39,11 +39,96 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
     }, [book.id]);
 
     const handleGenerateXRay = async () => {
-        // This would require extracting book content first
+        if (!book || !book.fileBlob) {
+            console.error('Book content not available');
+            return;
+        }
+
         setIsGeneratingXray(true);
         try {
-            // Placeholder - would need full book content
-            console.log('X-Ray generation would happen here');
+            // Import epubjs dynamically
+            const ePub = (await import('epubjs')).default;
+            const arrayBuffer = await book.fileBlob.arrayBuffer();
+            const bookInstance = ePub(arrayBuffer);
+
+            await bookInstance.ready;
+
+            // Extract text from the first few chapters (limit to avoid too much data)
+            // We want enough context for a good X-Ray. 
+            // Let's iterate spine items and extract text until we hit a limit or finish.
+            let fullText = '';
+            // @ts-ignore
+            const spine = bookInstance.spine;
+            const sections: any[] = [];
+            // Use the public API to iterate sections ensures we get initialized Section objects
+            spine.each((section: any) => sections.push(section));
+
+            const limit = 60000; // Character limit for AI context
+
+            // Use simple iteration for now, assuming standard spine
+            // Ideally we'd use the same robust extraction logic as indexer, but let's keep it simple for MVP client-side
+            for (const item of sections) {
+                if (fullText.length >= limit) break;
+
+                try {
+                    const doc = await item.load(bookInstance.load.bind(bookInstance));
+                    // Extract text similar to indexer
+                    const tempDiv = document.createElement('div');
+                    if (doc instanceof Document) {
+                        const root = doc.body || doc.documentElement;
+                        if (root) tempDiv.innerHTML = root.innerHTML;
+                    } else if (typeof doc === 'string') {
+                        tempDiv.innerHTML = doc;
+                    }
+
+                    // Attach for robust extraction
+                    tempDiv.style.position = 'absolute';
+                    tempDiv.style.left = '-9999px';
+                    document.body.appendChild(tempDiv);
+
+                    const text = (tempDiv.innerText || tempDiv.textContent || '').replace(/\s+/g, ' ').trim();
+
+                    document.body.removeChild(tempDiv);
+
+                    if (text) {
+                        fullText += text + '\n\n';
+                    }
+
+                    item.unload();
+                } catch (e) {
+                    console.error('Error reading chapter for X-Ray:', e);
+                }
+            }
+
+            bookInstance.destroy();
+
+            if (!fullText) {
+                throw new Error('Could not extract text from book');
+            }
+
+            // Call server action
+            const { generateXRayAction } = await import('@/app/actions/ai');
+            const result = await generateXRayAction(fullText, book.title);
+
+            if (result.success && result.data) {
+                const { saveXRayData } = await import('@/lib/db');
+                // Map AI result to DB schema (add empty mentions)
+                const mappedData: XRayData = {
+                    id: crypto.randomUUID(),
+                    bookId: book.id,
+                    generatedAt: new Date(),
+                    characters: result.data.characters.map((c: any) => ({ ...c, mentions: [] })),
+                    places: result.data.places.map((p: any) => ({ ...p, mentions: [] })),
+                    terms: result.data.terms.map((t: any) => ({ ...t, mentions: [] }))
+                };
+
+                await saveXRayData(mappedData);
+                setXrayData(mappedData);
+            } else {
+                console.error('X-Ray generation failed:', result.error);
+                // Optionally show error toast
+            }
+
         } catch (error) {
             console.error('Failed to generate X-Ray:', error);
         } finally {
