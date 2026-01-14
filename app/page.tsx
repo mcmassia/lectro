@@ -136,16 +136,24 @@ export default function Home() {
 
     // Sort
     booksToFilter.sort((a, b) => {
+      let comparison = 0;
       if (sortBy === 'title') {
-        return sortOrder === 'asc' ? a.title.localeCompare(b.title) : b.title.localeCompare(a.title);
+        comparison = a.title.localeCompare(b.title);
       } else if (sortBy === 'author') {
-        return sortOrder === 'asc' ? a.author.localeCompare(b.author) : b.author.localeCompare(a.author);
+        comparison = a.author.localeCompare(b.author);
       } else if (sortBy === 'lastRead') {
         const dateA = a.lastReadAt?.getTime() || 0;
         const dateB = b.lastReadAt?.getTime() || 0;
-        return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+        comparison = dateA - dateB;
+      } else if (sortBy === 'addedDate') {
+        comparison = (a.addedAt?.getTime() || 0) - (b.addedAt?.getTime() || 0);
+      } else if (sortBy === 'progress') {
+        comparison = (a.progress || 0) - (b.progress || 0);
+      } else if (sortBy === 'fileSize') {
+        comparison = (a.fileSize || 0) - (b.fileSize || 0);
       }
-      return 0;
+
+      return sortOrder === 'asc' ? comparison : -comparison;
     });
 
     setFilteredBooks(booksToFilter);
@@ -215,6 +223,76 @@ export default function Home() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
+                </div>
+
+                {/* Sort Selector */}
+                <div className="sort-container" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <select
+                    className="input sort-select"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as any)}
+                    style={{
+                      padding: '6px 10px',
+                      height: '36px',
+                      fontSize: 'var(--text-sm)',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: 'var(--color-bg-secondary)',
+                      border: 'none',
+                      color: 'var(--color-text-secondary)',
+                      cursor: 'pointer',
+                      outline: 'none'
+                    }}
+                  >
+                    <option value="title">Título</option>
+                    <option value="author">Autor</option>
+                    <option value="addedDate">Fecha inclusión</option>
+                    <option value="progress">% Progreso</option>
+                    <option value="fileSize">Tamaño archivo</option>
+                    <option value="lastRead">Último leído</option>
+                  </select>
+
+                  <button
+                    className="btn btn-icon"
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    title={sortOrder === 'asc' ? 'Orden ascendente' : 'Orden descendente'}
+                    style={{
+                      height: '36px',
+                      width: '36px',
+                      backgroundColor: 'var(--color-bg-secondary)',
+                      color: 'var(--color-text-secondary)'
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                      {sortOrder === 'asc' ? (
+                        <path d="M3 6h18M6 12h12m-9 6h6" /> // Descending bars visual, but typically ASC for text is A->Z. 
+                        // Let's use simple arrows for clarity
+                      ) : (
+                        <path d="M3 18h18M6 12h12m-9-6h6" />
+                      )}
+                      {/* Overriding with arrows for clearer direction */}
+                      {sortOrder === 'asc' ? (
+                        <path d="M7 15l5 5 5-5M12 3v17" /> // Arrow Down (A-Z usually means down list) - wait, Ascending (1-9, A-Z) usually implies getting bigger.
+                        // Actually standard icon for sort is list bars. Let's use arrows.
+                        // Ascending: Small to Large. Arrow Up? Or Arrow Down (A at top, Z at bottom)?
+                        // Context: List. A (top) -> Z (bottom) is standard.
+                        // Ascending A->Z.
+                      ) : (
+                        <path d="M7 9l5-5 5 5M12 21V3" /> // Arrow Up
+                      )}
+                      {/* Re-doing icons to be standard SortAsc / SortDesc */}
+                    </svg>
+                    {sortOrder === 'asc' ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                        <path d="M11 5h10M11 9h7M11 13h4" />
+                        <path d="M3 17l3 3 3-3M6 18V4" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                        <path d="M11 5h10M11 9h7M11 13h4" />
+                        <path d="M3 7l3-3 3 3M6 6v14" />
+                      </svg>
+                    )}
+                  </button>
                 </div>
 
                 <div className="view-toggle">
