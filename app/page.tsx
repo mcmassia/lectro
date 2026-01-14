@@ -55,13 +55,23 @@ export default function Home() {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
 
+  const [syncLogs, setSyncLogs] = useState<string[]>([]);
+
   // Handle Sync
   const handleSync = async () => {
     setIsSyncing(true);
+    setSyncLogs([]); // Reset logs
     setShowSyncReport(true);
+
+    // Helper to add logs safely
+    const addLog = (msg: string) => {
+      setSyncLogs(prev => [...prev.slice(-19), msg]); // Keep last 20 logs
+    };
+
     try {
       console.log('Calling syncWithServer...');
-      const results = await syncWithServer();
+      const results = await syncWithServer(addLog);
+      setSyncLogs(prev => [...prev, '¡Listo!']);
       setSyncResults(results);
 
       // Refresh library
@@ -70,6 +80,7 @@ export default function Home() {
     } catch (error) {
       console.error('Sync failed:', error);
       const msg = (error as Error).message || 'Unknown error';
+      addLog(`Error: ${msg}`);
       setSyncResults({ added: 0, removed: 0, errors: [msg] });
     } finally {
       setIsSyncing(false);
@@ -296,6 +307,7 @@ export default function Home() {
         onClose={() => setShowSyncReport(false)}
         results={syncResults}
         isLoading={isSyncing}
+        progressLogs={syncLogs}
       />
 
       {selectedBook && (

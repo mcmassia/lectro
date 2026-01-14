@@ -9,26 +9,35 @@ interface SyncReportModalProps {
         errors: string[];
     } | null;
     isLoading: boolean;
+    progressLogs?: string[];
 }
 
-export function SyncReportModal({ isOpen, onClose, results, isLoading }: SyncReportModalProps) {
+export function SyncReportModal({ isOpen, onClose, results, isLoading, progressLogs = [] }: SyncReportModalProps) {
     if (!isOpen) return null;
+
+    // Auto-scroll to bottom of logs
+    // ...
 
     return (
         <div className="modal-overlay">
             <div className="modal-content">
                 <div className="modal-header">
                     <h2 className="modal-title">Sincronización con Servidor</h2>
-                    {!isLoading && (
-                        <button className="close-btn" onClick={onClose}>×</button>
-                    )}
                 </div>
 
                 <div className="modal-body">
                     {isLoading ? (
                         <div className="sync-loading">
-                            <div className="spinner" />
-                            <p>Sincronizando biblioteca...</p>
+                            <div className="spinner-container">
+                                <div className="spinner" />
+                                <p>Sincronizando biblioteca...</p>
+                            </div>
+                            <div className="logs-container">
+                                {progressLogs.map((log, i) => (
+                                    <div key={i} className="log-entry">{log}</div>
+                                ))}
+                                {progressLogs.length === 0 && <div className="log-entry placeholder">Iniciando...</div>}
+                            </div>
                         </div>
                     ) : results ? (
                         <div className="sync-results">
@@ -116,18 +125,55 @@ export function SyncReportModal({ isOpen, onClose, results, isLoading }: SyncRep
                 .sync-loading {
                     display: flex;
                     flex-direction: column;
-                    align-items: center;
                     gap: var(--space-4);
-                    padding: var(--space-4) 0;
+                }
+
+                .spinner-container {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--space-3);
+                    justify-content: center;
+                    padding-bottom: var(--space-2);
                 }
 
                 .spinner {
-                    width: 32px;
-                    height: 32px;
-                    border: 3px solid var(--color-border);
+                    width: 24px;
+                    height: 24px;
+                    border: 2px solid var(--color-border);
                     border-top-color: var(--color-accent);
                     border-radius: 50%;
                     animation: spin 1s linear infinite;
+                }
+                
+                .logs-container {
+                    background: var(--color-bg-secondary);
+                    border-radius: var(--radius-md);
+                    padding: var(--space-3);
+                    height: 150px;
+                    overflow-y: auto;
+                    font-family: monospace;
+                    font-size: 0.8rem;
+                    border: 1px solid var(--color-border);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+                
+                .log-entry {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    color: var(--color-text-secondary);
+                }
+                
+                .log-entry:last-child {
+                    color: var(--color-text-primary);
+                    font-weight: 500;
+                }
+
+                .log-entry.placeholder {
+                    color: var(--color-text-tertiary);
+                    font-style: italic;
                 }
 
                 .result-item {

@@ -175,18 +175,24 @@ export interface ServerFile {
     modifiedTime: string;
 }
 
-export async function syncWithServer(): Promise<{ added: number; removed: number; errors: string[] }> {
+export async function syncWithServer(onProgress?: (log: string) => void): Promise<{ added: number; removed: number; errors: string[] }> {
     let added = 0;
     const errors: string[] = [];
+    const log = (msg: string) => {
+        console.log(msg);
+        if (onProgress) onProgress(msg);
+    };
 
     try {
         // 1. Fetch list of files from server
+        log('Conectando con el servidor...');
         const customPath = localStorage.getItem('lectro_server_path');
         const headers: HeadersInit = {};
         if (customPath) {
             headers['x-library-path'] = customPath;
         }
 
+        log('Escaneando archivos en el servidor...');
         const response = await fetch('/api/library/scan', { headers });
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
@@ -195,27 +201,26 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
         const data = await response.json();
         const serverFiles: ServerFile[] = data.files || [];
 
-        console.log('Server files found:', serverFiles.length);
+        log(`Encontrados ${serverFiles.length} archivos en el servidor.`);
 
         // 2. Process each file
+        let processed = 0;
         for (const fileInfo of serverFiles) {
+            processed++;
             try {
                 // Determine the correct identifier: prefer relativePath, fallback to name
                 const currentPath = fileInfo.relativePath || fileInfo.name;
+
+                // log(`Procesando (${processed}/${serverFiles.length}): ${currentPath}`); // Too verbose? no, good for debug context
 
                 // Check uniqueness by filePath (new standard) OR fileName (legacy migration)
                 let existing = await db.books.where('filePath').equals(currentPath).first();
 
                 if (!existing && !fileInfo.relativePath) {
-                    // Fallback check by fileName ONLY if we don't have a structured path from server (shouldn't happen with new API)
-                    // or if we want to migrate old flat library entries.
                     existing = await db.books.where('fileName').equals(fileInfo.name).first();
                 } else if (!existing && fileInfo.relativePath) {
-                    // If we have a relativePath, check if there's a legacy entry with just the filename that matches the basename
-                    // This is risky if duplicates exist, but assumes migration of previously single-folder library.
                     const potentialLegacy = await db.books.where('fileName').equals(fileInfo.name).first();
                     if (potentialLegacy && !potentialLegacy.filePath) {
-                        // Assuming this is the same book (migration)
                         existing = potentialLegacy;
                     }
                 }
@@ -223,9 +228,8 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
                 if (existing) {
                     const updates: Partial<Book> = { isOnServer: true };
 
-                    // Update filePath if it's missing or different (migration/update)
                     if (existing.filePath !== currentPath) {
-                        console.log(`Updating filePath for book: ${existing.title} -> ${currentPath}`);
+                        // log(`Actualizando ruta: ${existing.title}`);
                         updates.filePath = currentPath;
                     }
 
@@ -235,12 +239,9 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
                     continue; // Skip download
                 }
 
-                console.log('Downloading from server:', currentPath);
-                // Use relativePath if available (for nested files), otherwise fallback to name
-                const targetPath = fileInfo.relativePath || fileInfo.name;
-                // Encode path components properly (slashes must be preserved if using path param, or encoded if using filename)
-                // Our API implementation now uses query param 'path' for relative paths.
+                log(`Descargando (${processed}/${serverFiles.length}): ${currentPath}`);
 
+                // Use relativePath if available (for nested files), otherwise fallback to name
                 let downloadUrl = `/api/library/file/${encodeURIComponent(fileInfo.name)}`;
                 if (fileInfo.relativePath) {
                     // Use path param for nested files
@@ -256,24 +257,18 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
                 }
 
                 const blob = await fileRes.blob();
-                // Create a File object from Blob to reuse existing logic if possible, 
-                // or just pass to a helper. 
-                // We'll mimic a File object since our logic often expects name/lastModified
                 const file = new File([blob], fileInfo.name, {
                     type: fileInfo.name.endsWith('.epub') ? 'application/epub+zip' : 'application/pdf',
                     lastModified: new Date(fileInfo.modifiedTime).getTime()
                 });
 
-                // Reuse logic similar to processFileEntry but we don't have a Handle
-                // We can extract the core logic of processFileEntry into a helper or just duplicate the minimal needed parts here.
-                // Refactoring processFileEntry to share logic is cleaner.
                 const book = await processFileBlob(file);
 
                 if (book) {
-                    book.filePath = currentPath; // Save the path!
-                    // Ensure author is set efficiently if we can derive it from path (optional, epub metadata usually better)
+                    book.filePath = currentPath;
                     await addBook(book);
                     added++;
+                    // log(`Importado: ${book.title}`);
                 }
 
             } catch (err) {
@@ -283,8 +278,10 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
         }
 
         // 3. Handle deletions
+        log('Verificando archivos eliminados...');
         const removed = await handleDeletions(serverFiles, errors);
 
+        log(`Sincronización completada. +${added} / -${removed}`);
         return { added, removed, errors };
 
     } catch (err) {
