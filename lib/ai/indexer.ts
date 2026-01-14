@@ -112,10 +112,17 @@ export class LibraryIndexer {
         const chunks: { text: string, chapterTitle: string, cfi: string }[] = [];
 
         // Iterate over spine items (chapters)
+        // Iterate over spine items (chapters)
         // @ts-ignore
         const spine = book.spine as any;
+        const sections: any[] = [];
 
-        for (const item of spine.items) {
+        // Use the public API to iterate sections ensures we get initialized Section objects
+        spine.each((section: any) => {
+            sections.push(section);
+        });
+
+        for (const item of sections) {
             if (this.isCancelled) break;
 
             try {
