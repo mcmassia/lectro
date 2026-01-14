@@ -307,20 +307,7 @@ export default function ReaderPage() {
                 </div>
             )}
 
-            {/* Floating sidebar toggle button */}
-            <button
-                className="sidebar-toggle-fab"
-                onClick={() => setReaderSidebarOpen(!readerSidebarOpen)}
-                title={readerSidebarOpen ? 'Cerrar panel' : 'Abrir panel'}
-            >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-                    {readerSidebarOpen ? (
-                        <polyline points="9 18 15 12 9 6" />
-                    ) : (
-                        <polyline points="15 18 9 12 15 6" />
-                    )}
-                </svg>
-            </button>
+            {/* Floating sidebar toggle button removed as per user request */}
 
             <style jsx>{`
         .reader-container {

@@ -13,14 +13,19 @@ if (!API_KEY) {
 const genAI = new GoogleGenerativeAI(API_KEY);
 
 // Models
-export const geminiPro = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-export const geminiProVision = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+// Models
+export const geminiPro = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+export const geminiProVision = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
 
 // ===================================
 // X-Ray Generation
 // ===================================
 
 export interface XRayResult {
+    language: string;
+    summary: string;
+    plot: string;
+    keyPoints: string[];
     characters: XRayEntity[];
     places: XRayEntity[];
     terms: XRayEntity[];
@@ -32,45 +37,67 @@ export interface XRayEntity {
     importance: 'main' | 'secondary' | 'minor';
 }
 
-export async function generateXRay(bookContent: string, bookTitle: string): Promise<XRayResult> {
-    const prompt = `Analyze the following book content and extract key entities. For each entity, provide a brief description and its importance level.
+export async function generateXRay(bookContent: string, bookTitle: string, modelName: string = 'gemini-1.5-pro'): Promise<XRayResult> {
+    const prompt = `Analyze the provided book content for "${bookTitle}".
+    
+First, detect the language of the book content (e.g., Spanish, English, French).
+You MUST respond IN THE SAME LANGUAGE as the book.
 
-Book Title: ${bookTitle}
+Your task is to generate an "X-Ray" deep dive analysis.
 
-Content:
-${bookContent.slice(0, 50000)} // Limit to avoid token limits
+Required Information:
+1. Language: The 2-letter code of the detected language (e.g., 'es', 'en').
+2. Summary (Resumen): A high-level overview of the book (in the book's language).
+3. Plot (Trama/Historia): A detailed description of the plot or main arguments (in the book's language).
+4. Key Points (Puntos Clave): 5-7 most important bullet points or themes (in the book's language).
+5. Characters: Key characters with descriptions and importance.
+6. Places: Important settings or locations.
+7. Terms: Key technical terms, jargon, or unique concepts.
 
-Please respond with a JSON object in this exact format:
+Content Excerpt:
+${bookContent.slice(0, 60000)}
+
+Respond strictly with this JSON structure:
 {
+  "language": "es",
+  "summary": "...",
+  "plot": "...",
+  "keyPoints": ["...", "..."],
   "characters": [
-    {"name": "Character Name", "description": "Brief description of the character and their role", "importance": "main|secondary|minor"}
+    {"name": "Name", "description": "...", "importance": "main|secondary|minor"}
   ],
-  "places": [
-    {"name": "Place Name", "description": "Brief description of the location and its significance", "importance": "main|secondary|minor"}
-  ],
-  "terms": [
-    {"name": "Technical Term", "description": "Definition and context of the term", "importance": "main|secondary|minor"}
-  ]
+  "places": [ {"name": "Place Name", "description": "Description of place..."} ],
+  "terms": [ {"name": "Term Name", "description": "Definition of term..."} ]
 }
 
-Focus on:
-- Characters: Main protagonists, antagonists, and important supporting characters
-- Places: Settings, cities, worlds, or significant locations
-- Terms: Technical vocabulary, concepts, or invented terms specific to the book
-
-Respond ONLY with the JSON object, no additional text.`;
+Ensure "places" and "terms" are ALWAYS arrays of objects with "name" and "description" fields. DO NOT return simple strings for these arrays. Ensure all descriptions are in the DETECTED LANGUAGE of the book. Respond ONLY with the JSON.`;
 
     try {
-        const result = await geminiPro.generateContent(prompt);
-        const response = result.response.text();
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+                responseMimeType: "application/json",
+                maxOutputTokens: 8192, // Ensure enough tokens for full JSON
+            }
+        });
+        const result = await model.generateContent(prompt);
+        let response = result.response.text();
+
+        // Remove markdown code blocks if present (even with JSON mode it happens sometimes)
+        response = response.replace(/^```json\n/, '').replace(/\n```$/, '');
 
         // Parse JSON from response
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-            throw new Error('Failed to parse X-Ray response');
+        // Try parsing directly first, if fails then try regex
+        try {
+            return JSON.parse(response) as XRayResult;
+        } catch (e) {
+            const jsonMatch = response.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error('Failed to parse X-Ray response: ' + response.slice(0, 100));
+            }
+            return JSON.parse(jsonMatch[0]) as XRayResult;
         }
 
-        return JSON.parse(jsonMatch[0]) as XRayResult;
     } catch (error) {
         console.error('X-Ray generation error:', error);
         throw error;

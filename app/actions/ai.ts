@@ -40,14 +40,14 @@ export async function generateEmbeddingAction(text: string): Promise<{ success: 
     }
 }
 
-export async function generateXRayAction(content: string, title: string): Promise<{ success: boolean; data?: XRayResult; error?: string }> {
+export async function generateXRayAction(content: string, title: string, modelName: string = 'gemini-1.5-pro'): Promise<{ success: boolean; data?: XRayResult; error?: string }> {
     if (!process.env.GEMINI_API_KEY) {
         return { success: false, error: 'Configuration Error: Gemini API Key is missing.' };
     }
 
     try {
         const { generateXRay } = await import('@/lib/ai/gemini');
-        const data = await generateXRay(content, title);
+        const data = await generateXRay(content, title, modelName);
         return { success: true, data };
     } catch (error: any) {
         console.error('X-Ray error:', error);

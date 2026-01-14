@@ -16,7 +16,7 @@ interface ReaderSidebarProps {
 }
 
 export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, onTocItemClick, onEditAnnotation, onDeleteAnnotation }: ReaderSidebarProps) {
-    const { readerSidebarTab, setReaderSidebarTab, readerSettings, updateReaderSettings } = useAppStore();
+    const { readerSidebarTab, setReaderSidebarTab, readerSettings, updateReaderSettings, aiModel } = useAppStore();
     const { setCurrentCfi } = useReaderStore();
     const [xrayData, setXrayData] = useState<XRayData | null>(null);
     const [isGeneratingXray, setIsGeneratingXray] = useState(false);
@@ -26,6 +26,41 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
     const [editNote, setEditNote] = useState('');
     const [editColor, setEditColor] = useState<HighlightColor>('yellow');
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+    // Sidebar Resize State
+    const [sidebarWidth, setSidebarWidth] = useState(350);
+    const [isResizing, setIsResizing] = useState(false);
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (isResizing) {
+                // Sidebar is on the RIGHT.
+                // Width = Window Width - Mouse X
+                const newWidth = window.innerWidth - e.clientX;
+                if (newWidth > 250 && newWidth < 800) {
+                    setSidebarWidth(newWidth);
+                }
+            }
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto';
+        };
+
+        if (isResizing) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isResizing]);
 
     // Load X-Ray data
     useEffect(() => {
@@ -69,40 +104,56 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
             // Ideally we'd use the same robust extraction logic as indexer, but let's keep it simple for MVP client-side
 
             console.log(`X-Ray: Processing ${sections.length} sections`);
+            // Strategy: Use JSZip directly to read files. This bypasses all browser/CORS/iframe issues.
+            const JSZip = (await import('jszip')).default;
+            const zip = await JSZip.loadAsync(book.fileBlob);
 
             for (const item of sections) {
                 if (fullText.length >= limit) break;
 
+                let text = '';
+                const href = item.href;
+
                 try {
-                    const doc = await item.load(bookInstance.load.bind(bookInstance));
+                    // Try to find the file in the zip
+                    // epubjs hrefs might be relative, so we might need to adjust or search
+                    // Usually item.href matches the path in the zip (e.g. OEBPS/Text/section.xhtml)
 
-                    let text = '';
-                    if (doc instanceof Document) {
-                        // Prefer textContent for robustness, it works even if not rendered
-                        const root = doc.body || doc.documentElement;
-                        if (root && root.textContent) {
-                            text = root.textContent;
-                        }
-                    } else if (typeof doc === 'string') {
-                        // Sometimes it returns raw string
+                    let zipFile = zip.file(href);
+
+                    // Fallback: search for file if strict path fails (handle leading slash)
+                    if (!zipFile) {
+                        const cleanHref = href.replace(/^\//, '');
+                        zipFile = zip.file(cleanHref);
+                    }
+
+                    // Recursive search/fuzzy match if still not found (common in epubs)
+                    if (!zipFile) {
+                        const files = Object.keys(zip.files);
+                        const match = files.find(f => f.endsWith(href) || href.endsWith(f));
+                        if (match) zipFile = zip.file(match);
+                    }
+
+                    if (zipFile) {
+                        const rawContent = await zipFile.async('string');
                         const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = doc;
-                        text = tempDiv.textContent || '';
-                    }
-
-                    // Clean up text
-                    text = text.replace(/\s+/g, ' ').trim();
-
-                    if (text) {
-                        fullText += text + '\n\n';
+                        tempDiv.innerHTML = rawContent;
+                        // Basic cleanup
+                        text = (tempDiv.textContent || '').replace(/\s+/g, ' ').trim();
+                        if (text) console.log(`X-Ray: Extracted ${text.length} chars via JSZip for ${href}`);
                     } else {
-                        console.warn(`X-Ray: No text found in ${item.href}`);
+                        console.warn(`X-Ray: File ${href} not found in zip`);
                     }
 
-                    item.unload();
                 } catch (e) {
-                    console.error('Error reading chapter for X-Ray:', e);
+                    console.warn(`X-Ray: JSZip extraction failed for ${href}`, e);
                 }
+
+                if (text) {
+                    fullText += text + '\n\n';
+                }
+
+                // No need to unload item as we didn't use item.load()
             }
 
             bookInstance.destroy();
@@ -114,7 +165,7 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
 
             // Call server action
             const { generateXRayAction } = await import('@/app/actions/ai');
-            const result = await generateXRayAction(fullText, book.title);
+            const result = await generateXRayAction(fullText, book.title, aiModel);
 
             if (result.success && result.data) {
                 const { saveXRayData } = await import('@/lib/db');
@@ -123,9 +174,28 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
                     id: crypto.randomUUID(),
                     bookId: book.id,
                     generatedAt: new Date(),
-                    characters: result.data.characters.map((c: any) => ({ ...c, mentions: [] })),
-                    places: result.data.places.map((p: any) => ({ ...p, mentions: [] })),
-                    terms: result.data.terms.map((t: any) => ({ ...t, mentions: [] }))
+                    language: result.data.language,
+                    summary: result.data.summary,
+                    plot: result.data.plot,
+                    keyPoints: result.data.keyPoints,
+                    characters: result.data.characters.map((c: any) => ({
+                        ...c,
+                        name: c.name || c.Name || 'Sin nombre',
+                        description: c.description || c.Description || '',
+                        mentions: []
+                    })),
+                    places: result.data.places.map((p: any) => ({
+                        ...p,
+                        name: p.name || p.Name || (typeof p === 'string' ? p : 'Sin nombre'),
+                        description: p.description || p.Description || '',
+                        mentions: []
+                    })),
+                    terms: result.data.terms.map((t: any) => ({
+                        ...t,
+                        name: t.name || t.Name || (typeof t === 'string' ? t : 'Sin nombre'),
+                        description: t.description || t.Description || '',
+                        mentions: []
+                    }))
                 };
 
                 await saveXRayData(mappedData);
@@ -181,8 +251,65 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
         setDeleteConfirmId(null);
     };
 
+    const handleExportMarkdown = () => {
+        if (!xrayData) return;
+
+        let md = `# X-Ray: ${book.title}\n\n`;
+        md += `*Generado por Lectro AI el ${new Date().toLocaleDateString()}*\n\n`;
+
+        if (xrayData.summary) md += `## Resumen\n\n${xrayData.summary}\n\n`;
+        if (xrayData.plot) md += `## Trama / Historia\n\n${xrayData.plot}\n\n`;
+
+        if (xrayData.keyPoints && xrayData.keyPoints.length > 0) {
+            md += `## Puntos Clave\n\n`;
+            xrayData.keyPoints.forEach(p => md += `- ${p}\n`);
+            md += '\n';
+        }
+
+        md += `## Personajes\n\n`;
+        xrayData.characters.forEach(c => {
+            md += `### ${c.name} (${c.importance})\n${c.description}\n\n`;
+        });
+
+        md += `## Lugares\n\n`;
+        xrayData.places.forEach(p => {
+            md += `### ${p.name}\n${p.description}\n\n`;
+        });
+
+        md += `## Términos\n\n`;
+        xrayData.terms.forEach(t => {
+            md += `### ${t.name}\n${t.description}\n\n`;
+        });
+
+        const blob = new Blob([md], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${book.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_xray.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     return (
-        <aside className="reader-sidebar">
+        <aside className="reader-sidebar" style={{ width: sidebarWidth, position: 'relative' }}>
+            <div
+                className="sidebar-resizer"
+                onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }}
+                style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: '16px', // Even wider hit area
+                    marginLeft: '-8px',
+                    cursor: 'col-resize',
+                    zIndex: 9999, // Ensure it's above everything
+                    background: isResizing ? 'rgba(0,0,0,0.1)' : 'transparent',
+                    transition: 'background 0.2s'
+                }}
+            />
             <div className="reader-sidebar-header">
                 <div className="reader-sidebar-tabs">
                     <button
@@ -316,16 +443,89 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
 
                 {/* X-Ray */}
                 {readerSidebarTab === 'xray' && (
-                    <div className="xray-content">
+                    <div
+                        className="xray-content"
+                        style={{
+                            fontFamily: readerSettings.fontFamily,
+                            // Use a relative size or specific size based on settings, but maybe slightly smaller/adjusted for sidebar density?
+                            // User asked: "el estilo de fuente y su tamaño configurado en los ajustes del lector no está aplicando al x-ray"
+                            // So let's apply it directly.
+                            fontSize: `${readerSettings.fontSize}px`,
+                            lineHeight: readerSettings.lineHeight
+                        }}
+                    >
                         {xrayData ? (
                             <div className="xray-sections">
+                                <div className="xray-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '16px' }}>
+                                    <button
+                                        className="btn btn-ghost btn-sm btn-icon"
+                                        onClick={handleGenerateXRay}
+                                        title="Regenerar X-Ray"
+                                        disabled={isGeneratingXray}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                                            <path d="M21 3v5h-5" />
+                                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                                            <path d="M3 21v-5h5" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        className="btn btn-ghost btn-sm btn-icon"
+                                        onClick={handleExportMarkdown}
+                                        title="Exportar como Markdown"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                            <polyline points="7 10 12 15 17 10" />
+                                            <line x1="12" x2="12" y1="15" y2="3" />
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                {xrayData.summary && (
+                                    <div className="xray-section">
+                                        <h4 className="xray-section-title">Resumen</h4>
+                                        <p className="xray-description">{xrayData.summary}</p>
+                                    </div>
+                                )}
+
+                                {xrayData.plot && (
+                                    <div className="xray-section">
+                                        <h4 className="xray-section-title">Trama / Historia</h4>
+                                        <p className="xray-description">{xrayData.plot}</p>
+                                    </div>
+                                )}
+
+                                {xrayData.keyPoints && xrayData.keyPoints.length > 0 && (
+                                    <div className="xray-section">
+                                        <h4 className="xray-section-title">Puntos Clave</h4>
+                                        <ul className="xray-list" style={{
+                                            paddingLeft: '20px',
+                                            margin: 0,
+                                            // Inherit fonts from reader settings or app defaults to match rest of text
+                                            fontFamily: 'inherit',
+                                            fontSize: 'inherit'
+                                        }}>
+                                            {xrayData.keyPoints.map((point, i) => (
+                                                <li key={i} className="xray-list-item" style={{ marginBottom: '8px' }}>
+                                                    {point}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
                                 {xrayData.characters.length > 0 && (
                                     <div className="xray-section">
                                         <h4 className="xray-section-title">Personajes</h4>
                                         {xrayData.characters.map((char, i) => (
                                             <div key={i} className="xray-item">
-                                                <span className="xray-name">{char.name}</span>
-                                                <p className="xray-description">{char.description}</p>
+                                                <div className="xray-header">
+                                                    <span className="xray-name">{char.name || 'Sin nombre'}</span>
+                                                    <span className={`xray-badge badge-${char.importance}`}>{char.importance === 'main' ? 'Principal' : char.importance === 'secondary' ? 'Secundario' : 'Menor'}</span>
+                                                </div>
+                                                <p className="xray-description">{char.description || ''}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -335,8 +535,8 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
                                         <h4 className="xray-section-title">Lugares</h4>
                                         {xrayData.places.map((place, i) => (
                                             <div key={i} className="xray-item">
-                                                <span className="xray-name">{place.name}</span>
-                                                <p className="xray-description">{place.description}</p>
+                                                <span className="xray-name">{place.name || (typeof place === 'string' ? place : 'Sin nombre')}</span>
+                                                <p className="xray-description">{place.description || ''}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -346,8 +546,8 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
                                         <h4 className="xray-section-title">Términos</h4>
                                         {xrayData.terms.map((term, i) => (
                                             <div key={i} className="xray-item">
-                                                <span className="xray-name">{term.name}</span>
-                                                <p className="xray-description">{term.description}</p>
+                                                <span className="xray-name">{term.name || (typeof term === 'string' ? term : 'Sin nombre')}</span>
+                                                <p className="xray-description">{term.description || ''}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -890,7 +1090,9 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
         }
 
         .xray-section-title {
-          font-size: var(--text-sm);
+          /* font-size removed to inherit, maybe keep it slightly larger optionally, but user wants consistency. 
+             Let's make it 1.1em to be relative */
+          font-size: 1.1em;
           font-weight: 600;
           color: var(--color-text-primary);
           margin-bottom: var(--space-3);
@@ -904,13 +1106,13 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
         }
 
         .xray-name {
-          font-size: var(--text-sm);
+          /* font-size removed to inherit */
           font-weight: 600;
           color: var(--color-accent);
         }
 
         .xray-description {
-          font-size: var(--text-xs);
+          /* font-size removed to inherit from parent .xray-content */
           color: var(--color-text-secondary);
           margin-top: var(--space-1);
         }

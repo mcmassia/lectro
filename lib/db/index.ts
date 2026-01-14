@@ -82,6 +82,10 @@ export interface XRayData {
   characters: XRayEntity[];
   places: XRayEntity[];
   terms: XRayEntity[];
+  language?: string;
+  summary?: string;
+  plot?: string;
+  keyPoints?: string[];
   generatedAt: Date;
 }
 
