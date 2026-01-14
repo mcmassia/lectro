@@ -211,12 +211,23 @@ export default function Home() {
                   <button className={`btn btn-icon ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')}><ListIcon /></button>
                 </div>
 
-                <button className="btn btn-secondary btn-icon" onClick={handleSync} title="Sincronizar con servidor">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
-                    <line x1="16" y1="3" x2="21" y2="3" />
-                    <line x1="21" y1="3" x2="21" y2="8" />
-                    <line x1="21" y1="3" x2="10" y2="14" />
+                <button
+                  className={`btn btn-secondary btn-icon ${isSyncing ? 'loading' : ''}`}
+                  onClick={handleSync}
+                  title="Sincronizar con servidor"
+                  disabled={isSyncing}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20" className={isSyncing ? 'animate-spin' : ''}>
+                    {isSyncing ? (
+                      <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+                    ) : (
+                      <>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+                        <line x1="16" y1="3" x2="21" y2="3" />
+                        <line x1="21" y1="3" x2="21" y2="8" />
+                        <line x1="21" y1="3" x2="10" y2="14" />
+                      </>
+                    )}
                   </svg>
                 </button>
                 <button className="btn btn-primary btn-import" onClick={() => setShowImport(true)} title="Importar">

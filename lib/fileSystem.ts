@@ -200,18 +200,42 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
         // 2. Process each file
         for (const fileInfo of serverFiles) {
             try {
-                // Check uniqueness by fileName for now (could be improved)
-                const existing = await db.books.where('fileName').equals(fileInfo.name).first();
+                // Determine the correct identifier: prefer relativePath, fallback to name
+                const currentPath = fileInfo.relativePath || fileInfo.name;
+
+                // Check uniqueness by filePath (new standard) OR fileName (legacy migration)
+                let existing = await db.books.where('filePath').equals(currentPath).first();
+
+                if (!existing && !fileInfo.relativePath) {
+                    // Fallback check by fileName ONLY if we don't have a structured path from server (shouldn't happen with new API)
+                    // or if we want to migrate old flat library entries.
+                    existing = await db.books.where('fileName').equals(fileInfo.name).first();
+                } else if (!existing && fileInfo.relativePath) {
+                    // If we have a relativePath, check if there's a legacy entry with just the filename that matches the basename
+                    // This is risky if duplicates exist, but assumes migration of previously single-folder library.
+                    const potentialLegacy = await db.books.where('fileName').equals(fileInfo.name).first();
+                    if (potentialLegacy && !potentialLegacy.filePath) {
+                        // Assuming this is the same book (migration)
+                        existing = potentialLegacy;
+                    }
+                }
+
                 if (existing) {
-                    // Update existing book to be marked as on server if not already
-                    if (!existing.isOnServer) {
-                        console.log('Marking existing book as on server:', existing.title);
-                        await db.books.update(existing.id, { isOnServer: true });
+                    const updates: Partial<Book> = { isOnServer: true };
+
+                    // Update filePath if it's missing or different (migration/update)
+                    if (existing.filePath !== currentPath) {
+                        console.log(`Updating filePath for book: ${existing.title} -> ${currentPath}`);
+                        updates.filePath = currentPath;
+                    }
+
+                    if (!existing.isOnServer || existing.filePath !== currentPath) {
+                        await db.books.update(existing.id, updates);
                     }
                     continue; // Skip download
                 }
 
-                console.log('Downloading from server:', fileInfo.name);
+                console.log('Downloading from server:', currentPath);
                 // Use relativePath if available (for nested files), otherwise fallback to name
                 const targetPath = fileInfo.relativePath || fileInfo.name;
                 // Encode path components properly (slashes must be preserved if using path param, or encoded if using filename)
@@ -226,8 +250,8 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
                 const fileRes = await fetch(downloadUrl, { headers });
 
                 if (!fileRes.ok) {
-                    console.error('Failed to download:', fileInfo.name);
-                    errors.push(`Failed to download ${fileInfo.name}`);
+                    console.error('Failed to download:', currentPath);
+                    errors.push(`Failed to download ${currentPath}`);
                     continue;
                 }
 
@@ -246,6 +270,7 @@ export async function syncWithServer(): Promise<{ added: number; removed: number
                 const book = await processFileBlob(file);
 
                 if (book) {
+                    book.filePath = currentPath; // Save the path!
                     // Ensure author is set efficiently if we can derive it from path (optional, epub metadata usually better)
                     await addBook(book);
                     added++;

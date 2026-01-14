@@ -11,6 +11,7 @@ export interface Book {
   cover?: string; // Base64 or blob URL
   format: 'epub' | 'pdf';
   fileName: string;
+  filePath?: string; // Relative path on server (e.g. Author/Book/file.epub)
   fileBlob: Blob;
   fileSize: number;
   addedAt: Date;
@@ -24,6 +25,8 @@ export interface Book {
   isOnServer?: boolean;
   isFavorite?: boolean;
 }
+
+
 
 
 
@@ -195,6 +198,10 @@ export class LectroDB extends Dexie {
 
     this.version(4).stores({
       books: 'id, title, author, format, addedAt, lastReadAt, progress, status, fileName, isOnServer, isFavorite',
+    });
+
+    this.version(5).stores({
+      books: 'id, title, author, format, addedAt, lastReadAt, progress, status, fileName, filePath, isOnServer, isFavorite',
     });
   }
 }

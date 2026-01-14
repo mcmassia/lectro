@@ -47,25 +47,36 @@ export async function GET(req: NextRequest) {
             if (currentDepth > maxDepth) return [];
 
             let results: { name: string, relativePath: string, size: number, modifiedTime: string }[] = [];
-            const list = fs.readdirSync(dir);
 
-            for (const file of list) {
-                const filePath = path.join(dir, file);
-                const stat = fs.statSync(filePath);
+            try {
+                const list = fs.readdirSync(dir);
 
-                if (stat && stat.isDirectory()) {
-                    results = results.concat(getFilesRecursively(filePath, baseDir, currentDepth + 1, maxDepth));
-                } else {
-                    const ext = path.extname(file).toLowerCase();
-                    if (ext === '.epub' || ext === '.pdf') {
-                        results.push({
-                            name: file,
-                            relativePath: path.relative(baseDir, filePath),
-                            size: stat.size,
-                            modifiedTime: stat.mtime.toISOString(),
-                        });
+                for (const file of list) {
+                    try {
+                        const filePath = path.join(dir, file);
+                        const stat = fs.statSync(filePath);
+
+                        if (stat && stat.isDirectory()) {
+                            results = results.concat(getFilesRecursively(filePath, baseDir, currentDepth + 1, maxDepth));
+                        } else {
+                            const ext = path.extname(file).toLowerCase();
+                            if (ext === '.epub' || ext === '.pdf') {
+                                results.push({
+                                    name: file,
+                                    relativePath: path.relative(baseDir, filePath),
+                                    size: stat.size,
+                                    modifiedTime: stat.mtime.toISOString(),
+                                });
+                            }
+                        }
+                    } catch (err) {
+                        console.warn(`Error processing file in ${dir}: ${file}`, err);
+                        // Skip problematic file
                     }
                 }
+            } catch (err) {
+                console.warn(`Error reading directory ${dir}:`, err);
+                // Skip problematic directory
             }
             return results;
         };
