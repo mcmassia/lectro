@@ -5,8 +5,13 @@ import { useParams, useRouter } from 'next/navigation';
 import { useReaderStore, useAppStore } from '@/stores/appStore';
 import { getBook, updateBook, getAnnotationsForBook, addAnnotation, updateAnnotation, deleteAnnotation, Annotation, Book, HighlightColor } from '@/lib/db';
 import { EpubReader, EpubReaderRef, TocItem } from '@/components/reader/EpubReader';
-import { PdfReader } from '@/components/reader/PdfReader';
+import dynamic from 'next/dynamic';
 import { ReaderToolbar } from '@/components/reader/ReaderToolbar';
+
+const PdfReader = dynamic(() => import('@/components/reader/PdfReader').then(mod => mod.PdfReader), {
+    ssr: false,
+    loading: () => <div className="loading">Cargando lector PDF...</div>
+});
 import { ReaderSidebar } from '@/components/reader/ReaderSidebar';
 import { v4 as uuid } from 'uuid';
 

@@ -67,31 +67,36 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
 
             // Use simple iteration for now, assuming standard spine
             // Ideally we'd use the same robust extraction logic as indexer, but let's keep it simple for MVP client-side
+
+            console.log(`X-Ray: Processing ${sections.length} sections`);
+
             for (const item of sections) {
                 if (fullText.length >= limit) break;
 
                 try {
                     const doc = await item.load(bookInstance.load.bind(bookInstance));
-                    // Extract text similar to indexer
-                    const tempDiv = document.createElement('div');
+
+                    let text = '';
                     if (doc instanceof Document) {
+                        // Prefer textContent for robustness, it works even if not rendered
                         const root = doc.body || doc.documentElement;
-                        if (root) tempDiv.innerHTML = root.innerHTML;
+                        if (root && root.textContent) {
+                            text = root.textContent;
+                        }
                     } else if (typeof doc === 'string') {
+                        // Sometimes it returns raw string
+                        const tempDiv = document.createElement('div');
                         tempDiv.innerHTML = doc;
+                        text = tempDiv.textContent || '';
                     }
 
-                    // Attach for robust extraction
-                    tempDiv.style.position = 'absolute';
-                    tempDiv.style.left = '-9999px';
-                    document.body.appendChild(tempDiv);
-
-                    const text = (tempDiv.innerText || tempDiv.textContent || '').replace(/\s+/g, ' ').trim();
-
-                    document.body.removeChild(tempDiv);
+                    // Clean up text
+                    text = text.replace(/\s+/g, ' ').trim();
 
                     if (text) {
                         fullText += text + '\n\n';
+                    } else {
+                        console.warn(`X-Ray: No text found in ${item.href}`);
                     }
 
                     item.unload();
@@ -103,6 +108,7 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
             bookInstance.destroy();
 
             if (!fullText) {
+                console.error('X-Ray: Full text is empty after processing sections');
                 throw new Error('Could not extract text from book');
             }
 
