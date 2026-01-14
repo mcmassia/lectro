@@ -132,28 +132,34 @@ export class LibraryIndexer {
                     // Start with body if available (HTML), else documentElement (XHTML/XML)
                     const root = doc.body || doc.documentElement;
                     if (root) {
-                        // textContent extracts text from all nodes. 
-                        // To avoid scripts/styles, we should ideally sanitize, but for now let's grab plain text.
-                        // innerText is better but might trigger reflows or need attachment. 
-                        // Let's try to get innerHTML and put it in a div to rely on browser's innerText behavior which handles style/script tags better usually.
                         tempDiv.innerHTML = root.innerHTML;
-                    } else {
-                        console.warn('Document has no body or documentElement', item.href);
                     }
                 } else if (typeof doc === 'string') {
                     tempDiv.innerHTML = doc;
                 }
 
-                // Get text and basic cleaning
-                const text = (tempDiv.innerText || tempDiv.textContent || '')
-                    .replace(/\s+/g, ' ') // Collapse whitespace
+                // Append to body to ensure innerText works (Safari/some browsers issue with detached nodes)
+                tempDiv.style.position = 'absolute';
+                tempDiv.style.left = '-9999px';
+                tempDiv.style.visibility = 'hidden';
+                document.body.appendChild(tempDiv);
+
+                // Get text - prefer innerText for layout awareness, fallback to textContent
+                let text = (tempDiv.innerText || tempDiv.textContent || '')
+                    .replace(/\s+/g, ' ')
                     .trim();
 
+                // Cleanup
+                document.body.removeChild(tempDiv);
+
                 if (!text) {
-                    // Diagnostic logging
-                    // console.warn(`Empty text for chapter ${item.href}`);
-                    if (doc instanceof Document && !doc.body) {
-                        // It was XML without body
+                    // Try fallback to simple textContent on root if detached extraction failed
+                    if (doc instanceof Document) {
+                        const root = doc.body || doc.documentElement;
+                        if (root && root.textContent) {
+                            // Use raw text content if innerText failed
+                            text = root.textContent.replace(/\s+/g, ' ').trim();
+                        }
                     }
                 }
 
