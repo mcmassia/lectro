@@ -182,7 +182,8 @@ export class ReadiumHelper {
                     // Ensure forward slashes for URL
                     const urlPath = fullPath.split(path.sep).join('/');
 
-                    const resourceUrl = `/api/readium/${this.bookId}/resource/${encodeURIComponent(urlPath)}`;
+                    // Preserve slashes so browser can resolve relative paths (e.g. ../Images/foo.jpg)
+                    const resourceUrl = `/api/readium/${this.bookId}/resource/${urlPath.split('/').map(encodeURIComponent).join('/')}`;
 
                     readingOrder.push({
                         href: resourceUrl,
@@ -227,7 +228,7 @@ export class ReadiumHelper {
                             const urlPath = targetPath.split(path.sep).join('/');
 
                             toc.push({
-                                href: `/api/readium/${this.bookId}/resource/${encodeURIComponent(urlPath)}`,
+                                href: `/api/readium/${this.bookId}/resource/${urlPath.split('/').map(encodeURIComponent).join('/')}`,
                                 title: labelMatch[1].trim(),
                                 type: 'application/xhtml+xml' // Assumption
                             });
