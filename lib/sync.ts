@@ -154,9 +154,9 @@ async function pushLocalData() {
         return chunks;
     };
 
-    // Strip blobs to reduce payload
+    // Strip blobs and covers to reduce payload
     const booksPayload = books.map(b => {
-        const { fileBlob, ...rest } = b;
+        const { fileBlob, cover, ...rest } = b;
         return rest;
     });
 

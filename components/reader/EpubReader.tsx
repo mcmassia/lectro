@@ -127,7 +127,7 @@ export const EpubReader = forwardRef<EpubReaderRef, EpubReaderProps>(function Ep
 
     // Initialize EPUB
     useEffect(() => {
-        if (!containerRef.current || !book.fileBlob) return;
+        if (!containerRef.current || (!book.fileBlob && !book.filePath)) return;
 
         let mounted = true;
 
@@ -142,11 +142,24 @@ export const EpubReader = forwardRef<EpubReaderRef, EpubReaderProps>(function Ep
                     epubRef.current = null;
                 }
 
-                // Create array buffer from blob
-                const arrayBuffer = await book.fileBlob.arrayBuffer();
+                let epubSource: ArrayBuffer | string;
+                if (book.fileBlob) {
+                    epubSource = await book.fileBlob.arrayBuffer();
+                } else if (book.filePath) {
+                    // Use streaming API
+                    // We need to encode parts but not slashes? 
+                    // The ...path catch-all in Next.js handles slashes in URL if properly formatted.
+                    // The previous API handler decodes components. 
+                    // We should encodeURIComponent each segment if we were constructing manually,
+                    // but book.filePath is usually "Author/Book/file.epub".
+                    // Ideally, we pass it as a path.
+                    epubSource = `/api/library/stream/${book.filePath}`;
+                } else {
+                    throw new Error('No book source available');
+                }
 
                 // Initialize epub
-                const epub = ePub(arrayBuffer);
+                const epub = ePub(epubSource);
                 epubRef.current = epub;
 
                 await epub.ready;

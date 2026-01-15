@@ -86,8 +86,8 @@ export const PdfReader = forwardRef<PdfReaderRef, PdfReaderProps>(({ book, onLoc
         if (book.fileBlob) {
             url = URL.createObjectURL(book.fileBlob);
             setPdfUrl(url);
-        } else if (book.cover && !book.fileBlob) {
-            // Fallback logic
+        } else if (book.filePath) {
+            setPdfUrl(`/api/library/stream/${book.filePath}`);
         }
 
         return () => {
