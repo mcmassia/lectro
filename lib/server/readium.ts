@@ -83,107 +83,105 @@ export class ReadiumHelper {
     }
 
     public getManifest(): ReadiumManifest {
-        // 1. Ensure unzipped
-        if (!this.isUnzipped()) {
-            this.unzip();
-        }
-
-        // 2. Parse OPF
-        // A. Find OPF Path from container.xml
-        const containerPath = path.join(this.cachePath, 'META-INF', 'container.xml');
-        const containerXml = fs.readFileSync(containerPath, 'utf8');
-        const opfMatch = containerXml.match(/full-path="([^"]+)"/);
-        if (!opfMatch) throw new Error('Invalid container.xml');
-        const opfRelPath = opfMatch[1];
-        const opfPath = path.join(this.cachePath, opfRelPath);
-        const opfDir = path.dirname(opfRelPath); // relative to root
-
-        const opfContent = fs.readFileSync(opfPath, 'utf8');
-
-        // B. Extract Metadata (Title, Author) - Simplified regex parsing for MVP
-        // A real XML parser (xmldom) would be safer but heavier.
-        const titleMatch = opfContent.match(/<dc:title[^>]*>([\s\S]*?)<\/dc:title>/);
-        const authorMatch = opfContent.match(/<dc:creator[^>]*>([\s\S]*?)<\/dc:creator>/);
-
-        const metadata = {
-            '@type': 'http://schema.org/Book',
-            title: titleMatch ? titleMatch[1] : 'Unknown',
-            author: authorMatch ? authorMatch[1] : 'Unknown',
-            identifier: `urn:lectro:${this.bookId}`
-        };
-
-        // C. Parse Manifest Items
-        const items: Record<string, { href: string; mediaType: string }> = {};
-        const itemRegex = /<item\s+([^>]+)\/>/g;
-        let match;
-        while ((match = itemRegex.exec(opfContent)) !== null) {
-            const attrs = match[1];
-            const idMatch = attrs.match(/id="([^"]+)"/);
-            const hrefMatch = attrs.match(/href="([^"]+)"/);
-            const mediaTypeMatch = attrs.match(/media-type="([^"]+)"/);
-
-            if (idMatch && hrefMatch && mediaTypeMatch) {
-                items[idMatch[1]] = {
-                    href: hrefMatch[1],
-                    mediaType: mediaTypeMatch[1]
-                };
+        try {
+            // 1. Ensure unzipped
+            if (!this.isUnzipped()) {
+                this.unzip();
             }
-        }
 
-        // D. Parse Spine (Reading Order)
-        const readingOrder: ReadiumLink[] = [];
-        const spineRegex = /<itemref\s+idref="([^"]+)"/g;
-        while ((match = spineRegex.exec(opfContent)) !== null) {
-            const idref = match[1];
-            const item = items[idref];
-            if (item) {
-                // Hrefs in manifest must be relative to the manifest file URL?
-                // Or absolute? 
-                // In Readium Web Publication, resources are typically relative to the manifest.
-                // But our files are inside a subfolder structure (maybe). 
-                // If OPF is in OEBPS/, and item is Text/chap1.xhtml, the link should be OEBPS/Text/chap1.xhtml?
-                // No, usually OPF defines resources relative to itself. 
-                // Readium Manifest usually served from root? 
-                // Let's assume we serve manifest from /api/readium/[id]/manifest
-                // And resources from /api/readium/[id]/resource/...
-
-                // We need to construct the URL for the resource.
-                // Let's make it easy: href = `../resource/${opfDir}/${item.href}`? 
-                // Or if opfDir is empty, `../resource/${item.href}`
-
-                // Correct logic:
-                // The resource path relative to the book root is `path.join(opfDir, item.href)`.
-                // Our Resource API expects the path relative to book root.
-
-                const fullPath = opfDir === '.' ? item.href : `${opfDir}/${item.href}`;
-
-                // Readium WebPub Manifest hrefs should be URI-escaped.
-                // And usually relative to the manifest.
-                // If manifest is at `/manifest`, a resource at `/resource/foo.html` should be linked as `../resource/foo.html`?
-                // Or absolute URI. Let's use absolute path relative to server root? 
-                // Readium implies relative to manifest.
-                // Let's use a special protocol or just relative path if we structure routes well.
-                // Let's try absolute URL path for now: `/api/readium/${this.bookId}/resource/${fullPath}`
-
-                readingOrder.push({
-                    href: `/api/readium/${this.bookId}/resource/${fullPath}`,
-                    type: item.mediaType
-                });
+            // 2. Parse OPF
+            // A. Find OPF Path from container.xml
+            const containerPath = path.join(this.cachePath, 'META-INF', 'container.xml');
+            if (!fs.existsSync(containerPath)) {
+                throw new Error(`container.xml not found at ${containerPath}`);
             }
+
+            const containerXml = fs.readFileSync(containerPath, 'utf8');
+            // More flexible regex for full-path attribute (supports single/double quotes, spaces)
+            const opfMatch = containerXml.match(/full-path\s*=\s*["']([^"']+)["']/);
+            if (!opfMatch) {
+                console.error(`[Readium] Invalid container.xml content for book ${this.bookId}:`, containerXml);
+                throw new Error('Invalid container.xml: full-path not found');
+            }
+            const opfRelPath = opfMatch[1];
+            const opfPath = path.join(this.cachePath, opfRelPath);
+
+            if (!fs.existsSync(opfPath)) {
+                console.error(`[Readium] OPF file not found at ${opfPath} (rel: ${opfRelPath})`);
+                throw new Error(`OPF file not found: ${opfRelPath}`);
+            }
+
+            const opfDir = path.dirname(opfRelPath); // relative to root
+            const opfContent = fs.readFileSync(opfPath, 'utf8');
+
+            // B. Extract Metadata
+            const titleMatch = opfContent.match(/<dc:title[^>]*>([\s\S]*?)<\/dc:title>/i);
+            const authorMatch = opfContent.match(/<dc:creator[^>]*>([\s\S]*?)<\/dc:creator>/i);
+
+            const metadata = {
+                '@type': 'http://schema.org/Book',
+                title: titleMatch ? titleMatch[1].trim() : 'Unknown Title',
+                author: authorMatch ? authorMatch[1].trim() : 'Unknown Author',
+                identifier: `urn:lectro:${this.bookId}`
+            };
+
+            // C. Parse Manifest Items
+            const items: Record<string, { href: string; mediaType: string }> = {};
+            const itemRegex = /<item\s+([^>]+)\/>/gi;
+            let match;
+            while ((match = itemRegex.exec(opfContent)) !== null) {
+                const attrs = match[1];
+                const idMatch = attrs.match(/id\s*=\s*["']([^"']+)["']/i);
+                const hrefMatch = attrs.match(/href\s*=\s*["']([^"']+)["']/i);
+                const mediaTypeMatch = attrs.match(/media-type\s*=\s*["']([^"']+)["']/i);
+
+                if (idMatch && hrefMatch && mediaTypeMatch) {
+                    items[idMatch[1]] = {
+                        href: hrefMatch[1],
+                        mediaType: mediaTypeMatch[1]
+                    };
+                }
+            }
+
+            // D. Parse Spine
+            const readingOrder: ReadiumLink[] = [];
+            const spineRegex = /<itemref\s+idref\s*=\s*["']([^"']+)["']/gi;
+            while ((match = spineRegex.exec(opfContent)) !== null) {
+                const idref = match[1];
+                const item = items[idref];
+                if (item) {
+                    // Path resolution:
+                    // opfDir might be "." if OPF is at root. 
+                    // If opfDir is "OEBPS", and item.href is "Text/chap1.xhtml", fullPath = "OEBPS/Text/chap1.xhtml"
+                    const fullPath = opfDir === '.' ? item.href : path.join(opfDir, item.href);
+
+                    // Ensure forward slashes for URL
+                    const urlPath = fullPath.split(path.sep).join('/');
+
+                    const resourceUrl = `/api/readium/${this.bookId}/resource/${encodeURIComponent(urlPath)}`;
+
+                    readingOrder.push({
+                        href: resourceUrl,
+                        type: item.mediaType
+                    });
+                }
+            }
+
+            if (readingOrder.length === 0) {
+                console.warn(`[Readium] No reading order found for book ${this.bookId}. Check OPF parsing.`);
+            }
+
+            return {
+                '@context': 'https://readium.org/webpub-manifest/context.jsonld',
+                metadata,
+                links: [
+                    { href: `/api/readium/${this.bookId}/manifest`, type: 'application/webpub+json', rel: 'self' }
+                ],
+                readingOrder,
+            };
+        } catch (error) {
+            console.error(`[Readium] Failed to generate manifest for ${this.bookId}:`, error);
+            throw error;
         }
-
-        // E. Resources (Everything else + fonts + css)
-        // For MVP, maybe we don't list all resources in 'resources', Readium engine might fetch them if referenced in HTML.
-        // But usually fonts/css should be listed.
-
-        return {
-            '@context': 'https://readium.org/webpub-manifest/context.jsonld',
-            metadata,
-            links: [
-                { href: `/api/readium/${this.bookId}/manifest`, type: 'application/webpub+json', rel: 'self' }
-            ],
-            readingOrder,
-            // resources: [...] // Fill later if needed
-        };
     }
 }
