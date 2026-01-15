@@ -38,8 +38,8 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
         const serverData: ServerData = await response.json();
 
         // Handle empty server state (first run)
-        if (!serverData.books && !serverData.tags) {
-            console.log('Server empty, pushing local data...');
+        if ((!serverData.books || serverData.books.length === 0) && (!serverData.tags || serverData.tags.length === 0)) {
+            console.log('Server library empty, forcing push of local data...');
             await pushLocalData();
             return { success: true, message: 'Initial push complete' };
         }
@@ -133,8 +133,14 @@ async function pushLocalData() {
     const annotations = await getAllAnnotations();
     const readingSessions = await db.readingSessions.toArray();
 
+    // Prepare payload (strip Blobs to avoid serialization issues and large payloads)
+    const booksPayload = books.map(b => {
+        const { fileBlob, ...rest } = b;
+        return rest;
+    });
+
     const payload = {
-        books,
+        books: booksPayload,
         tags,
         annotations,
         readingSessions,
