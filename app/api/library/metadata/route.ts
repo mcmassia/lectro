@@ -100,6 +100,9 @@ export async function POST(req: NextRequest) {
         const dbPath = path.join(libraryPath, 'lectro_data.json');
         console.log(`[POST] Writing metadata to: ${dbPath}`);
 
+        const booksCount = body.books?.length || 0;
+        console.log(`[POST] Received ${booksCount} books to save.`);
+
         // Ensure we are saving a valid structure
         const dataToSave = {
             books: body.books || [],
