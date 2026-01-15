@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ActivityRings } from '@/components/dashboard/ActivityRings';
-import { TagManagerModal } from '@/components/library/TagManagerModal';
 import { getAllTags } from '@/lib/db';
 
 export function RightSidebar() {
@@ -23,7 +22,6 @@ export function RightSidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const [stats, setStats] = useState<{ dailyStats: any } | null>(null);
-    const [showTagManager, setShowTagManager] = useState(false);
 
     useEffect(() => {
         getReadingStats().then(setStats);
@@ -211,7 +209,7 @@ export function RightSidebar() {
 
 
 
-            {showTagManager && <TagManagerModal onClose={() => setShowTagManager(false)} />}
+
 
             <style jsx>{`
         .right-sidebar {
