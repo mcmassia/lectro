@@ -11,6 +11,7 @@ import {
     getAllBooks,
     getAllTags
 } from '@/lib/db';
+import { syncData } from '@/lib/sync';
 
 // ===================================
 // App Store Types
@@ -163,6 +164,7 @@ interface LibraryState {
     setIsLoading: (loading: boolean) => void;
     setView: (view: 'library' | 'tags') => void;
     loadBooks: () => Promise<void>;
+    syncMetadata: () => Promise<void>;
 
     // Computed
     filteredBooks: () => Book[];
@@ -184,24 +186,22 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     loadBooks: async () => {
         set({ isLoading: true });
         try {
-            // Check if getAllBooks is imported or can be imported. 
-            // It is not imported at the top of this file in the current view.
-            // But strict mode might fail. Assuming it's available or I need to add import.
-            // Wait, I cannot see imports at top of file.
-            // I should use dynamic import or ensure it's imported.
-            // Actually, I'll assume proper import exists or standard implementation.
-            // FOR SAFETY: I will add the import in a separate tool call if needed, 
-            // but here I will just add the method assuming getAllBooks is available 
-            // from earlier imports or I will check imports next.
-            // Wait, I haven't viewed imports (lines 1-100).
-            // Let's assume the user has getAllBooks available or I will fix it if it errors.
-            // Since this is replace_content, I am sticking to the structure.
             const books = await getAllBooks();
             const tags = await getAllTags();
             set({ books, tags, isLoading: false });
         } catch (e) {
             console.error(e);
             set({ isLoading: false });
+        }
+    },
+    syncMetadata: async () => {
+        try {
+            console.log('Triggering metadata sync...');
+            await syncData();
+            // Refresh local state after sync
+            await get().loadBooks();
+        } catch (e) {
+            console.error('Sync error:', e);
         }
     },
     addBook: (book) => set((state) => ({ books: [book, ...state.books] })),

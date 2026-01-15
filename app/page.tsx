@@ -53,7 +53,7 @@ const CheckSquareIcon = () => (
 import TagManagerView from '@/components/library/TagManagerView';
 
 export default function Home() {
-  const { books, isLoading, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, activeFormat, sortOrder, setSortOrder, currentView } = useLibraryStore();
+  const { books, isLoading, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, activeFormat, sortOrder, setSortOrder, currentView, syncMetadata } = useLibraryStore();
   const { onboardingComplete } = useAppStore();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   // const [showOnboarding, setShowOnboarding] = useState(false);
@@ -215,6 +215,10 @@ export default function Home() {
         await syncTagsFromBooks();
         const allTags = await getAllTags();
         useLibraryStore.getState().setTags(allTags);
+
+        // Auto-sync metadata with server to ensure consistency
+        await syncMetadata();
+
 
       } catch (error) {
         console.error('Failed to load books:', error);

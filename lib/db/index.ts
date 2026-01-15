@@ -16,6 +16,7 @@ export interface Book {
   fileBlob: Blob;
   fileSize: number;
   addedAt: Date;
+  updatedAt?: Date;
   lastReadAt?: Date;
   progress: number; // 0-100
   currentPosition: string; // CFI for EPUB, page number for PDF
@@ -48,6 +49,7 @@ export interface Tag {
   name: string;
   color?: string; // hex color
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 export interface Annotation {
@@ -216,6 +218,11 @@ export class LectroDB extends Dexie {
     this.version(6).stores({
       tags: 'id, &name, createdAt', // &name makes it unique index
     });
+
+    this.version(7).stores({
+      books: 'id, title, author, format, addedAt, lastReadAt, updatedAt, progress, status, fileName, filePath, isOnServer, isFavorite',
+      tags: 'id, &name, createdAt, updatedAt',
+    });
   }
 }
 
@@ -231,6 +238,9 @@ export const db = new LectroDB();
 
 // Books
 export async function addBook(book: Book): Promise<string> {
+  if (!book.updatedAt) {
+    book.updatedAt = new Date();
+  }
   return db.books.add(book);
 }
 
@@ -245,7 +255,7 @@ export async function getAllBooks(): Promise<Book[]> {
 }
 
 export async function updateBook(id: string, updates: Partial<Book>): Promise<number> {
-  return db.books.update(id, updates);
+  return db.books.update(id, { ...updates, updatedAt: new Date() });
 }
 
 export async function deleteBook(id: string): Promise<void> {
@@ -413,12 +423,13 @@ export async function addTag(name: string, color?: string): Promise<string> {
     name,
     color,
     createdAt: new Date(),
+    updatedAt: new Date(),
   };
   return db.tags.add(tag);
 }
 
 export async function updateTag(id: string, updates: Partial<Tag>): Promise<number> {
-  return db.tags.update(id, updates);
+  return db.tags.update(id, { ...updates, updatedAt: new Date() });
 }
 
 export async function deleteTag(id: string): Promise<void> {
@@ -445,7 +456,8 @@ export async function syncTagsFromBooks(): Promise<void> {
   const newTags: Tag[] = Array.from(tagsToAdd).map(name => ({
     id: uuidv4(),
     name,
-    createdAt: new Date()
+    createdAt: new Date(),
+    updatedAt: new Date()
   }));
 
   await db.tags.bulkAdd(newTags);

@@ -1,0 +1,187 @@
+import {
+    db,
+    Book,
+    Tag,
+    Annotation,
+    ReadingSession,
+    getAllBooks,
+    getAllTags,
+    getAllAnnotations,
+    addBook,
+    updateBook,
+    addTag,
+    updateTag,
+    addAnnotation,
+    updateAnnotation,
+    addReadingSession,
+    getReadingSessionsForBook
+} from './db';
+
+interface ServerData {
+    books: Book[];
+    tags: Tag[];
+    annotations: Annotation[];
+    readingSessions: ReadingSession[];
+    lastSync: string;
+}
+
+export async function syncData(): Promise<{ success: boolean; message: string }> {
+    try {
+        console.log('Starting sync...');
+
+        // 1. Fetch server data
+        const response = await fetch('/api/library/metadata');
+        if (!response.ok) {
+            throw new Error(`Failed to fetch server data: ${response.statusText}`);
+        }
+
+        const serverData: ServerData = await response.json();
+
+        // Handle empty server state (first run)
+        if (!serverData.books && !serverData.tags) {
+            console.log('Server empty, pushing local data...');
+            await pushLocalData();
+            return { success: true, message: 'Initial push complete' };
+        }
+
+        // 2. Load all local data
+        const localBooks = await getAllBooks();
+        const localTags = await getAllTags();
+        const localAnnotations = await getAllAnnotations();
+        const localSessions = await db.readingSessions.toArray();
+
+        // 3. Merge Books
+        let hasChanges = false;
+
+        // Process Server Books -> Local
+        for (const sBook of (serverData.books || [])) {
+            const lBook = localBooks.find(b => b.id === sBook.id);
+
+            if (!lBook) {
+                // New book from server (ensure date objects are instantiated)
+                await addBook(hydrateBookDates(sBook));
+                hasChanges = true;
+            } else {
+                // Conflict resolution
+                const sTime = getTime(sBook.updatedAt) || getTime(sBook.lastReadAt) || 0;
+                const lTime = getTime(lBook.updatedAt) || getTime(lBook.lastReadAt) || 0;
+
+                if (sTime > lTime) {
+                    // Server is newer
+                    await updateBook(lBook.id, hydrateBookDates(sBook));
+                    hasChanges = true;
+                }
+            }
+        }
+
+        // 4. Merge Tags
+        for (const sTag of (serverData.tags || [])) {
+            const lTag = localTags.find(t => t.id === sTag.id);
+            const lTagName = localTags.find(t => t.name === sTag.name);
+
+            if (lTag) {
+                const sTime = getTime(sTag.updatedAt) || getTime(sTag.createdAt);
+                const lTime = getTime(lTag.updatedAt) || getTime(lTag.createdAt);
+
+                if (sTime > lTime) {
+                    await db.tags.update(lTag.id, hydrateTagDates(sTag));
+                    hasChanges = true;
+                }
+            } else if (lTagName) {
+                // Same name but different ID. Server authority wins to converge IDs.
+                await db.tags.delete(lTagName.id);
+                await db.tags.add(hydrateTagDates(sTag));
+                hasChanges = true;
+            } else {
+                await db.tags.add(hydrateTagDates(sTag));
+                hasChanges = true;
+            }
+        }
+
+        // 5. Merge Annotations
+        for (const sAnn of (serverData.annotations || [])) {
+            const lAnn = localAnnotations.find(a => a.id === sAnn.id);
+            if (!lAnn) {
+                await db.annotations.put(hydrateAnnotationDates(sAnn));
+                hasChanges = true;
+            } else {
+                const sTime = getTime(sAnn.updatedAt);
+                const lTime = getTime(lAnn.updatedAt);
+                if (sTime > lTime) {
+                    await db.annotations.update(lAnn.id, hydrateAnnotationDates(sAnn));
+                    hasChanges = true;
+                }
+            }
+        }
+
+        // 6. Push merged state back to server
+        // We always push the final state to ensure server is strictly consistent with the latest merge.
+
+        await pushLocalData();
+
+        return { success: true, message: 'Sync complete' };
+
+    } catch (error) {
+        console.error('Sync failed:', error);
+        return { success: false, message: (error as Error).message };
+    }
+}
+
+async function pushLocalData() {
+    const books = await getAllBooks();
+    const tags = await getAllTags();
+    const annotations = await getAllAnnotations();
+    const readingSessions = await db.readingSessions.toArray();
+
+    const payload = {
+        books,
+        tags,
+        annotations,
+        readingSessions,
+        lastSync: new Date().toISOString()
+    };
+
+    const res = await fetch('/api/library/metadata', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+        throw new Error('Failed to push data to server');
+    }
+}
+
+// Helpers to ensure Dates are Dates (JSON returns strings)
+
+function getTime(date?: Date | string): number {
+    if (!date) return 0;
+    return new Date(date).getTime();
+}
+
+function hydrateBookDates(book: any): Book {
+    return {
+        ...book,
+        addedAt: new Date(book.addedAt),
+        updatedAt: book.updatedAt ? new Date(book.updatedAt) : undefined,
+        lastReadAt: book.lastReadAt ? new Date(book.lastReadAt) : undefined,
+    };
+}
+
+function hydrateTagDates(tag: any): Tag {
+    return {
+        ...tag,
+        createdAt: new Date(tag.createdAt),
+        updatedAt: tag.updatedAt ? new Date(tag.updatedAt) : undefined,
+    };
+}
+
+function hydrateAnnotationDates(ann: any): Annotation {
+    return {
+        ...ann,
+        createdAt: new Date(ann.createdAt),
+        updatedAt: ann.updatedAt ? new Date(ann.updatedAt) : undefined,
+    };
+}

@@ -42,3 +42,6 @@ next-env.d.ts
 
 # frontend nested next.js
 frontend/.next/
+
+# library data
+/library
