@@ -89,12 +89,31 @@ export default function ReaderPage() {
         // Save reading progress
         if (book) {
             const progress = Math.round((page / total) * 100);
+
+            // Local update (IndexedDB)
             await updateBook(bookId, {
                 currentPosition: cfi,
                 currentPage: page,
                 totalPages: total,
                 progress,
             });
+
+            // Server Heartbeat (Fire and forget)
+            // No await to avoid blocking UI
+            if (navigator.onLine) {
+                fetch('/api/sync/heartbeat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        bookId,
+                        cfi,
+                        progress,
+                        totalPages: total,
+                        currentPage: page
+                    }),
+                    keepalive: true // Ensure request finishes even if page unloads
+                }).catch(e => console.warn('Heartbeat failed:', e));
+            }
         }
     }, [book, bookId, setCurrentCfi, setCurrentPage, setTotalPages, setChapterTitle]);
 

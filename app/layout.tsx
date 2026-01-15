@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 // import { Sidebar } from "@/components/ui/Sidebar";
@@ -14,7 +14,21 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Lectro - Digital Reading Platform",
   description: "Premium reading and knowledge management with AI-powered insights",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Lectro",
+  },
   keywords: ["reading", "ebooks", "epub", "pdf", "knowledge management", "AI"],
+};
+
+export const viewport: Viewport = {
+  themeColor: "#FFFFFF",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({

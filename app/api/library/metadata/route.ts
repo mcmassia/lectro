@@ -5,41 +5,57 @@ import path from 'path';
 const CONFIG_FILE = path.join(process.cwd(), 'server-config.json');
 
 function getLibraryPath(req: NextRequest): string {
-    // 1. Header (Highest Priority - Client Override)
-    const customPath = req.headers.get('x-library-path');
-    if (customPath) {
-        // Persist valid custom path to server config
+    // 4. Validate and Fallback
+    // If we found a path from any source (Config, Env, Header), check if it exists.
+    // If not, fall back to default project library.
+
+    // We need to keep the "candidate" path to check existence
+    let candidatePath = '';
+
+    // Re-evaluating priority structure to include validation:
+
+    // 1. Header
+    const headerPath = req.headers.get('x-library-path');
+    if (headerPath) candidatePath = headerPath;
+
+    // 2. Env
+    else if (process.env.LIBRARY_PATH) candidatePath = process.env.LIBRARY_PATH;
+
+    // 3. Config
+    else {
         try {
-            fs.writeFileSync(CONFIG_FILE, JSON.stringify({ libraryPath: customPath }, null, 2));
-            console.log(`Updated server config with library path: ${customPath}`);
-        } catch (e) {
-            console.error('Failed to write server config:', e);
-        }
-        return customPath;
-    }
-
-    // 2. Environment Variable
-    if (process.env.LIBRARY_PATH) {
-        return process.env.LIBRARY_PATH;
-    }
-
-    // 3. Server Config File (Persistence)
-    try {
-        if (fs.existsSync(CONFIG_FILE)) {
-            const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-            if (config.libraryPath) {
-                return config.libraryPath;
+            if (fs.existsSync(CONFIG_FILE)) {
+                const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+                if (config.libraryPath) candidatePath = config.libraryPath;
             }
-        }
-    } catch (e) {
-        console.warn('Error reading server config:', e);
+        } catch (e) { /* ignore */ }
     }
 
-    // 4. Default Fallback
+    // Validate Candidate
+    if (candidatePath && fs.existsSync(candidatePath)) {
+        // If header provided valid path, verify we persist it if it's new? 
+        // Logic in original code persisted header path. We should keep that behavior if desired, 
+        // but robustly.
+        if (headerPath && headerPath === candidatePath) {
+            try {
+                // simple comparison to avoid unnecessary writes
+                const currentConfig = fs.existsSync(CONFIG_FILE) ? JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) : {};
+                if (currentConfig.libraryPath !== headerPath) {
+                    fs.writeFileSync(CONFIG_FILE, JSON.stringify({ libraryPath: headerPath }, null, 2));
+                }
+            } catch (e) { /* ignore */ }
+        }
+        return candidatePath;
+    }
+
+    // 4. Default Fallback (if candidate missing or invalid)
+    console.warn(`Configured path "${candidatePath}" not found. Falling back to default.`);
     const defaultPath = path.join(process.cwd(), 'library');
+    // Ensure default exists
     if (!fs.existsSync(defaultPath)) {
-        // Try creating it if it doesn't exist? Only for default.
-        // fs.mkdirSync(defaultPath, { recursive: true });
+        try {
+            fs.mkdirSync(defaultPath, { recursive: true });
+        } catch (e) { /* ignore */ }
     }
     return defaultPath;
 }
