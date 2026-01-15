@@ -5,7 +5,7 @@ import path from 'path';
 export async function GET(req: NextRequest) {
     try {
         const customPath = req.headers.get('x-library-path');
-        let libraryPath = customPath || process.env.LIBRARY_PATH;
+        let libraryPath = customPath || process.env.LECTRO_LIBRARY_PATH;
 
         if (!libraryPath) {
             // Fallback for local development
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
         if (!libraryPath) {
             return NextResponse.json(
-                { error: 'LIBRARY_PATH environment variable not set. Please configure the Server Path in Settings or set the env var.' },
+                { error: 'LECTRO_LIBRARY_PATH environment variable not set. Please configure the Server Path in Settings or set the env var.' },
                 { status: 500 }
             );
         }

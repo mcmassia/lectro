@@ -19,7 +19,7 @@ function getLibraryPath(req: NextRequest): string {
     if (headerPath) candidatePath = headerPath;
 
     // 2. Env
-    else if (process.env.LIBRARY_PATH) candidatePath = process.env.LIBRARY_PATH;
+    else if (process.env.LECTRO_LIBRARY_PATH) candidatePath = process.env.LECTRO_LIBRARY_PATH;
 
     // 3. Config
     else {

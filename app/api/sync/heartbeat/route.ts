@@ -5,7 +5,7 @@ import path from 'path';
 const CONFIG_FILE = path.join(process.cwd(), 'server-config.json');
 
 function getLibraryPath(): string {
-    if (process.env.LIBRARY_PATH) return process.env.LIBRARY_PATH;
+    if (process.env.LECTRO_LIBRARY_PATH) return process.env.LECTRO_LIBRARY_PATH;
     try {
         if (fs.existsSync(CONFIG_FILE)) {
             const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));

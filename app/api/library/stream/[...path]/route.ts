@@ -34,7 +34,7 @@ function getLibraryPath(): string {
     } catch (e) { /* ignore */ }
 
     // 2. Env
-    if (process.env.LIBRARY_PATH) return process.env.LIBRARY_PATH;
+    if (process.env.LECTRO_LIBRARY_PATH) return process.env.LECTRO_LIBRARY_PATH;
 
     // 3. Default
     return path.join(process.cwd(), 'library');

@@ -8,7 +8,7 @@ const CONFIG_FILE = path.join(process.cwd(), 'server-config.json');
 
 function getLibraryPath(): string {
     // 1. Env
-    if (process.env.LIBRARY_PATH) return process.env.LIBRARY_PATH;
+    if (process.env.LECTRO_LIBRARY_PATH) return process.env.LECTRO_LIBRARY_PATH;
 
     // 2. Config
     try {

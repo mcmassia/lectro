@@ -15,7 +15,7 @@ export async function GET(
 ) {
     try {
         const customPath = req.headers.get('x-library-path');
-        let libraryPath = customPath || process.env.LIBRARY_PATH;
+        let libraryPath = customPath || process.env.LECTRO_LIBRARY_PATH;
 
         // Check query param 'path' first, fallback to filename param
         // We need to parse searchParams from req.url
@@ -45,7 +45,7 @@ export async function GET(
 
         if (!libraryPath) {
             return NextResponse.json(
-                { error: 'LIBRARY_PATH environment variable not set' },
+                { error: 'LECTRO_LIBRARY_PATH environment variable not set' },
                 { status: 500 }
             );
         }
@@ -104,7 +104,7 @@ export async function POST(
         const author = req.headers.get('x-book-author');
         const title = req.headers.get('x-book-title');
 
-        let libraryPath = customPath || process.env.LIBRARY_PATH;
+        let libraryPath = customPath || process.env.LECTRO_LIBRARY_PATH;
 
         // Await params as per Next.js 15+ requirements
         const { filename } = await params;
@@ -129,7 +129,7 @@ export async function POST(
 
         if (!libraryPath) {
             return NextResponse.json(
-                { error: 'LIBRARY_PATH environment variable not set' },
+                { error: 'LECTRO_LIBRARY_PATH environment variable not set' },
                 { status: 500 }
             );
         }
