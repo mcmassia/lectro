@@ -140,37 +140,60 @@ async function pushLocalData() {
     const annotations = await getAllAnnotations();
     const readingSessions = await db.readingSessions.toArray();
 
-    // Prepare payload (strip Blobs to avoid serialization issues and large payloads)
+    // Prepare headers
+    const customPath = localStorage.getItem('lectro_server_path');
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (customPath) headers['x-library-path'] = customPath;
+
+    // Helper to chunk array
+    const chunkArray = (arr: any[], size: number) => {
+        const chunks = [];
+        for (let i = 0; i < arr.length; i += size) {
+            chunks.push(arr.slice(i, i + size));
+        }
+        return chunks;
+    };
+
+    // Strip blobs to reduce payload
     const booksPayload = books.map(b => {
         const { fileBlob, ...rest } = b;
         return rest;
     });
 
-    const payload = {
-        books: booksPayload,
-        tags,
-        annotations,
-        readingSessions,
-        lastSync: new Date().toISOString()
-    };
+    const BATCH_SIZE = 500;
+    const chunks = chunkArray(booksPayload, BATCH_SIZE);
 
-    const customPath = localStorage.getItem('lectro_server_path');
-    const headers: HeadersInit = {
-        'Content-Type': 'application/json'
-    };
-    if (customPath) {
-        headers['x-library-path'] = customPath;
+    // If no books, ensure we still push tags/annotations in one go
+    if (chunks.length === 0) chunks.push([]);
+
+    console.log(`Pushing ${books.length} books in ${chunks.length} batches...`);
+
+    for (let i = 0; i < chunks.length; i++) {
+        const isLastChunk = i === chunks.length - 1;
+        const chunk = chunks[i];
+
+        const payload = {
+            books: chunk,
+            // Only send other metadata in the last batch to avoid partial overwrites (though server merges now)
+            tags: isLastChunk ? tags : [],
+            annotations: isLastChunk ? annotations : [],
+            readingSessions: isLastChunk ? readingSessions : [],
+            lastSync: new Date().toISOString()
+        };
+
+        console.log(`Pushing batch ${i + 1}/${chunks.length} (${chunk.length} books)...`);
+
+        const res = await fetch('/api/library/metadata', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            throw new Error(`Failed to push batch ${i + 1}: ${res.statusText}`);
+        }
     }
-
-    const res = await fetch('/api/library/metadata', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-        throw new Error('Failed to push data to server');
-    }
+    console.log('Push complete.');
 }
 
 // Helpers to ensure Dates are Dates (JSON returns strings)

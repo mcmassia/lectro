@@ -101,20 +101,48 @@ export async function POST(req: NextRequest) {
         console.log(`[POST] Writing metadata to: ${dbPath}`);
 
         const booksCount = body.books?.length || 0;
-        console.log(`[POST] Received ${booksCount} books to save.`);
+        console.log(`[POST] Received ${booksCount} books to merge.`);
 
-        // Ensure we are saving a valid structure
+        // Read existing data to merge
+        let existingData: any = { books: [], tags: [], annotations: [], readingSessions: [] };
+        if (fs.existsSync(dbPath)) {
+            try {
+                const fileContent = fs.readFileSync(dbPath, 'utf8');
+                existingData = JSON.parse(fileContent);
+            } catch (e) {
+                console.error('Failed to parse existing metadata, starting fresh:', e);
+            }
+        }
+
+        // Helper to merge arrays by ID
+        const mergeById = (existing: any[], incoming: any[]) => {
+            if (!incoming || incoming.length === 0) return existing;
+            const map = new Map(existing.map(item => [item.id || item.name, item]));
+            incoming.forEach(item => {
+                if (item.id) map.set(item.id, item);
+            });
+            return Array.from(map.values());
+        };
+
+        // Merge Logic
+        const mergedBooks = mergeById(existingData.books || [], body.books || []);
+        const mergedTags = mergeById(existingData.tags || [], body.tags || []);
+        const mergedAnnotations = mergeById(existingData.annotations || [], body.annotations || []);
+        const mergedSessions = (body.readingSessions && body.readingSessions.length > 0)
+            ? body.readingSessions
+            : (existingData.readingSessions || []);
+
         const dataToSave = {
-            books: body.books || [],
-            tags: body.tags || [],
-            annotations: body.annotations || [],
-            readingSessions: body.readingSessions || [],
+            books: mergedBooks,
+            tags: mergedTags,
+            annotations: mergedAnnotations,
+            readingSessions: mergedSessions,
             lastSync: new Date().toISOString()
         };
 
         fs.writeFileSync(dbPath, JSON.stringify(dataToSave, null, 2));
 
-        return NextResponse.json({ success: true, timestamp: dataToSave.lastSync });
+        return NextResponse.json({ success: true, timestamp: dataToSave.lastSync, mergedBooks: mergedBooks.length });
 
     } catch (error) {
         console.error('Error saving metadata:', error);
