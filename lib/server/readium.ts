@@ -68,14 +68,26 @@ export class ReadiumHelper {
                 return null;
             }
 
-            const fullPath = path.join(this.libraryPath, book.filePath);
-            console.log(`[Readium] Resolved book path: ${fullPath} (from rel: ${book.filePath})`);
+            const rawPath = path.join(this.libraryPath, book.filePath);
 
-            if (!fs.existsSync(fullPath)) {
-                console.error(`[Readium] File does not exist at ${fullPath}`);
+            // Try different normalizations (NFC, NFD) to handle OS/Browser mismatches
+            const candidates = [
+                rawPath,
+                rawPath.normalize('NFC'),
+                rawPath.normalize('NFD')
+            ];
+
+            for (const candidate of candidates) {
+                if (fs.existsSync(candidate)) {
+                    console.log(`[Readium] Resolved path: ${candidate}`);
+                    return candidate;
+                }
             }
 
-            return fullPath;
+            console.error(`[Readium] File does not exist at ${rawPath} (tried all normalizations)`);
+            return null;
+
+
         } catch (e) {
             console.error('[Readium] Error resolving book path:', e);
             return null;
