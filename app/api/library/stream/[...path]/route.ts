@@ -40,9 +40,9 @@ function getLibraryPath(): string {
     return path.join(process.cwd(), 'library');
 }
 
-export async function GET(req: NextRequest, { params }: { params: { path: string[] } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
     try {
-        const pathSegments = params.path;
+        const { path: pathSegments } = await params;
         if (!pathSegments || pathSegments.length === 0) {
             return NextResponse.json({ error: 'File path not specified' }, { status: 400 });
         }
