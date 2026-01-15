@@ -44,10 +44,19 @@ export async function GET(
         const fullPath = path.join(cachePath, relativePath);
 
         if (!fullPath.startsWith(cachePath)) {
+            console.error(`[Readium Resource] Forbidden access: ${fullPath} (outside ${cachePath})`);
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isFile()) {
+            console.error(`[Readium Resource] File not found: ${fullPath}`);
+            // List directory content to debug casing issues
+            const parentDir = path.dirname(fullPath);
+            if (fs.existsSync(parentDir)) {
+                console.log(`[Readium Resource] Contents of ${parentDir}:`, fs.readdirSync(parentDir));
+            } else {
+                console.log(`[Readium Resource] Parent directory ${parentDir} does not exist`);
+            }
             return NextResponse.json({ error: 'File not found' }, { status: 404 });
         }
 
