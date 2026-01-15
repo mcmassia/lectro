@@ -47,15 +47,37 @@ export class ReadiumHelper {
     }
 
     private getBookPath(): string | null {
-        const dbPath = path.join(this.libraryPath, 'lectro_data.json');
-        if (!fs.existsSync(dbPath)) return null;
-
         try {
+            const dbPath = path.join(this.libraryPath, 'lectro_data.json');
+            console.log(`[Readium] Looking for DB at: ${dbPath}`);
+
+            if (!fs.existsSync(dbPath)) {
+                console.error(`[Readium] DB not found at ${dbPath}`);
+                return null;
+            }
+
             const data = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
             const book = data.books?.find((b: any) => b.id === this.bookId);
-            if (!book || !book.filePath) return null;
-            return path.join(this.libraryPath, book.filePath);
-        } catch {
+
+            if (!book) {
+                console.error(`[Readium] Book ${this.bookId} not found in DB`);
+                return null;
+            }
+            if (!book.filePath) {
+                console.error(`[Readium] Book ${this.bookId} has no filePath`);
+                return null;
+            }
+
+            const fullPath = path.join(this.libraryPath, book.filePath);
+            console.log(`[Readium] Resolved book path: ${fullPath} (from rel: ${book.filePath})`);
+
+            if (!fs.existsSync(fullPath)) {
+                console.error(`[Readium] File does not exist at ${fullPath}`);
+            }
+
+            return fullPath;
+        } catch (e) {
+            console.error('[Readium] Error resolving book path:', e);
             return null;
         }
     }
