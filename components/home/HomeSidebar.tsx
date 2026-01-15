@@ -6,17 +6,29 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ActivityRings } from '@/components/dashboard/ActivityRings';
+import { TagManagerModal } from '@/components/library/TagManagerModal';
+import { getAllTags } from '@/lib/db';
 
 export function RightSidebar() {
-    const { books, activeCategory, setActiveCategory, activeFormat, setActiveFormat } = useLibraryStore();
+    const {
+        books,
+        searchQuery, setSearchQuery,
+        sortBy, setSortBy,
+        activeCategory, setActiveCategory,
+        activeFormat, setActiveFormat,
+        activeTag, setActiveTag,
+        tags, setTags, setView, currentView
+    } = useLibraryStore();
     const { dailyReadingGoal } = useAppStore();
     const pathname = usePathname();
     const router = useRouter();
     const [stats, setStats] = useState<{ dailyStats: any } | null>(null);
+    const [showTagManager, setShowTagManager] = useState(false);
 
     useEffect(() => {
         getReadingStats().then(setStats);
-    }, []);
+        getAllTags().then(setTags);
+    }, [setTags]);
 
     const currentlyReading = books.filter(b => b.progress > 0 && b.progress < 100).slice(0, 3);
     const readingStates = {
@@ -27,8 +39,20 @@ export function RightSidebar() {
 
     const handleNavigation = (category: 'all' | 'authors') => {
         setActiveCategory(category);
+        setActiveTag(null); // Clear tag when switching categories
+        setView('library'); // Ensure we switch back to library view from tags or other views
         if (pathname !== '/') {
             router.push('/');
+        }
+    };
+
+    const handleTagClick = (tagName: string) => {
+        if (activeTag === tagName) {
+            setActiveTag(null);
+        } else {
+            setActiveTag(tagName);
+            setView('library'); // Switch to library to see filtered books
+            if (pathname !== '/') router.push('/');
         }
     };
 
@@ -43,7 +67,7 @@ export function RightSidebar() {
             <div className="sidebar-section">
                 <div className="filter-grid">
                     <button
-                        className={`filter-card cyan ${pathname === '/' && activeCategory === 'all' ? 'active' : ''}`}
+                        className={`filter-card cyan ${pathname === '/' && activeCategory === 'all' && currentView === 'library' ? 'active' : ''}`}
                         onClick={() => handleNavigation('all')}
                     >
                         <div className="filter-icon">
@@ -56,7 +80,7 @@ export function RightSidebar() {
                     </button>
 
                     <button
-                        className={`filter-card orange ${pathname === '/' && activeCategory === 'authors' ? 'active' : ''}`}
+                        className={`filter-card orange ${pathname === '/' && activeCategory === 'authors' && currentView === 'library' ? 'active' : ''}`}
                         onClick={() => handleNavigation('authors')}
                     >
                         <div className="filter-icon">
@@ -80,6 +104,21 @@ export function RightSidebar() {
                             <div className="filter-info">
                                 <span className="filter-label">Insights</span>
                                 <span className="filter-count">{books.filter(b => b.isFavorite).length}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="filter-card-wrapper" onClick={() => {
+                        setView('tags');
+                        if (pathname !== '/') router.push('/');
+                    }}>
+                        <div className={`filter-card blue ${pathname === '/' && currentView === 'tags' ? 'active' : ''}`}>
+                            <div className="filter-icon">
+                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16z" /></svg>
+                            </div>
+                            <div className="filter-info">
+                                <span className="filter-label">Etiquetas</span>
+                                <span className="filter-count">{tags.length}</span>
                             </div>
                         </div>
                     </div>
@@ -169,6 +208,10 @@ export function RightSidebar() {
                     </button>
                 </div>
             </div>
+
+
+
+            {showTagManager && <TagManagerModal onClose={() => setShowTagManager(false)} />}
 
             <style jsx>{`
         .right-sidebar {
@@ -343,6 +386,43 @@ export function RightSidebar() {
                 border-bottom: 1px solid var(--color-divider);
                 padding: var(--space-6);
             }
+        }
+
+        .tags-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tag-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: var(--color-bg-tertiary);
+            border: 1px solid transparent;
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tag-item:hover {
+            background: var(--color-bg-elevated);
+            color: var(--color-text-primary);
+        }
+
+        .tag-item.active {
+            background: var(--color-accent-subtle, rgba(var(--color-accent-rgb), 0.1));
+            color: var(--color-accent);
+            border-color: var(--color-accent);
+        }
+
+        .tag-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
         }
       `}</style>
         </aside >

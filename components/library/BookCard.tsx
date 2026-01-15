@@ -7,9 +7,20 @@ interface BookCardProps {
   viewMode: 'grid' | 'list';
   onClick: (book: Book) => void;
   onDelete?: (book: Book) => void;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelection?: (book: Book) => void;
 }
 
-export function BookCard({ book, viewMode, onClick, onDelete }: BookCardProps) {
+export function BookCard({
+  book,
+  viewMode,
+  onClick,
+  onDelete,
+  selectionMode = false,
+  isSelected = false,
+  onToggleSelection
+}: BookCardProps) {
   const progressPercent = book.progress || 0;
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -19,9 +30,37 @@ export function BookCard({ book, viewMode, onClick, onDelete }: BookCardProps) {
     }
   };
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (selectionMode && onToggleSelection) {
+      e.preventDefault();
+      onToggleSelection(book);
+    } else {
+      onClick(book);
+    }
+  };
+
+  const handleSelectionClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onToggleSelection) {
+      onToggleSelection(book);
+    }
+  };
+
   if (viewMode === 'list') {
     return (
-      <div className="book-list-item" onClick={() => onClick(book)}>
+      <div
+        className={`book-list-item ${isSelected ? 'selected' : ''} ${selectionMode ? 'selection-mode' : ''}`}
+        onClick={handleCardClick}
+      >
+        {selectionMode && (
+          <div className="list-selection-checkbox" onClick={handleSelectionClick}>
+            {isSelected && (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" width="14" height="14">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </div>
+        )}
         <div className="book-list-cover">
           {book.cover ? (
             <img src={book.cover} alt={book.title} />
@@ -42,7 +81,7 @@ export function BookCard({ book, viewMode, onClick, onDelete }: BookCardProps) {
           <div className="progress-pill">
             {Math.round(progressPercent)}%
           </div>
-          {onDelete && (
+          {onDelete && !selectionMode && (
             <button className="delete-btn-list" onClick={handleDelete} title="Eliminar libro">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
                 <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -77,12 +116,36 @@ export function BookCard({ book, viewMode, onClick, onDelete }: BookCardProps) {
             border-radius: var(--radius-md);
             text-decoration: none;
             color: inherit;
-            transition: background-color var(--transition-fast);
+            transition: all var(--transition-fast);
             cursor: pointer;
+            border: 1px solid transparent;
           }
 
           .book-list-item:hover {
             background: var(--color-bg-tertiary);
+          }
+          
+          .book-list-item.selected {
+              background: rgba(var(--color-accent-rgb), 0.1);
+              border-color: var(--color-accent);
+          }
+
+          .list-selection-checkbox {
+              width: 20px;
+              height: 20px;
+              border-radius: 4px;
+              border: 2px solid rgba(255,255,255,0.3);
+              margin-right: var(--space-2);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              flex-shrink: 0;
+          }
+          
+          .book-list-item.selected .list-selection-checkbox {
+              background: var(--color-accent);
+              border-color: var(--color-accent);
+              color: white;
           }
 
           .book-list-cover {
@@ -155,8 +218,18 @@ export function BookCard({ book, viewMode, onClick, onDelete }: BookCardProps) {
   }
 
   return (
-    <div className="book-card-container" onClick={() => onClick(book)}>
-      <div className="book-card">
+    <div className={`book-card-container ${isSelected ? 'selected' : ''}`} onClick={handleCardClick}>
+      <div className={`book-card ${isSelected ? 'selected-card' : ''}`}>
+        {(selectionMode || isSelected) && (
+          <div className={`grid-selection-checkbox ${isSelected ? 'checked' : ''}`} onClick={handleSelectionClick}>
+            {isSelected && (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" width="14" height="14">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            )}
+          </div>
+        )}
+
         {book.cover ? (
           <img src={book.cover} alt={book.title} className="book-card-cover" />
         ) : (
@@ -165,7 +238,7 @@ export function BookCard({ book, viewMode, onClick, onDelete }: BookCardProps) {
           </div>
         )}
 
-        {onDelete && (
+        {onDelete && !selectionMode && (
           <button className="delete-btn-grid" onClick={handleDelete} title="Eliminar libro">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
               <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -216,10 +289,43 @@ export function BookCard({ book, viewMode, onClick, onDelete }: BookCardProps) {
                     transition: all var(--transition-fast);
                     border: 2px solid transparent;
                 }
+                
+                .book-card.selected-card {
+                    border-color: var(--color-accent);
+                    box-shadow: 0 0 0 2px var(--color-accent);
+                }
 
                 .book-card-container:hover .book-card {
                     transform: translateY(-4px);
                     box-shadow: var(--shadow-md);
+                    border-color: var(--color-accent);
+                }
+                
+                .grid-selection-checkbox {
+                    position: absolute;
+                    top: 8px;
+                    left: 8px;
+                    width: 24px;
+                    height: 24px;
+                    background: rgba(0,0,0,0.6);
+                    border: 2px solid rgba(255,255,255,0.6);
+                    border-radius: 6px;
+                    z-index: 20;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: white;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+                
+                .grid-selection-checkbox:hover {
+                    background: rgba(0,0,0,0.8);
+                    border-color: white;
+                }
+                
+                .grid-selection-checkbox.checked {
+                    background: var(--color-accent);
                     border-color: var(--color-accent);
                 }
 

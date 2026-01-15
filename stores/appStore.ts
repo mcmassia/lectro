@@ -6,7 +6,10 @@ import {
     AppSettings,
     ReaderSettings,
     defaultAppSettings,
-    defaultReaderSettings
+    defaultReaderSettings,
+    Tag,
+    getAllBooks,
+    getAllTags
 } from '@/lib/db';
 
 // ===================================
@@ -138,7 +141,10 @@ interface LibraryState {
     sortBy: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress' | 'fileSize' | 'relevance';
     activeCategory: 'all' | 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read' | 'favorites' | 'authors';
     activeFormat: 'all' | 'epub' | 'pdf';
+    activeTag: string | null;
+    tags: Tag[];
     sortOrder: 'asc' | 'desc';
+    currentView: 'library' | 'tags';
 
     setBooks: (books: Book[]) => void;
     addBook: (book: Book) => void;
@@ -148,8 +154,15 @@ interface LibraryState {
     setSortBy: (sort: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress' | 'fileSize' | 'relevance') => void;
     setActiveCategory: (category: 'all' | 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read' | 'favorites' | 'authors') => void;
     setActiveFormat: (format: 'all' | 'epub' | 'pdf') => void;
+    setActiveTag: (tag: string | null) => void;
+    setTags: (tags: Tag[]) => void;
+    addTag: (tag: Tag) => void; // For UI update after DB add
+    updateTag: (id: string, updates: Partial<Tag>) => void;
+    removeTag: (id: string) => void;
     setSortOrder: (order: 'asc' | 'desc') => void;
     setIsLoading: (loading: boolean) => void;
+    setView: (view: 'library' | 'tags') => void;
+    loadBooks: () => Promise<void>;
 
     // Computed
     filteredBooks: () => Book[];
@@ -162,9 +175,35 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     sortBy: 'relevance',
     activeCategory: 'all',
     activeFormat: 'all',
+    activeTag: null,
+    tags: [],
     sortOrder: 'desc',
+    currentView: 'library',
 
     setBooks: (books) => set({ books, isLoading: false }),
+    loadBooks: async () => {
+        set({ isLoading: true });
+        try {
+            // Check if getAllBooks is imported or can be imported. 
+            // It is not imported at the top of this file in the current view.
+            // But strict mode might fail. Assuming it's available or I need to add import.
+            // Wait, I cannot see imports at top of file.
+            // I should use dynamic import or ensure it's imported.
+            // Actually, I'll assume proper import exists or standard implementation.
+            // FOR SAFETY: I will add the import in a separate tool call if needed, 
+            // but here I will just add the method assuming getAllBooks is available 
+            // from earlier imports or I will check imports next.
+            // Wait, I haven't viewed imports (lines 1-100).
+            // Let's assume the user has getAllBooks available or I will fix it if it errors.
+            // Since this is replace_content, I am sticking to the structure.
+            const books = await getAllBooks();
+            const tags = await getAllTags();
+            set({ books, tags, isLoading: false });
+        } catch (e) {
+            console.error(e);
+            set({ isLoading: false });
+        }
+    },
     addBook: (book) => set((state) => ({ books: [book, ...state.books] })),
     updateBook: (id, updates) => set((state) => ({
         books: state.books.map((b) => b.id === id ? { ...b, ...updates } : b)
@@ -176,11 +215,19 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     setSortBy: (sort) => set({ sortBy: sort }),
     setActiveCategory: (category) => set({ activeCategory: category }),
     setActiveFormat: (format) => set({ activeFormat: format }),
+    setActiveTag: (tag) => set({ activeTag: tag }),
+    setTags: (tags) => set({ tags }),
+    addTag: (tag) => set((state) => ({ tags: [...state.tags, tag].sort((a, b) => a.name.localeCompare(b.name)) })),
+    updateTag: (id, updates) => set((state) => ({
+        tags: state.tags.map(t => t.id === id ? { ...t, ...updates } : t).sort((a, b) => a.name.localeCompare(b.name))
+    })),
+    removeTag: (id) => set((state) => ({ tags: state.tags.filter(t => t.id !== id) })),
     setSortOrder: (order) => set({ sortOrder: order }),
     setIsLoading: (loading) => set({ isLoading: loading }),
+    setView: (view) => set({ currentView: view }),
 
     filteredBooks: () => {
-        const { books, searchQuery, sortBy, sortOrder, activeCategory, activeFormat } = get();
+        const { books, searchQuery, sortBy, sortOrder, activeCategory, activeFormat, activeTag } = get();
 
         let filtered = books;
 
@@ -201,6 +248,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         // Filter by format
         if (activeFormat !== 'all') {
             filtered = filtered.filter((b) => b.format === activeFormat);
+        }
+
+        // Filter by Tag
+        if (activeTag) {
+            filtered = filtered.filter((b) => b.metadata.tags?.includes(activeTag));
         }
 
         // Filter by search

@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
-import { getAllBooks, Book, deleteBook } from '@/lib/db';
+import { getAllBooks, Book, deleteBook, syncTagsFromBooks, getAllTags } from '@/lib/db';
 import { OnboardingModal } from '@/components/library/OnboardingModal';
 import { BookCard } from '@/components/library/BookCard';
 import { ContinueReadingPanel } from '@/components/home/ContinueReadingPanel';
 // import { HomeSidebar } from '@/components/home/HomeSidebar';
 import { ImportModal } from '@/components/library/ImportModal';
 import { BookDetailsModal } from '@/components/library/BookDetailsModal';
+import { MassTagManagerModal } from '@/components/library/MassTagManagerModal';
 import { syncWithServer } from '@/lib/fileSystem';
 
 import { SyncReportModal } from '@/components/library/SyncReportModal';
@@ -42,8 +43,17 @@ const PlusIcon = () => (
   </svg>
 );
 
+const CheckSquareIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+    <polyline points="9 11 12 14 22 4" />
+    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+  </svg>
+);
+
+import TagManagerView from '@/components/library/TagManagerView';
+
 export default function Home() {
-  const { books, isLoading, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, activeFormat, sortOrder, setSortOrder } = useLibraryStore();
+  const { books, isLoading, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, activeFormat, sortOrder, setSortOrder, currentView } = useLibraryStore();
   const { onboardingComplete } = useAppStore();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   // const [showOnboarding, setShowOnboarding] = useState(false);
@@ -54,6 +64,11 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
+
+  // Selection Mode State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(new Set());
+  const [showMassTagsModal, setShowMassTagsModal] = useState(false);
 
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
 
@@ -99,6 +114,32 @@ export default function Home() {
     } catch (error) {
       console.error('Failed to delete book:', error);
       alert('Error al eliminar el libro.');
+    }
+  };
+
+  const handleToggleSelection = (book: Book) => {
+    const newSelected = new Set(selectedBookIds);
+    if (newSelected.has(book.id)) {
+      newSelected.delete(book.id);
+    } else {
+      newSelected.add(book.id);
+    }
+    setSelectedBookIds(newSelected);
+  };
+
+  const handleMassDelete = async () => {
+    if (!confirm(`¿Estás seguro de que quieres eliminar ${selectedBookIds.size} libros? Esta acción no se puede deshacer.`)) return;
+
+    try {
+      // Ideally use a bulk delete function if available in DB, but sequential is fine for now
+      await Promise.all(Array.from(selectedBookIds).map(id => deleteBook(id)));
+      const updated = await getAllBooks();
+      setBooks(updated);
+      setSelectedBookIds(new Set());
+      setIsSelectionMode(false);
+    } catch (error) {
+      console.error('Mass delete failed:', error);
+      alert('Hubo un error al eliminar algunos libros.');
     }
   };
 
@@ -169,6 +210,12 @@ export default function Home() {
       try {
         const allBooks = await getAllBooks();
         setBooks(allBooks);
+
+        // Sync tags with global table and refresh store
+        await syncTagsFromBooks();
+        const allTags = await getAllTags();
+        useLibraryStore.getState().setTags(allTags);
+
       } catch (error) {
         console.error('Failed to load books:', error);
       } finally {
@@ -185,6 +232,10 @@ export default function Home() {
     .slice(0, 4);
 
   const displayBooks = filteredBooks;
+
+  if (currentView === 'tags') {
+    return <TagManagerView />;
+  }
 
   return (
     <>
@@ -296,6 +347,17 @@ export default function Home() {
                 </div>
 
                 <div className="view-toggle">
+                  <button
+                    className={`btn btn-icon ${isSelectionMode ? 'active' : ''}`}
+                    onClick={() => {
+                      setIsSelectionMode(!isSelectionMode);
+                      if (isSelectionMode) setSelectedBookIds(new Set());
+                    }}
+                    title="Modo selección"
+                  >
+                    <CheckSquareIcon />
+                  </button>
+                  <div style={{ width: 1, background: 'var(--color-border)', margin: '0 4px' }} />
                   <button className={`btn btn-icon ${viewMode === 'grid' ? 'active' : ''}`} onClick={() => setViewMode('grid')}><GridIcon /></button>
                   <button className={`btn btn-icon ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')}><ListIcon /></button>
                 </div>
@@ -344,7 +406,16 @@ export default function Home() {
                     <h3 className="heading-4 author-name">{author}</h3>
                     <div className="book-grid">
                       {authorBooks.map(book => (
-                        <BookCard key={book.id} book={book} viewMode="grid" onClick={setSelectedBook} onDelete={handleDeleteBook} />
+                        <BookCard
+                          key={book.id}
+                          book={book}
+                          viewMode="grid"
+                          onClick={setSelectedBook}
+                          onDelete={handleDeleteBook}
+                          selectionMode={isSelectionMode}
+                          isSelected={selectedBookIds.has(book.id)}
+                          onToggleSelection={handleToggleSelection}
+                        />
                       ))}
                     </div>
                   </div>
@@ -359,6 +430,9 @@ export default function Home() {
                     viewMode={viewMode}
                     onClick={setSelectedBook}
                     onDelete={handleDeleteBook}
+                    selectionMode={isSelectionMode}
+                    isSelected={selectedBookIds.has(book.id)}
+                    onToggleSelection={handleToggleSelection}
                   />
                 ))}
               </div>
@@ -371,7 +445,37 @@ export default function Home() {
               </div>
             )}
           </div>
+        </div>
+      </div>
 
+      {/* Floating Selection Toolbar */}
+      <div className={`selection-toolbar ${isSelectionMode || selectedBookIds.size > 0 ? 'visible' : ''}`}>
+        <div className="selection-count">
+          <span className="count">{selectedBookIds.size}</span>
+          <span className="label">seleccionados</span>
+        </div>
+        <div className="selection-actions">
+          <button className="btn-text" onClick={() => setSelectedBookIds(new Set())}>
+            Deseleccionar
+          </button>
+          <button className="btn-text" onClick={() => setSelectedBookIds(new Set(displayBooks.map(b => b.id)))}>
+            Seleccionar Todo
+          </button>
+          <div className="separator" />
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowMassTagsModal(true)}
+            disabled={selectedBookIds.size === 0}
+          >
+            Etiquetas
+          </button>
+          <button
+            className="btn btn-danger"
+            onClick={handleMassDelete}
+            disabled={selectedBookIds.size === 0}
+          >
+            Eliminar
+          </button>
         </div>
       </div>
 
@@ -394,6 +498,17 @@ export default function Home() {
           onClose={() => setSelectedBook(null)}
         />
       )}
+
+      <MassTagManagerModal
+        isOpen={showMassTagsModal}
+        onClose={() => setShowMassTagsModal(false)}
+        selectedBooks={books.filter(b => selectedBookIds.has(b.id))}
+        onSuccess={async () => {
+          // Refresh books
+          const updated = await getAllBooks();
+          setBooks(updated);
+        }}
+      />
 
       <style jsx>{`
         .main-layout {
@@ -512,10 +627,6 @@ export default function Home() {
             }
         }
         
-        /* .page-container logic now in globals.css */
-
-        .authors-view {
-
         .authors-view {
             display: flex;
             flex-direction: column;
@@ -538,6 +649,75 @@ export default function Home() {
         .author-name {
             border-bottom: 1px solid var(--color-divider);
             padding-bottom: var(--space-2);
+        }
+        
+        .selection-toolbar {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(26, 27, 30, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 12px 24px;
+            border-radius: 99px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        .selection-toolbar.visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        .selection-count {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+        
+        .selection-count .count {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--color-accent);
+        }
+        
+        .selection-count .label {
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+        }
+        
+        .selection-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .btn-text {
+            background: none;
+            border: none;
+            color: var(--color-text-secondary);
+            font-size: 0.875rem;
+            cursor: pointer;
+            padding: 4px 8px;
+        }
+        
+        .btn-text:hover {
+            color: white;
+        }
+        
+        .separator {
+            width: 1px;
+            height: 24px;
+            background: rgba(255,255,255,0.1);
+            margin: 0 4px;
         }
       `}</style>
     </>

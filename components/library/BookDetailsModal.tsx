@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Book, updateBook } from '@/lib/db';
+import { Book, updateBook, getAllTags, Tag } from '@/lib/db';
 import { useLibraryStore } from '@/stores/appStore';
 import { useRouter } from 'next/navigation';
 import { searchGoogleBooks, searchMetadata, findCovers, MetadataResult } from '@/lib/metadata';
@@ -26,6 +26,9 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
     const [coverResults, setCoverResults] = useState<string[]>([]);
     const [isSearchingCovers, setIsSearchingCovers] = useState(false);
 
+    const [availableTags, setAvailableTags] = useState<Tag[]>([]);
+    const [tagInput, setTagInput] = useState('');
+
     const { updateBook: updateBookInStore } = useLibraryStore();
     const router = useRouter();
     const modalRef = useRef<HTMLDivElement>(null);
@@ -46,6 +49,10 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [onClose]);
+
+    useEffect(() => {
+        getAllTags().then(setAvailableTags);
+    }, []);
 
     const handleStatusChange = async (status: Book['status']) => {
         try {
@@ -367,18 +374,79 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                         <div className="tags-section">
                             <h3 className="section-label">Tags</h3>
                             {isEditing ? (
-                                <input
-                                    className="edit-input"
-                                    value={book.metadata.tags?.join(', ') || ''}
-                                    onChange={(e) => setBook({
-                                        ...book,
-                                        metadata: {
-                                            ...book.metadata,
-                                            tags: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                                <div className="tags-edit-container">
+                                    <div className="current-tags-edit">
+                                        {book.metadata.tags?.map((tag, i) => (
+                                            <span key={i} className="tag-chip-edit">
+                                                {tag}
+                                                <button
+                                                    onClick={() => {
+                                                        const newTags = book.metadata.tags?.filter(t => t !== tag) || [];
+                                                        setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
+                                                    }}
+                                                    className="tag-remove-btn"
+                                                >×</button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="tag-input-wrapper">
+                                        <input
+                                            className="edit-input-sm"
+                                            value={tagInput}
+                                            onChange={(e) => setTagInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    const val = tagInput.trim();
+                                                    if (val && !book.metadata.tags?.includes(val)) {
+                                                        const newTags = [...(book.metadata.tags || []), val];
+                                                        setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
+                                                        setTagInput('');
+                                                    }
+                                                }
+                                            }}
+                                            placeholder="Add tag..."
+                                            list="available-tags"
+                                        />
+                                        <datalist id="available-tags">
+                                            {availableTags.map(t => (
+                                                <option key={t.id} value={t.name} />
+                                            ))}
+                                        </datalist>
+                                        <button
+                                            className="btn-xs btn-primary ml-2"
+                                            onClick={() => {
+                                                const val = tagInput.trim();
+                                                if (val && !book.metadata.tags?.includes(val)) {
+                                                    const newTags = [...(book.metadata.tags || []), val];
+                                                    setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
+                                                    setTagInput('');
+                                                }
+                                            }}
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                    {/* Quick Suggestions */}
+                                    <div className="quick-tags">
+                                        {availableTags
+                                            .filter(t => !book.metadata.tags?.includes(t.name))
+                                            .slice(0, 10) // Show top 10 unused
+                                            .map(t => (
+                                                <button
+                                                    key={t.id}
+                                                    className="tag-suggestion"
+                                                    onClick={() => {
+                                                        const newTags = [...(book.metadata.tags || []), t.name];
+                                                        setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
+                                                    }}
+                                                >
+                                                    + {t.name}
+                                                </button>
+                                            ))
                                         }
-                                    })}
-                                    placeholder="Tags (comma separated)"
-                                />
+                                    </div>
+                                </div>
                             ) : (
                                 <div className="tags-list">
                                     {book.metadata.tags?.map((tag, i) => (
@@ -482,23 +550,6 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                 </svg>
                             )}
                         </button>
-                        {isEditing && (
-                            <button
-                                className="btn-icon"
-                                onClick={() => {
-                                    if (confirm('Revert all changes to original metadata?')) {
-                                        setBook(initialBook);
-                                        setIsEditing(false);
-                                    }
-                                }}
-                                title="Revert Changes"
-                            >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                                    <path d="M3 3v5h5" />
-                                </svg>
-                            </button>
-                        )}
                         {isEditing && (
                             <button
                                 className="btn-icon"
@@ -733,6 +784,154 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     align-items: center;
                     justify-content: center;
                     transition: all 0.2s;
+                    border: none;
+                }
+
+                .btn-primary {
+                    background: var(--color-accent);
+                    color: white;
+                }
+
+                .btn-primary:hover {
+                    opacity: 0.9;
+                }
+
+                .btn-secondary {
+                    background: rgba(255,255,255,0.1);
+                    color: white;
+                    border: 1px solid rgba(255,255,255,0.1);
+                }
+
+                .btn-secondary:hover {
+                    background: rgba(255,255,255,0.15);
+                }
+
+                .metadata-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: var(--space-6);
+                    padding: var(--space-6) 0;
+                    border-top: 1px solid rgba(255,255,255,0.1);
+                    border-bottom: 1px solid rgba(255,255,255,0.1);
+                }
+
+                .metadata-item {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--space-1);
+                }
+
+                .metadata-label {
+                    font-size: var(--text-xs);
+                    color: rgba(255,255,255,0.5);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                }
+
+                .metadata-value {
+                    font-size: var(--text-sm);
+                    color: #fff;
+                }
+                
+                .tags-section {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--space-3);
+                }
+                
+                .tags-list {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: var(--space-2);
+                }
+                
+                .tag {
+                    font-size: var(--text-xs);
+                    padding: 4px 10px;
+                    border-radius: 99px;
+                    background: rgba(255,255,255,0.1);
+                    color: rgba(255,255,255,0.8);
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                }
+                
+                .tag-remove {
+                    cursor: pointer;
+                    opacity: 0.6;
+                    display: flex;
+                    align-items: center;
+                }
+                .tag-remove:hover { opacity: 1; }
+                
+                .quick-tags {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 6px;
+                    margin-top: 8px;
+                }
+                
+                .tag-suggestion {
+                    font-size: 10px;
+                    padding: 2px 8px;
+                    border-radius: 99px;
+                    background: rgba(255,255,255,0.05);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    color: rgba(255,255,255,0.6);
+                    cursor: pointer;
+                }
+                .tag-suggestion:hover {
+                    background: rgba(255,255,255,0.1);
+                    color: white;
+                    border-color: rgba(255,255,255,0.2);
+                }
+                
+                .description h4, .tags-section h4 {
+                    font-size: var(--text-sm);
+                    color: rgba(255,255,255,0.5);
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    margin: 0 0 var(--space-2) 0;
+                }
+
+                .description p {
+                    font-size: var(--text-sm);
+                    line-height: 1.6;
+                    color: rgba(255,255,255,0.8);
+                    white-space: pre-wrap;
+                }
+
+                .status-dropdown-wrapper {
+                    position: relative;
+                    min-width: 140px;
+                }
+                
+                .status-dropdown-wrapper::after {
+                    content: '';
+                    position: absolute;
+                    top: 0; bottom: 0; right: 0; left: 0;
+                    pointer-events: none;
+                }
+
+                .status-select {
+                    background: rgba(255,255,255,0.1);
+                    border: none;
+                    color: #fff;
+                    padding: 8px 16px;
+                    border-radius: var(--radius-md);
+                    font-size: var(--text-sm);
+                    cursor: pointer;
+                    appearance: none;
+                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+                    background-repeat: no-repeat;
+                    background-position: right 8px center;
+                    background-size: 16px;
+                    padding-right: 32px;
+                }
+                
+                .footer-actions {
+                    display: flex;
+                    gap: var(--space-2);
                 }
 
                 .btn-read {
@@ -770,165 +969,238 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     overflow-y: auto;
                 }
 
-                .metadata-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: var(--space-4);
-                }
-
-                .metadata-item {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 4px;
-                }
-
-                .meta-label {
-                    font-size: var(--text-xs);
-                    color: rgba(255,255,255,0.5);
-                }
-
-                .meta-value {
-                    font-size: var(--text-sm);
-                    font-weight: 500;
-                }
-
-                .meta-value.upp {
-                    text-transform: uppercase;
-                }
-
-                .tags-list {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: var(--space-2);
-                }
-
-                .tag {
-                    background: rgba(255,255,255,0.1);
-                    color: rgba(255,255,255,0.8);
-                    padding: 4px 12px;
-                    border-radius: var(--radius-full);
-                    font-size: var(--text-xs);
-                    font-weight: 500;
-                }
-                
-                .tag.aventuras { color: #facc15; background: rgba(250, 204, 21, 0.1); }
-                .tag.belico { color: #f87171; background: rgba(248, 113, 113, 0.1); }
-                .tag.historico { color: #a3e635; background: rgba(163, 230, 53, 0.1); }
-
-                .modal-footer {
-                    padding: var(--space-4) var(--space-8);
-                    border-top: 1px solid rgba(255,255,255,0.1);
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    background: rgba(0,0,0,0.2);
-                }
-
-                .status-select {
-                    background: rgba(255,255,255,0.1);
-                    border: none;
-                    color: #fff;
-                    padding: 8px 16px;
-                    border-radius: var(--radius-md);
-                    font-size: var(--text-sm);
-                    cursor: pointer;
-                    appearance: none;
-                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-                    background-repeat: no-repeat;
-                    background-position: right 8px center;
-                    background-size: 16px;
-                    padding-right: 32px;
-                }
-
-                .footer-actions {
-                    display: flex;
-                    gap: var(--space-2);
-                }
-
-                .btn-icon {
-                    width: 36px;
-                    height: 36px;
-                    border-radius: var(--radius-md);
-                    background: transparent;
-                    border: none;
-                    color: rgba(255,255,255,0.6);
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.2s;
-                }
-
-                .btn-icon:hover {
-                    background: rgba(255,255,255,0.1);
-                    color: #fff;
-                }
-                
-                .btn-icon.active-fav {
-                    color: #FFD700;
-                }
-                
-                .btn-icon.active-edit {
-                    color: var(--color-accent);
-                    background: rgba(var(--color-accent-rgb), 0.1);
-                }
-
-                .edit-form-group {
-                    display: flex;
-                    flex-direction: column;
-                    gap: var(--space-2);
-                    width: 100%;
-                }
-
                 .edit-input, .edit-textarea {
-                    background: rgba(255,255,255,0.1);
-                    border: 1px solid rgba(255,255,255,0.2);
+                    background-color: #25262b;
+                    border: 1px solid #373a40;
                     color: #fff;
                     padding: 8px 12px;
                     border-radius: var(--radius-md);
                     font-size: var(--text-sm);
                     width: 100%;
                     font-family: inherit;
+                    display: block;
                 }
 
                 .edit-input:focus, .edit-textarea:focus {
                     outline: none;
                     border-color: var(--color-accent);
-                    background: rgba(255,255,255,0.15);
+                    background-color: #2c2e33;
                 }
 
                 .author-input {
                     font-size: var(--text-sm);
                     font-weight: 500;
+                    margin-bottom: 4px;
                 }
 
                 .title-input {
                     font-size: var(--text-xl);
                     font-weight: 700;
+                    margin-bottom: 8px;
                 }
 
                 .edit-textarea {
                     min-height: 100px;
                     resize: vertical;
-                    line-height: 1.5;
+                    line-height: 1.6;
                 }
 
                 .edit-input-sm {
-                    background: rgba(255,255,255,0.1);
-                    border: 1px solid rgba(255,255,255,0.2);
+                    background-color: #25262b;
+                    border: 1px solid #373a40;
                     color: #fff;
-                    padding: 4px 8px;
+                    padding: 6px 10px;
                     border-radius: var(--radius-sm);
                     font-size: var(--text-sm);
                     width: 100%;
                 }
-                
+
                 .edit-input-sm:focus {
-                     outline: none;
+                    outline: none;
                     border-color: var(--color-accent);
                 }
 
-                @media (max-width: 768px) {
+                /* Fix date inputs on dark mode */
+                input[type="date"] {
+                    color-scheme: dark;
+                }
+
+
+                .tag-chip-edit {
+                    background: rgba(255,255,255,0.1);
+                    padding: 2px 8px;
+                    border-radius: 4px;
+                    font-size: 12px;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                }
+                
+                .tag-remove-btn {
+                    background: none;
+                    border: none;
+                    color: rgba(255,255,255,0.5);
+                    cursor: pointer;
+                    padding: 0 2px;
+                }
+                .tag-remove-btn:hover { color: white; }
+
+                .tag-input-wrapper {
+                    display: flex;
+                    gap: 4px;
+                }
+
+                .quick-tags {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 4px;
+                    margin-top: 4px;
+                }
+                
+                .tag-suggestion {
+                    background: none;
+                    border: 1px solid rgba(255,255,255,0.2);
+                    padding: 2px 6px;
+                    border-radius: 99px;
+                    font-size: 11px;
+                    color: rgba(255,255,255,0.6);
+                    cursor: pointer;
+                }
+                .tag-suggestion:hover {
+                    border-color: rgba(255,255,255,0.5);
+                    color: white;
+                }
+                .tag {
+            background: rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.8);
+            padding: 4px 12px;
+            border-radius: var(--radius-full);
+            font-size: var(--text-xs);
+            font-weight: 500;
+                }
+
+            .tag.aventuras {color: #facc15; background: rgba(250, 204, 21, 0.1); }
+            .tag.belico {color: #f87171; background: rgba(248, 113, 113, 0.1); }
+            .tag.historico {color: #a3e635; background: rgba(163, 230, 53, 0.1); }
+
+            .tags-edit-container {
+                display: flex;
+            flex-direction: column;
+            gap: 8px;
+                }
+
+            .current-tags-edit {
+                display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+                }
+
+            .tag-chip-edit {
+                background: rgba(255,255,255,0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+                }
+
+            .tag-remove-btn {
+                background: none;
+            border: none;
+            color: rgba(255,255,255,0.5);
+            cursor: pointer;
+            padding: 0 2px;
+                }
+            .tag-remove-btn:hover {color: white; }
+
+            .tag-input-wrapper {
+                display: flex;
+            gap: 4px;
+                }
+
+            .quick-tags {
+                display: flex;
+                flex-wrap: wrap;
+                margin-top: 8px;
+            }
+
+            .quick-tags .tag {
+                background: rgba(255,255,255,0.1);
+                color: rgba(255,255,255,0.8);
+                padding: 4px 12px;
+                border-radius: var(--radius-full);
+                font-size: var(--text-xs);
+                font-weight: 500;
+            }
+
+            .tag.aventuras { color: #facc15; background: rgba(250, 204, 21, 0.1); }
+            .tag.belico { color: #f87171; background: rgba(248, 113, 113, 0.1); }
+            .tag.historico { color: #a3e635; background: rgba(163, 230, 53, 0.1); }
+
+            .modal-footer {
+                padding: var(--space-4) var(--space-8);
+                border-top: 1px solid rgba(255,255,255,0.1);
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: #1a1b1e;
+                margin-top: auto;
+            }
+
+            .status-select {
+                background: rgba(255,255,255,0.1);
+                border: none;
+                color: #fff;
+                padding: 8px 16px;
+                border-radius: var(--radius-md);
+                font-size: var(--text-sm);
+                cursor: pointer;
+                appearance: none;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+                background-repeat: no-repeat;
+                background-position: right 8px center;
+                background-size: 16px;
+                padding-right: 32px;
+            }
+            .status-select:hover {
+                background: rgba(255,255,255,0.15);
+            }
+
+            .footer-actions {
+                display: flex;
+                gap: var(--space-2);
+            }
+
+            .btn-icon {
+                width: 36px;
+                height: 36px;
+                border-radius: var(--radius-md);
+                background: transparent;
+                border: none;
+                color: rgba(255,255,255,0.6);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s;
+            }
+
+            .btn-icon:hover {
+                background: rgba(255,255,255,0.1);
+                color: #fff;
+            }
+
+            .btn-icon.active-fav {
+                color: #FFD700;
+            }
+
+            .btn-icon.active-edit {
+                color: #fff;
+                background: var(--color-accent);
+            }
+
+            @media (max-width: 768px) {
                     .modal-content {
                         grid-template-columns: 1fr;
                         padding: var(--space-6);
@@ -938,24 +1210,24 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                         width: 160px;
                         margin: 0 auto;
                     }
-                    
+
                     .info-section {
                         text-align: center;
                     }
-                    
+
                     .header-info {
                         align-items: center;
                     }
-                    
+
                     .metadata-grid {
                         text-align: left;
                     }
-                    
+
                     .tags-list {
                         justify-content: center;
                     }
                 }
-                
+
                 @keyframes fadeIn {
                     from { opacity: 0; }
                     to { opacity: 1; }
@@ -964,7 +1236,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                 .animate-spin {
                     animation: spin 1s linear infinite;
                 }
-                
+
                 @keyframes spin {
                     from { transform: rotate(0deg); }
                     to { transform: rotate(360deg); }
@@ -991,14 +1263,14 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     display: flex;
                     flex-direction: column;
                 }
-                
+
                 .cover-selector-container {
-                     background: #1a1b1e;
-                     border-radius: var(--radius-lg);
-                     border: 1px solid rgba(255,255,255,0.1);
-                     overflow: hidden;
+                    background: #1a1b1e;
+                    border-radius: var(--radius-lg);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    overflow: hidden;
                 }
-                
+
                 .cover-grid {
                     display: grid;
                     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
@@ -1006,7 +1278,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     padding: var(--space-4);
                     overflow-y: auto;
                 }
-                
+
                 .cover-option {
                     aspect-ratio: 2/3;
                     border-radius: var(--radius-md);
@@ -1015,18 +1287,18 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     transition: transform 0.2s;
                     border: 2px solid transparent;
                 }
-                
+
                 .cover-option:hover {
                     transform: scale(1.05);
                     border-color: var(--color-accent);
                 }
-                
+
                 .cover-option img {
                     width: 100%;
                     height: 100%;
                     object-fit: cover;
                 }
-                
+
                 .btn-xs {
                     font-size: 10px;
                     padding: 2px 6px;
@@ -1037,19 +1309,18 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     cursor: pointer;
                     margin-top: 4px;
                 }
-                
+
                 .btn-xs:hover {
                     background: rgba(255,255,255,0.3);
                 }
-                
+
                 .no-results {
                     grid-column: 1 / -1;
                     text-align: center;
                     color: rgba(255,255,255,0.5);
                     padding: var(--space-8);
                 }
-
-            `}</style>
-        </div >
+      `}</style>
+        </div>
     );
 }

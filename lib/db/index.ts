@@ -1,4 +1,5 @@
 import Dexie, { Table } from 'dexie';
+import { v4 as uuidv4 } from 'uuid';
 
 // ===================================
 // Type Definitions
@@ -40,6 +41,13 @@ export interface BookMetadata {
   series?: string;
   seriesIndex?: number;
   tags?: string[];
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  color?: string; // hex color
+  createdAt: Date;
 }
 
 export interface Annotation {
@@ -174,6 +182,7 @@ export class LectroDB extends Dexie {
   xrayData!: Table<XRayData, string>;
   summaries!: Table<BookSummary, string>;
   settings!: Table<AppSettings, string>;
+  tags!: Table<Tag, string>;
 
   constructor() {
     super('LectroDB');
@@ -202,6 +211,10 @@ export class LectroDB extends Dexie {
 
     this.version(5).stores({
       books: 'id, title, author, format, addedAt, lastReadAt, progress, status, fileName, filePath, isOnServer, isFavorite',
+    });
+
+    this.version(6).stores({
+      tags: 'id, &name, createdAt', // &name makes it unique index
     });
   }
 }
@@ -384,4 +397,56 @@ function calculateStreak(dailyStats: Record<string, number>): number {
   }
 
   return streak;
+}
+
+// ===================================
+// Tags Operations
+// ===================================
+
+export async function getAllTags(): Promise<Tag[]> {
+  return db.tags.orderBy('name').toArray();
+}
+
+export async function addTag(name: string, color?: string): Promise<string> {
+  const tag: Tag = {
+    id: uuidv4(),
+    name,
+    color,
+    createdAt: new Date(),
+  };
+  return db.tags.add(tag);
+}
+
+export async function updateTag(id: string, updates: Partial<Tag>): Promise<number> {
+  return db.tags.update(id, updates);
+}
+
+export async function deleteTag(id: string): Promise<void> {
+  await db.tags.delete(id);
+}
+
+export async function syncTagsFromBooks(): Promise<void> {
+  const books = await getAllBooks();
+  const existingTags = await getAllTags();
+  const existingTagNames = new Set(existingTags.map(t => t.name));
+
+  const tagsToAdd = new Set<string>();
+
+  books.forEach(book => {
+    book.metadata.tags?.forEach(tagName => {
+      if (!existingTagNames.has(tagName)) {
+        tagsToAdd.add(tagName);
+      }
+    });
+  });
+
+  if (tagsToAdd.size === 0) return;
+
+  const newTags: Tag[] = Array.from(tagsToAdd).map(name => ({
+    id: uuidv4(),
+    name,
+    createdAt: new Date()
+  }));
+
+  await db.tags.bulkAdd(newTags);
 }
