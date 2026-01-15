@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useReaderStore, useAppStore } from '@/stores/appStore';
 import { getBook, updateBook, getAnnotationsForBook, addAnnotation, updateAnnotation, deleteAnnotation, Annotation, Book, HighlightColor } from '@/lib/db';
-import { EpubReader, EpubReaderRef, TocItem } from '@/components/reader/EpubReader';
+import { EpubReader, TocItem } from '@/components/reader/EpubReader';
+import { WebPubReader, WebPubReaderRef } from '@/components/reader/WebPubReader';
 import dynamic from 'next/dynamic';
 import { ReaderToolbar } from '@/components/reader/ReaderToolbar';
 
@@ -20,7 +21,7 @@ export default function ReaderPage() {
     const router = useRouter();
     const bookId = params.bookId as string;
     const contentRef = useRef<HTMLDivElement>(null);
-    const epubReaderRef = useRef<EpubReaderRef>(null);
+    const epubReaderRef = useRef<WebPubReaderRef>(null);
 
     const {
         book,
@@ -240,7 +241,7 @@ export default function ReaderPage() {
 
                 <div className="reader-content" ref={contentRef}>
                     {book.format === 'epub' ? (
-                        <EpubReader
+                        <WebPubReader
                             ref={epubReaderRef}
                             book={book}
                             onLocationChange={handleLocationChange}
