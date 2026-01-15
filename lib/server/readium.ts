@@ -46,6 +46,51 @@ export class ReadiumHelper {
         this.cachePath = path.join(this.libraryPath, CACHE_DIR_NAME, bookId);
     }
 
+    private resolveFuzzyPath(targetPath: string): string | null {
+        try {
+            if (!targetPath.startsWith(this.libraryPath)) return null;
+
+            const relPath = path.relative(this.libraryPath, targetPath);
+            const segments = relPath.split(path.sep);
+            let currentPath = this.libraryPath;
+
+            for (const segment of segments) {
+                // 1. Check direct existence
+                const directPath = path.join(currentPath, segment);
+                if (fs.existsSync(directPath)) {
+                    currentPath = directPath;
+                    continue;
+                }
+
+                // 2. Fuzzy search
+                if (!fs.existsSync(currentPath) || !fs.statSync(currentPath).isDirectory()) {
+                    return null; // Parent not found or not a dir
+                }
+
+                const siblings = fs.readdirSync(currentPath);
+
+                // Helper to strip non-ascii and normalize
+                const clean = (s: string) => s.normalize('NFD').replace(/[^\x20-\x7E]/g, '').toLowerCase();
+                const targetClean = clean(segment);
+
+                const match = siblings.find(sib => clean(sib) === targetClean);
+
+                if (match) {
+                    console.log(`[Readium] Fuzzy match: '${segment}' -> '${match}'`);
+                    currentPath = path.join(currentPath, match);
+                } else {
+                    console.log(`[Readium] No fuzzy match for '${segment}' in ${currentPath}`);
+                    return null;
+                }
+            }
+
+            return currentPath;
+        } catch (e) {
+            console.error('[Readium] Fuzzy resolution error:', e);
+            return null;
+        }
+    }
+
     private getBookPath(): string | null {
         try {
             const dbPath = path.join(this.libraryPath, 'lectro_data.json');
@@ -70,21 +115,26 @@ export class ReadiumHelper {
 
             const rawPath = path.join(this.libraryPath, book.filePath);
 
-            // Try different normalizations (NFC, NFD) to handle OS/Browser mismatches
+            // 1. Exact Match
+            if (fs.existsSync(rawPath)) return rawPath;
+
+            // 2. Normalization Matches
             const candidates = [
-                rawPath,
                 rawPath.normalize('NFC'),
                 rawPath.normalize('NFD')
             ];
-
             for (const candidate of candidates) {
-                if (fs.existsSync(candidate)) {
-                    console.log(`[Readium] Resolved path: ${candidate}`);
-                    return candidate;
-                }
+                if (fs.existsSync(candidate)) return candidate;
             }
 
-            console.error(`[Readium] File does not exist at ${rawPath} (tried all normalizations)`);
+            // 3. Fuzzy Match (Handling stripped characters)
+            const fuzzyPath = this.resolveFuzzyPath(rawPath);
+            if (fuzzyPath && fs.existsSync(fuzzyPath)) {
+                console.log(`[Readium] Resolved via fuzzy search: ${fuzzyPath}`);
+                return fuzzyPath;
+            }
+
+            console.error(`[Readium] File does not exist: ${rawPath}`);
             return null;
 
 
