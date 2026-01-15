@@ -30,12 +30,19 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
         console.log('Starting sync...');
 
         // 1. Fetch server data
-        const response = await fetch('/api/library/metadata');
+        const customPath = localStorage.getItem('lectro_server_path');
+        const headers: HeadersInit = {};
+        if (customPath) {
+            headers['x-library-path'] = customPath;
+        }
+
+        const response = await fetch('/api/library/metadata', { headers });
         if (!response.ok) {
             throw new Error(`Failed to fetch server data: ${response.statusText}`);
         }
 
         const serverData: ServerData = await response.json();
+        console.log(`Received ${serverData.books?.length || 0} books from server`);
 
         // Handle empty server state (first run)
         if ((!serverData.books || serverData.books.length === 0) && (!serverData.tags || serverData.tags.length === 0)) {
@@ -147,11 +154,17 @@ async function pushLocalData() {
         lastSync: new Date().toISOString()
     };
 
+    const customPath = localStorage.getItem('lectro_server_path');
+    const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+    };
+    if (customPath) {
+        headers['x-library-path'] = customPath;
+    }
+
     const res = await fetch('/api/library/metadata', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify(payload)
     });
 
