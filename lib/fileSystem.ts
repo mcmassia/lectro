@@ -1,6 +1,6 @@
 import { db, Book, addBook, updateBook } from './db';
 import { v4 as uuid } from 'uuid';
-import ePub from 'epubjs';
+// import ePub from 'epubjs';
 
 // Remove top-level pdfjs import to prevent SSR issues
 // import * as pdfjsLib from 'pdfjs-dist';
@@ -49,6 +49,7 @@ async function processFileEntry(fileHandle: FileSystemFileHandle): Promise<Book 
 
     if (extension === 'epub') {
         try {
+            const ePub = (await import('epubjs')).default;
             const arrayBuffer = await file.arrayBuffer();
             const book = ePub(arrayBuffer);
             await book.ready;
@@ -377,6 +378,7 @@ async function processFileBlob(file: File): Promise<Book | null> {
 
     if (extension === 'epub') {
         try {
+            const ePub = (await import('epubjs')).default;
             const arrayBuffer = await file.arrayBuffer();
             const book = ePub(arrayBuffer);
             await book.ready;

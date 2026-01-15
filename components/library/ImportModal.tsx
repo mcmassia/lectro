@@ -4,7 +4,7 @@ import { useState, useCallback, useRef } from 'react';
 import { v4 as uuid } from 'uuid';
 import { Book, addBook as dbAddBook } from '@/lib/db';
 import { useLibraryStore } from '@/stores/appStore';
-import ePub from 'epubjs';
+// import ePub from 'epubjs';
 
 interface ImportModalProps {
     onClose: () => void;
@@ -22,6 +22,7 @@ export function ImportModal({ onClose }: ImportModalProps) {
     const [serverSyncing, setServerSyncing] = useState(false);
 
     const processEpub = async (file: File): Promise<Partial<Book>> => {
+        const ePub = (await import('epubjs')).default;
         const arrayBuffer = await file.arrayBuffer();
         const book = ePub(arrayBuffer);
         await book.ready;
