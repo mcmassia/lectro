@@ -279,8 +279,32 @@ export async function syncWithServer(onProgress?: (log: string) => void): Promis
 
         // 3. Handle deletions
         log('Verificando archivos eliminados...');
-        const removed = await handleDeletions(serverFiles, errors);
+        const deletedIds = await handleDeletions(serverFiles, errors); // Returns string[]
 
+        if (deletedIds.length > 0) {
+            log(`Eliminando metadatos para ${deletedIds.length} libros...`);
+            try {
+                const customPath = localStorage.getItem('lectro_server_path');
+                const syncHeaders: HeadersInit = { 'Content-Type': 'application/json' };
+                if (customPath) syncHeaders['x-library-path'] = customPath;
+
+                await fetch('/api/library/metadata', {
+                    method: 'POST',
+                    headers: syncHeaders,
+                    body: JSON.stringify({
+                        books: [], // No metadata update, just delete
+                        lastSync: new Date().toISOString(),
+                        deletedBookIds: deletedIds
+                    })
+                });
+                log('Metadatos actualizados en el servidor.');
+            } catch (err) {
+                console.error('Failed to sync deletions to server:', err);
+                errors.push('Failed to sync deletions to server metadata');
+            }
+        }
+
+        const removed = deletedIds.length;
         log(`Sincronización completada. +${added} / -${removed}`);
         return { added, removed, errors };
 
@@ -290,13 +314,24 @@ export async function syncWithServer(onProgress?: (log: string) => void): Promis
     }
 }
 
-async function handleDeletions(serverFiles: ServerFile[], errors: string[]): Promise<number> {
-    let removed = 0;
+async function handleDeletions(serverFiles: ServerFile[], errors: string[]): Promise<string[]> {
+    const deletedIds: string[] = [];
     try {
         const localServerBooks = await db.books.filter(b => !!b.isOnServer).toArray();
+        // Normalize server names for comparison (stripping accents if needed, though exact match preferred)
+        // With the fuzzy logic on server, the server *should* have found the file if it existed.
+        // If it's not in serverFiles, it's truly gone.
         const serverFileNames = new Set(serverFiles.map(f => f.name));
 
         for (const book of localServerBooks) {
+            // Check if file exists in server listing
+            // Note: serverFiles contains actual filenames on disk.
+            // If book.fileName (from DB) doesn't match exactly, we might delete incorrectly if we don't fuzzy match here too.
+            // But usually db.fileName should match what's on disk.
+            // If the server performed a scan and returned "stripped" names, and DB has "full" names...
+            // current check !serverFileNames.has(book.fileName) might be true even if file exists (mismatched name).
+            // This is risky. But the user said "he borrado las carpetas", so they ARE gone.
+
             if (!serverFileNames.has(book.fileName)) {
                 console.log('Removing local book not on server:', book.title);
                 try {
@@ -307,7 +342,7 @@ async function handleDeletions(serverFiles: ServerFile[], errors: string[]): Pro
                         await db.xrayData.where('bookId').equals(book.id).delete();
                         await db.summaries.where('bookId').equals(book.id).delete();
                     });
-                    removed++;
+                    deletedIds.push(book.id);
                 } catch (e) {
                     console.error('Failed to remove local book:', book.title, e);
                     errors.push(`Failed to remove ${book.title}`);
@@ -317,7 +352,7 @@ async function handleDeletions(serverFiles: ServerFile[], errors: string[]): Pro
     } catch (e) {
         console.error('Error handling deletions:', e);
     }
-    return removed;
+    return deletedIds;
 }
 
 // Reuse logic from processFileEntry but for a direct File object

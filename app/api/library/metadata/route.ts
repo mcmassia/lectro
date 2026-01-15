@@ -131,17 +131,28 @@ export async function POST(req: NextRequest) {
         }
 
         // Helper to merge arrays by ID
-        const mergeById = (existing: any[], incoming: any[]) => {
-            if (!incoming || incoming.length === 0) return existing;
+        const mergeById = (existing: any[], incoming: any[], deletedIds: string[] = []) => {
             const map = new Map(existing.map(item => [item.id || item.name, item]));
-            incoming.forEach(item => {
-                if (item.id) map.set(item.id, item);
-            });
+
+            // Apply deletions first
+            deletedIds.forEach(id => map.delete(id));
+
+            // Apply updates/additions
+            if (incoming && incoming.length > 0) {
+                incoming.forEach(item => {
+                    if (item.id) map.set(item.id, item);
+                });
+            }
             return Array.from(map.values());
         };
 
+        const deletedBookIds = body.deletedBookIds || [];
+        if (deletedBookIds.length > 0) {
+            console.log(`[POST] Removing ${deletedBookIds.length} books:`, deletedBookIds);
+        }
+
         // Merge Logic
-        const mergedBooks = mergeById(existingData.books || [], body.books || []);
+        const mergedBooks = mergeById(existingData.books || [], body.books || [], deletedBookIds);
         const mergedTags = mergeById(existingData.tags || [], body.tags || []);
         const mergedAnnotations = mergeById(existingData.annotations || [], body.annotations || []);
         const mergedSessions = (body.readingSessions && body.readingSessions.length > 0)
