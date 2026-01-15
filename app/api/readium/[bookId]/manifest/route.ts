@@ -13,9 +13,12 @@ export async function GET(
         if (!helper.isUnzipped()) {
             try {
                 helper.unzip();
-            } catch (e) {
+            } catch (e: any) {
                 console.error('Failed to unzip book:', e);
-                return NextResponse.json({ error: 'Failed to process book' }, { status: 500 });
+                return NextResponse.json({
+                    error: e.message || 'Failed to process book',
+                    details: e.toString()
+                }, { status: 500 });
             }
         }
 

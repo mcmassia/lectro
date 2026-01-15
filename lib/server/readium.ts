@@ -71,7 +71,9 @@ export class ReadiumHelper {
             throw new Error('Book file not found');
         }
 
-        console.log(`[Readium] Unzipping book ${this.bookId} to ${this.cachePath}`);
+        console.log(`[Readium] Unzipping book ${this.bookId}`);
+        console.log(`[Readium] Source path: ${filePath}`);
+        console.log(`[Readium] Target path: ${this.cachePath}`);
 
         // Ensure cache base dir exists
         const baseCache = path.join(this.libraryPath, CACHE_DIR_NAME);
