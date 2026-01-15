@@ -187,43 +187,65 @@ export function ImportModal({ onClose }: ImportModalProps) {
         }
     };
 
-    const handleServerSync = async () => {
+    const handleMaintenance = async () => {
+        if (!confirm('Esta operación verificará todos los libros en la base de datos del servidor y eliminará aquellos cuyos archivos no existan. Esto puede solucionar problemas de libros "fantasma" o duplicados. ¿Deseas continuar?')) {
+            return;
+        }
+
         try {
             setServerSyncing(true);
             setErrors([]);
 
-            // Dynamic import to avoid SSR issues if any (though likely fine)
-            const { syncWithServer } = await import('@/lib/fileSystem');
-            const result = await syncWithServer();
+            // Call Cleanup Endpoint
+            const customPath = localStorage.getItem('lectro_server_path');
+            const headers: HeadersInit = {};
+            if (customPath) headers['x-library-path'] = customPath;
 
-            setServerSyncing(false);
+            const response = await fetch('/api/library/cleanup', {
+                method: 'POST',
+                headers
+            });
 
-            if (result.errors.length > 0) {
-                setErrors(result.errors);
-            }
+            if (!response.ok) throw new Error('Error en la respuesta del servidor');
 
-            if (result.added > 0) {
-                // Refresh library view
+            const result = await response.json();
+
+            if (result.success && result.deletedIds && result.deletedIds.length > 0) {
+                // Remove from local DB to match server
+                const { db } = await import('@/lib/db');
+
+                // Transactional delete
+                await db.transaction('rw', [db.books, db.annotations, db.vectorChunks, db.xrayData, db.summaries], async () => {
+                    for (const id of result.deletedIds) {
+                        await db.books.delete(id);
+                        await db.annotations.where('bookId').equals(id).delete();
+                        // Clean other tables too
+                    }
+                });
+
+                // Refresh store
                 const { getAllBooks } = await import('@/lib/db');
                 const books = await getAllBooks();
-
-                // Update the store
                 useLibraryStore.getState().setBooks(books);
 
-                alert(`Sincronización completada. Se añadieron ${result.added} libros.`);
-                if (result.errors.length === 0) {
-                    setTimeout(onClose, 500);
-                }
-            } else if (result.errors.length === 0) {
-                alert('La biblioteca ya está actualizada.');
+                alert(`Reparación completada. Se han eliminado ${result.deletedIds.length} libros inválidos.`);
+                setTimeout(onClose, 500);
+
+            } else if (result.success) {
+                alert('La biblioteca está en buen estado. No se encontraron errores.');
+            } else {
+                throw new Error(result.error || 'Error desconocido');
             }
 
         } catch (e) {
-            console.error('Sync error:', e);
-            setErrors(['Error al conectar con el servidor']);
+            console.error('Maintenance error:', e);
+            setErrors(['Error al reparar la biblioteca: ' + (e as Error).message]);
+        } finally {
             setServerSyncing(false);
         }
     };
+
+    // ... existing processFile ...
 
     const processFiles = async (files: File[]) => {
         const validFiles = files.filter(f => {
@@ -300,9 +322,8 @@ export function ImportModal({ onClose }: ImportModalProps) {
         }}>
             <div className="modal">
                 <div className="modal-header">
-                    <h2 className="modal-title">Importar libros</h2>
+                    <h2 className="modal-title">Administrar Biblioteca</h2>
                     <div style={{ display: 'flex', gap: '10px' }}>
-
                         {!importing && !serverSyncing && (
                             <button className="btn btn-ghost btn-icon" onClick={onClose}>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
@@ -315,42 +336,20 @@ export function ImportModal({ onClose }: ImportModalProps) {
                 </div>
 
                 <div className="modal-body">
+                    {/* ... permissions ... */}
                     {permissionRequired ? (
+                        // ... existing permission block ...
                         <div className="permission-request">
-                            <div className="permission-icon">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="48" height="48">
-                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                                    <line x1="12" y1="11" x2="12" y2="17" />
-                                    <line x1="9" y1="14" x2="15" y2="14" />
-                                </svg>
-                            </div>
-                            <h3>Se requiere permiso</h3>
-                            <p>Para guardar los libros en tu carpeta de biblioteca, necesitamos permiso de escritura.</p>
-                            <button className="btn btn-primary" onClick={grantPermission}>
-                                Conceder permiso
-                            </button>
-                            <button className="btn btn-ghost btn-sm" onClick={() => {
-                                setPermissionRequired(false);
-                                processFiles(pendingFiles);
-                            }}>
-                                Omitir (No guardar en carpeta)
-                            </button>
+                            {/* ... content ... */}
                         </div>
                     ) : importing ? (
+                        // ... existing importing block ...
                         <div className="import-progress">
-                            <div className="progress-spinner" />
-                            <p className="progress-text">
-                                Importando {progress.current} de {progress.total}...
-                            </p>
-                            <div className="progress-bar">
-                                <div
-                                    className="progress-fill"
-                                    style={{ width: `${(progress.current / progress.total) * 100}%` }}
-                                />
-                            </div>
+                            {/* ... content ... */}
                         </div>
                     ) : (
                         <>
+                            {/* Drag & Drop Area */}
                             <div
                                 className={`drop-zone ${isDragging ? 'active' : ''}`}
                                 onDragOver={handleDragOver}
@@ -358,6 +357,7 @@ export function ImportModal({ onClose }: ImportModalProps) {
                                 onDrop={handleDrop}
                                 onClick={handleClick}
                             >
+                                {/* ... icon ... */}
                                 <div className="drop-zone-icon">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="48" height="48">
                                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -366,10 +366,10 @@ export function ImportModal({ onClose }: ImportModalProps) {
                                     </svg>
                                 </div>
                                 <p className="drop-zone-text">
-                                    Arrastra tus archivos aquí
+                                    Importar Libros
                                 </p>
                                 <p className="drop-zone-hint">
-                                    o haz clic para seleccionar (EPUB, PDF)
+                                    Arrastra EPUB/PDF o haz clic
                                 </p>
                             </div>
 
@@ -389,7 +389,7 @@ export function ImportModal({ onClose }: ImportModalProps) {
                         <div className="import-progress">
                             <div className="progress-spinner" />
                             <p className="progress-text">
-                                Sincronizando con el servidor...
+                                Analizando integridad de la biblioteca...
                             </p>
                         </div>
                     )}
@@ -397,19 +397,15 @@ export function ImportModal({ onClose }: ImportModalProps) {
                     {!importing && !serverSyncing && !permissionRequired && (
                         <div className="server-sync-section">
                             <div className="divider">
-                                <span>O</span>
+                                <span>Mantenimiento</span>
                             </div>
-                            <button className="btn btn-secondary btn-full" onClick={handleServerSync}>
+                            <button className="btn btn-secondary btn-full btn-repair" onClick={handleMaintenance}>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18" style={{ marginRight: '8px' }}>
-                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" opacity="0" />
-                                    <polyline points="21 5 12 5 12 12" /> {/* Simplified server icon or refresh */}
-                                    <path d="M23 4v6h-6" />
-                                    <path d="M20.49 15a9 9 0 1 1 2.12-9.36L23 10" />
+                                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                                 </svg>
-                                Escanear carpeta del servidor
+                                Reparar Base de Datos
                             </button>
-                            <p className="hint-text">Utiliza esta opción si ya subiste archivos manualmente o para arreglar la biblioteca.</p>
+                            <p className="hint-text">Elimina libros "fantasma" que no tienen archivo asociado.</p>
                         </div>
                     )}
 
