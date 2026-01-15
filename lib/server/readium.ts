@@ -191,6 +191,53 @@ export class ReadiumHelper {
                 }
             }
 
+            // E. Parse TOC (NCX or Nav Doc)
+            const toc: ReadiumLink[] = [];
+
+            // 1. Try to find NCX (EPUB 2)
+            // Look for item with type application/x-dtbncx+xml
+            const ncxId = Object.keys(items).find(id => items[id].mediaType === 'application/x-dtbncx+xml');
+            if (ncxId) {
+                const ncxItem = items[ncxId];
+                const ncxFullPath = opfDir === '.' ? ncxItem.href : path.join(opfDir, ncxItem.href);
+                const ncxPath = path.join(this.cachePath, ncxFullPath);
+
+                if (fs.existsSync(ncxPath)) {
+                    const ncxContent = fs.readFileSync(ncxPath, 'utf8');
+                    // Simple regex for top-level navPoints
+                    // Note: Recursive parsing with regex is hard. We'll do flat or 1-level for now.
+                    // Better: use a proper recursive function on the string content if possible, or reliable regex loop.
+
+                    const navPointRegex = /<navPoint[^>]+playOrder="([^"]+)"[^>]*>([\s\S]*?)<\/navPoint>/gi;
+                    let match;
+                    while ((match = navPointRegex.exec(ncxContent)) !== null) {
+                        const content = match[2];
+                        const labelMatch = content.match(/<text>([\s\S]*?)<\/text>/i);
+                        const srcMatch = content.match(/<content\s+src="([^"]+)"/i);
+
+                        if (labelMatch && srcMatch) {
+                            // src is relative to NCX file.
+                            // We need to resolve it relative to book root, then encode for API.
+                            // ncxFullPath is path/to/toc.ncx
+                            const ncxDir = path.dirname(ncxFullPath);
+                            const src = srcMatch[1];
+
+                            // Resolve logic:
+                            const targetPath = ncxDir === '.' ? src : path.join(ncxDir, src);
+                            const urlPath = targetPath.split(path.sep).join('/');
+
+                            toc.push({
+                                href: `/api/readium/${this.bookId}/resource/${encodeURIComponent(urlPath)}`,
+                                title: labelMatch[1].trim(),
+                                type: 'application/xhtml+xml' // Assumption
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Sort by playOrder? Regex iteration usually follows document order.
+
             if (readingOrder.length === 0) {
                 console.warn(`[Readium] No reading order found for book ${this.bookId}. Check OPF parsing.`);
             }
@@ -202,6 +249,7 @@ export class ReadiumHelper {
                     { href: `/api/readium/${this.bookId}/manifest`, type: 'application/webpub+json', rel: 'self' }
                 ],
                 readingOrder,
+                toc: toc.length > 0 ? toc : undefined
             };
         } catch (error) {
             console.error(`[Readium] Failed to generate manifest for ${this.bookId}:`, error);
