@@ -39,7 +39,10 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
             try {
                 setIsLoading(true);
                 const res = await fetch(`/api/readium/${book.id}/manifest`);
-                if (!res.ok) throw new Error('Failed to load manifest');
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || `Failed to load manifest: ${res.status}`);
+                }
                 const data = await res.json();
 
                 if (mounted) {
@@ -59,9 +62,11 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
                     }
                     setIsLoading(false);
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error(err);
-                if (mounted) setError('Error loading book manifest.');
+                if (mounted) {
+                    setError(err.message || 'Error loading book manifest.');
+                }
                 setIsLoading(false);
             }
         }
