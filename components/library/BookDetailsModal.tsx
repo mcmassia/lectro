@@ -441,19 +441,28 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                             onClick={async () => {
                                 if (isEditing) {
                                     // Save changes
+                                    console.log('Saving book changes...', book);
                                     try {
                                         await updateBook(book.id, {
                                             title: book.title,
                                             author: book.author,
+                                            // Explicitly include cover update if present in book state
+                                            cover: book.cover,
                                             metadata: book.metadata
                                         });
+                                        console.log('DB update successful');
+
                                         updateBookInStore(book.id, {
                                             title: book.title,
                                             author: book.author,
+                                            cover: book.cover,
                                             metadata: book.metadata
                                         });
+                                        console.log('Store update successful');
+                                        alert('Metadata saved successfully!'); // Feedback for user
                                     } catch (err) {
-                                        console.error(err);
+                                        console.error('Failed to save book:', err);
+                                        alert('Failed to save changes: ' + (err as Error).message);
                                     }
                                 }
                                 setIsEditing(!isEditing);
@@ -473,6 +482,40 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                 </svg>
                             )}
                         </button>
+                        {isEditing && (
+                            <button
+                                className="btn-icon"
+                                onClick={() => {
+                                    if (confirm('Revert all changes to original metadata?')) {
+                                        setBook(initialBook);
+                                        setIsEditing(false);
+                                    }
+                                }}
+                                title="Revert Changes"
+                            >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                    <path d="M3 3v5h5" />
+                                </svg>
+                            </button>
+                        )}
+                        {isEditing && (
+                            <button
+                                className="btn-icon"
+                                onClick={() => {
+                                    if (confirm('Revert all changes to original metadata?')) {
+                                        setBook(initialBook);
+                                        setIsEditing(false);
+                                    }
+                                }}
+                                title="Revert Changes"
+                            >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                    <path d="M3 3v5h5" />
+                                </svg>
+                            </button>
+                        )}
                         <button className="btn-icon">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
                                 <circle cx="12" cy="12" r="1" />
