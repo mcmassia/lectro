@@ -53,7 +53,7 @@ const CheckSquareIcon = () => (
 import TagManagerView from '@/components/library/TagManagerView';
 
 export default function Home() {
-  const { books, isLoading, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, activeFormat, sortOrder, setSortOrder, currentView, syncMetadata } = useLibraryStore();
+  const { books, isLoading, isFullyLoaded, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, activeFormat, sortOrder, setSortOrder, currentView, syncMetadata, loadRecentBooks, loadBooks } = useLibraryStore();
   const { onboardingComplete } = useAppStore();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   // const [showOnboarding, setShowOnboarding] = useState(false);
@@ -90,8 +90,11 @@ export default function Home() {
       setSyncResults(results);
 
       // Refresh library
-      const allBooks = await getAllBooks();
-      setBooks(allBooks);
+      if (activeCategory === 'recientes') {
+        await loadRecentBooks();
+      } else {
+        await loadBooks();
+      }
     } catch (error) {
       console.error('Sync failed:', error);
       const msg = (error as Error).message || 'Unknown error';
@@ -109,8 +112,17 @@ export default function Home() {
     // Checking BookCard logic: yes, it has `confirm`.
     try {
       await deleteBook(book.id);
-      const updatedBooks = await getAllBooks();
-      setBooks(updatedBooks);
+      await deleteBook(book.id);
+      // Refresh based on current view
+      if (activeCategory === 'recientes' && !isFullyLoaded) {
+        await loadRecentBooks();
+      } else if (isFullyLoaded) {
+        await loadBooks();
+      } else {
+        // Fallback
+        const updatedBooks = await getAllBooks();
+        setBooks(updatedBooks);
+      }
     } catch (error) {
       console.error('Failed to delete book:', error);
       alert('Error al eliminar el libro.');
@@ -133,8 +145,12 @@ export default function Home() {
     try {
       // Ideally use a bulk delete function if available in DB, but sequential is fine for now
       await Promise.all(Array.from(selectedBookIds).map(id => deleteBook(id)));
-      const updated = await getAllBooks();
-      setBooks(updated);
+      await Promise.all(Array.from(selectedBookIds).map(id => deleteBook(id)));
+      if (activeCategory === 'recientes' && !isFullyLoaded) {
+        await loadRecentBooks();
+      } else {
+        await loadBooks();
+      }
       setSelectedBookIds(new Set());
       setIsSelectionMode(false);
     } catch (error) {
@@ -163,6 +179,19 @@ export default function Home() {
       booksToFilter = booksToFilter.filter(book => book.status === 'completed');
     } else if (activeCategory === 're_read') {
       booksToFilter = booksToFilter.filter(book => book.status === 're_read');
+    } else if (activeCategory === 'recientes') {
+      // If fully loaded, we need to filter to only the top 12 recent ones.
+      // If NOT fully loaded, 'books' already contains only the 12 recent ones (from loadRecentBooks).
+      // However, to be safe and consistent (e.g. if we switched from All -> Recientes), we sort and slice.
+      // We sort by updatedAt (modification/upload) descending.
+      if (isFullyLoaded) {
+        booksToFilter.sort((a, b) => {
+          const dateA = a.updatedAt?.getTime() || a.addedAt?.getTime() || 0;
+          const dateB = b.updatedAt?.getTime() || a.addedAt?.getTime() || 0;
+          return dateB - dateA;
+        });
+        booksToFilter = booksToFilter.slice(0, 12);
+      }
     }
 
     // Search filter
@@ -206,29 +235,30 @@ export default function Home() {
     //   setShowOnboarding(true);
     // }
 
-    async function loadBooks() {
-      try {
-        const allBooks = await getAllBooks();
-        setBooks(allBooks);
 
-        // Sync tags with global table and refresh store
-        await syncTagsFromBooks();
-        const allTags = await getAllTags();
-        useLibraryStore.getState().setTags(allTags);
-
-        // Auto-sync metadata with server to ensure consistency
-        await syncMetadata();
-
-
-      } catch (error) {
-        console.error('Failed to load books:', error);
-      } finally {
-        setIsLoading(false);
+    async function initBooks() {
+      // If we are already loaded, don't reload unless empty (or maybe we want fresh data on mount? existing logic did loadBooks())
+      // Standard pattern: load on mount.
+      if (activeCategory === 'recientes') {
+        await loadRecentBooks();
+      } else {
+        await loadBooks();
       }
+
+      // Sync tags etc - maybe move to store actions or keep here?
+      // Keeping here for now but using store data would be better.
+      // Sync tags from loaded books (if only 12, syncs 12).
+      const currentBooks = useLibraryStore.getState().books;
+      await syncTagsFromBooks(currentBooks);
+      const allTags = await getAllTags();
+      useLibraryStore.getState().setTags(allTags);
+
+      // Auto-sync
+      await syncMetadata();
     }
 
-    loadBooks();
-  }, [onboardingComplete, setBooks, setIsLoading]);
+    initBooks();
+  }, [onboardingComplete]);
 
   const recentBooks = books
     .filter(b => b.status === 'reading')
@@ -259,12 +289,43 @@ export default function Home() {
                 </h2>
                 {activeCategory !== 'authors' && (
                   <div className="category-tabs">
-                    <button className={`category-tab ${activeCategory === 'all' ? 'active' : ''}`} onClick={() => setActiveCategory('all')}>Todos</button>
-                    <button className={`category-tab ${activeCategory === 'favorites' ? 'active' : ''}`} onClick={() => setActiveCategory('favorites')}>Favoritos</button>
-                    <button className={`category-tab ${activeCategory === 'interesting' ? 'active' : ''}`} onClick={() => setActiveCategory('interesting')}>Interesante</button>
-                    <button className={`category-tab ${activeCategory === 'planToRead' ? 'active' : ''}`} onClick={() => setActiveCategory('planToRead')}>Para leer</button>
-                    <button className={`category-tab ${activeCategory === 'completed' ? 'active' : ''}`} onClick={() => setActiveCategory('completed')}>Leído</button>
-                    <button className={`category-tab ${activeCategory === 're_read' ? 'active' : ''}`} onClick={() => setActiveCategory('re_read')}>Releer</button>
+                    <button
+                      className={`category-tab ${activeCategory === 'recientes' ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveCategory('recientes');
+                        // No need to reload if we are fully loaded, effectively just filtering.
+                        // If we are NOT fully loaded, we likely started with Repositorio, so we have them.
+                        // Actually, if we are in 'recientes' state, we might strictly want to ensure we have the view.
+                        // But usually UI switching is enough if data is there.
+                        // If we want to force refresh? No.
+                      }}
+                    >
+                      Recientes
+                    </button>
+                    <button className={`category-tab ${activeCategory === 'all' ? 'active' : ''}`} onClick={() => {
+                      setActiveCategory('all');
+                      if (!isFullyLoaded) loadBooks();
+                    }}>Todos</button>
+                    <button className={`category-tab ${activeCategory === 'favorites' ? 'active' : ''}`} onClick={() => {
+                      setActiveCategory('favorites');
+                      if (!isFullyLoaded) loadBooks();
+                    }}>Favoritos</button>
+                    <button className={`category-tab ${activeCategory === 'interesting' ? 'active' : ''}`} onClick={() => {
+                      setActiveCategory('interesting');
+                      if (!isFullyLoaded) loadBooks();
+                    }}>Interesante</button>
+                    <button className={`category-tab ${activeCategory === 'planToRead' ? 'active' : ''}`} onClick={() => {
+                      setActiveCategory('planToRead');
+                      if (!isFullyLoaded) loadBooks();
+                    }}>Para leer</button>
+                    <button className={`category-tab ${activeCategory === 'completed' ? 'active' : ''}`} onClick={() => {
+                      setActiveCategory('completed');
+                      if (!isFullyLoaded) loadBooks();
+                    }}>Leído</button>
+                    <button className={`category-tab ${activeCategory === 're_read' ? 'active' : ''}`} onClick={() => {
+                      setActiveCategory('re_read');
+                      if (!isFullyLoaded) loadBooks();
+                    }}>Releer</button>
                   </div>
                 )}
               </div>
@@ -509,8 +570,12 @@ export default function Home() {
         selectedBooks={books.filter(b => selectedBookIds.has(b.id))}
         onSuccess={async () => {
           // Refresh books
-          const updated = await getAllBooks();
-          setBooks(updated);
+          // Refresh books
+          if (activeCategory === 'recientes' && !isFullyLoaded) {
+            await loadRecentBooks();
+          } else {
+            await loadBooks();
+          }
         }}
       />
 

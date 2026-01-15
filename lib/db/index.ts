@@ -254,6 +254,15 @@ export async function getAllBooks(): Promise<Book[]> {
   return db.books.toArray();
 }
 
+export async function getRecentBooks(limit: number = 12): Promise<Book[]> {
+  const books = await db.books.orderBy('updatedAt').reverse().limit(limit).toArray();
+  // Fallback to addedAt if needed, but we can assume updatedAt is populated or we could sort manually if mixed
+  // Since we want "subidos o modificados", updatedAt should cover both if we maintain it well.
+  // Ideally, query both indices? No, Dexie doesn't do OR easily.
+  // Let's assume updatedAt is reliable (it defaults to new Date() on add).
+  return books;
+}
+
 export async function updateBook(id: string, updates: Partial<Book>): Promise<number> {
   return db.books.update(id, { ...updates, updatedAt: new Date() });
 }
@@ -436,14 +445,14 @@ export async function deleteTag(id: string): Promise<void> {
   await db.tags.delete(id);
 }
 
-export async function syncTagsFromBooks(): Promise<void> {
-  const books = await getAllBooks();
+export async function syncTagsFromBooks(books?: Book[]): Promise<void> {
+  const targetBooks = books || await getAllBooks();
   const existingTags = await getAllTags();
   const existingTagNames = new Set(existingTags.map(t => t.name));
 
   const tagsToAdd = new Set<string>();
 
-  books.forEach(book => {
+  targetBooks.forEach(book => {
     book.metadata.tags?.forEach(tagName => {
       if (!existingTagNames.has(tagName)) {
         tagsToAdd.add(tagName);
