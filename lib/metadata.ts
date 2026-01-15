@@ -31,8 +31,12 @@ export async function searchGoogleBooks(query: string): Promise<MetadataResult[]
             const imageLinks = info.imageLinks || {};
             let cover = imageLinks.extraLarge || imageLinks.large || imageLinks.medium || imageLinks.small || imageLinks.thumbnail || imageLinks.smallThumbnail;
 
-            // Normalize HTTPS for cover
-            if (cover) cover = cover.replace('http:', 'https:');
+            // Optimize Google Books cover URL for better quality
+            if (cover) {
+                cover = cover.replace('http:', 'https:')
+                    .replace(/&edge=curl/g, '')
+                    .replace(/&zoom=\d+/g, ''); // Remove zoom constraint to get highest res
+            }
 
             return {
                 source: 'GoogleBooks',
