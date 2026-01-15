@@ -246,6 +246,65 @@ export function ImportModal({ onClose }: ImportModalProps) {
         }
     };
 
+    const handleDiscovery = async () => {
+        try {
+            setServerSyncing(true);
+            setErrors([]);
+
+            const customPath = localStorage.getItem('lectro_server_path');
+            const headers: HeadersInit = {};
+            if (customPath) headers['x-library-path'] = customPath;
+
+            const response = await fetch('/api/library/discovery', {
+                method: 'POST',
+                headers
+            });
+
+            if (!response.ok) throw new Error('Error al conectar con el servidor');
+
+            const result = await response.json();
+
+            if (result.success) {
+                if (result.addedCount > 0) {
+                    // Add to local DB
+                    const { db } = await import('@/lib/db');
+                    // We don't have full file blobs, just metadata pointing to server
+                    // The 'scan' logic usually handles download, but here we just want to create the "Pointer" entry
+                    // so the user sees it. Clicking it will trigger Reader which uses server path.
+
+                    await db.transaction('rw', [db.books], async () => {
+                        for (const book of result.addedBooks) {
+                            // Check existence locally
+                            const exists = await db.books.where('id').equals(book.id).count();
+                            if (!exists) {
+                                await db.books.add(book);
+                            }
+                        }
+                    });
+
+                    // Update UI
+                    const { getAllBooks } = await import('@/lib/db');
+                    const books = await getAllBooks();
+                    useLibraryStore.getState().setBooks(books);
+
+                    alert(`Sincronización completada. Se han encontrado y añadido ${result.addedCount} libros nuevos.`);
+                    setTimeout(onClose, 500);
+
+                } else {
+                    alert('No se encontraron libros nuevos en las carpetas.');
+                }
+            } else {
+                throw new Error(result.error || 'Error desconocido');
+            }
+
+        } catch (e) {
+            console.error('Discovery error:', e);
+            setErrors(['Error al sincronizar carpetas: ' + (e as Error).message]);
+        } finally {
+            setServerSyncing(false);
+        }
+    };
+
     // ... existing processFile ...
 
     const processFiles = async (files: File[]) => {
@@ -407,6 +466,18 @@ export function ImportModal({ onClose }: ImportModalProps) {
                                 Reparar Base de Datos
                             </button>
                             <p className="hint-text">Elimina libros "fantasma" que no tienen archivo asociado.</p>
+
+                            <div className="divider" style={{ margin: '12px 0' }}></div>
+
+                            <button className="btn btn-secondary btn-full btn-sync" onClick={handleDiscovery}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18" style={{ marginRight: '8px' }}>
+                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+                                    <line x1="16" y1="5" x2="22" y2="5" />
+                                    <line x1="19" y1="2" x2="19" y2="8" />
+                                </svg>
+                                Sincronizar Carpetas
+                            </button>
+                            <p className="hint-text">Busca y añade archivos copiados manualmente en la carpeta del servidor.</p>
                         </div>
                     )}
 
