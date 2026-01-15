@@ -4,7 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Book, updateBook } from '@/lib/db';
 import { useLibraryStore } from '@/stores/appStore';
 import { useRouter } from 'next/navigation';
-import { searchGoogleBooks, findCover } from '@/lib/metadata';
+import { searchGoogleBooks, searchMetadata, findCovers, MetadataResult } from '@/lib/metadata';
+import { MetadataSelector } from './MetadataSelector';
 
 interface BookDetailsModalProps {
     book: Book;
@@ -14,6 +15,17 @@ interface BookDetailsModalProps {
 export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModalProps) {
     const [book, setBook] = useState<Book>(initialBook);
     const [isEditing, setIsEditing] = useState(false);
+
+    // Metadata Search State
+    const [showMetadataSelector, setShowMetadataSelector] = useState(false);
+    const [searchResults, setSearchResults] = useState<MetadataResult[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+
+    // Cover Search State
+    const [showCoverSelector, setShowCoverSelector] = useState(false);
+    const [coverResults, setCoverResults] = useState<string[]>([]);
+    const [isSearchingCovers, setIsSearchingCovers] = useState(false);
+
     const { updateBook: updateBookInStore } = useLibraryStore();
     const router = useRouter();
     const modalRef = useRef<HTMLDivElement>(null);
@@ -21,7 +33,13 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
     // Close on click outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+            const target = event.target as Element;
+            // Ignore if click is inside modal OR inside any selector overlay
+            if (
+                modalRef.current &&
+                !modalRef.current.contains(event.target as Node) &&
+                !target.closest('.selector-overlay')
+            ) {
                 onClose();
             }
         };
@@ -50,43 +68,75 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
         }
     };
 
-    const handleAutoMetadata = async () => {
-        if (!confirm('Search internet for metadata? This will overwrite current fields if found.')) return;
-
+    const handleSearchMetadata = async () => {
+        if (isSearching) return;
+        setIsSearching(true);
         try {
             const query = `${book.title} ${book.author}`;
-            const results = await searchGoogleBooks(query);
+            const results = await searchMetadata(query);
 
-            if (results && results.length > 0) {
-                const bestMatch = results[0];
-                const updates: Partial<Book> = {
-                    author: bestMatch.author || book.author,
-                    // keep title as is or ask? usually better to keep user title or update if missing
-                    metadata: {
-                        ...book.metadata,
-                        description: bestMatch.description || book.metadata.description,
-                        publisher: bestMatch.publisher || book.metadata.publisher,
-                        publishedDate: bestMatch.publishedDate || book.metadata.publishedDate,
-                        language: bestMatch.language || book.metadata.language,
-                        tags: bestMatch.tags || book.metadata.tags
-                    }
-                };
-
-                if (bestMatch.cover && !book.cover) {
-                    updates.cover = bestMatch.cover;
-                }
-
-                await updateBook(book.id, updates);
-                updateBookInStore(book.id, updates);
-                setBook({ ...book, ...updates });
-                setIsEditing(true); // Let user review changes
-            } else {
-                alert('No metadata found.');
+            if (results.length === 0) {
+                alert('No metadata found for this book.');
+                return;
             }
+
+            setSearchResults(results);
+            setShowMetadataSelector(true);
         } catch (error) {
             console.error('Metadata search failed:', error);
             alert('Failed to search metadata.');
+        } finally {
+            setIsSearching(false);
         }
+    };
+
+    const handleSelectMetadata = (result: MetadataResult) => {
+        const updates: Partial<Book> = {
+            author: result.author || book.author,
+            title: result.title || book.title, // Optionally update title too
+            metadata: {
+                ...book.metadata,
+                description: result.description || book.metadata.description,
+                publisher: result.publisher || book.metadata.publisher,
+                publishedDate: result.publishedDate || book.metadata.publishedDate,
+                language: result.language || book.metadata.language,
+                tags: result.tags || book.metadata.tags
+            }
+        };
+
+        if (result.cover && !book.cover) {
+            updates.cover = result.cover;
+        } else if (result.cover && book.cover) {
+            // If book already has cover, maybe ask? Or just let user choose via cover selector?
+            // For now, let's update it if the user explicitly selected this metadata result.
+            updates.cover = result.cover;
+        }
+
+        // Apply updates to local state only (Explicit Save required)
+        setBook({ ...book, ...updates });
+        setIsEditing(true); // Switch to edit mode so user can review/save
+        setShowMetadataSelector(false);
+    };
+
+    const handleSearchCovers = async () => {
+        setIsSearchingCovers(true);
+        try {
+            const query = `${book.title} ${book.author}`;
+            const results = await findCovers(query);
+            setCoverResults(results);
+            setShowCoverSelector(true);
+        } catch (error) {
+            console.error('Cover search failed:', error);
+            alert('Failed to search covers.');
+        } finally {
+            setIsSearchingCovers(false);
+        }
+    };
+
+    const handleSelectCover = (coverUrl: string) => {
+        setBook({ ...book, cover: coverUrl });
+        setIsEditing(true); // Switch to edit mode
+        setShowCoverSelector(false);
     };
 
     const handlePaste = async (e: React.ClipboardEvent) => {
@@ -176,6 +226,15 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                             )}
                             <div className="cover-overlay">
                                 <span>Paste image (Ctrl+V)</span>
+                                <button
+                                    className="btn-xs btn-find-cover"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSearchCovers();
+                                    }}
+                                >
+                                    {isSearchingCovers ? 'Searching...' : 'Find Cover'}
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -361,14 +420,21 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                         </button>
                         <button
                             className="btn-icon"
-                            onClick={handleAutoMetadata}
-                            title="Auto-fetch Metadata"
+                            onClick={handleSearchMetadata}
+                            title="Find Metadata"
+                            disabled={isSearching}
                         >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                                <path d="M21 5c0 1.66-4 3-9 3s-9-1.34-9-3" />
-                            </svg>
+                            {isSearching ? (
+                                <svg className="animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                                </svg>
+                            ) : (
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                                    <path d="M21 5c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                                </svg>
+                            )}
                         </button>
                         <button
                             className={`btn-icon ${isEditing ? 'active-edit' : ''}`}
@@ -417,6 +483,57 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     </div>
                 </div>
             </div>
+
+
+            {
+                showMetadataSelector && (
+                    <div className="selector-overlay">
+                        <div className="selector-container">
+                            <MetadataSelector
+                                results={searchResults}
+                                onSelect={handleSelectMetadata}
+                                onCancel={() => setShowMetadataSelector(false)}
+                            />
+                        </div>
+                    </div>
+                )
+            }
+
+            {
+                showCoverSelector && (
+                    <div className="selector-overlay">
+                        <div className="selector-container cover-selector-container">
+                            <div className="selector-header">
+                                <h3>Select Cover</h3>
+                                <button className="close-btn" onClick={() => setShowCoverSelector(false)}>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                    </svg>
+                                </button>
+                            </div>
+                            {isSearchingCovers ? (
+                                <div className="loading-state">
+                                    <svg className="animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24">
+                                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                                    </svg>
+                                    <span>Searching covers...</span>
+                                </div>
+                            ) : coverResults.length > 0 ? (
+                                <div className="cover-grid">
+                                    {coverResults.map((url, i) => (
+                                        <div key={i} className="cover-option" onClick={() => handleSelectCover(url)}>
+                                            <img src={url} alt={`Cover option ${i + 1}`} />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="no-results">No covers found</div>
+                            )}
+                        </div>
+                    </div>
+                )
+            }
 
             <style jsx>{`
                 .modal-overlay {
@@ -800,7 +917,96 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     from { opacity: 0; }
                     to { opacity: 1; }
                 }
+
+                .animate-spin {
+                    animation: spin 1s linear infinite;
+                }
+                
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+
+                .selector-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0,0,0,0.95);
+                    z-index: 2147483647;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: var(--space-8);
+                }
+
+                .selector-container {
+                    width: 100%;
+                    max-width: 600px;
+                    height: 80%;
+                    display: flex;
+                    flex-direction: column;
+                }
+                
+                .cover-selector-container {
+                     background: #1a1b1e;
+                     border-radius: var(--radius-lg);
+                     border: 1px solid rgba(255,255,255,0.1);
+                     overflow: hidden;
+                }
+                
+                .cover-grid {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+                    gap: var(--space-4);
+                    padding: var(--space-4);
+                    overflow-y: auto;
+                }
+                
+                .cover-option {
+                    aspect-ratio: 2/3;
+                    border-radius: var(--radius-md);
+                    overflow: hidden;
+                    cursor: pointer;
+                    transition: transform 0.2s;
+                    border: 2px solid transparent;
+                }
+                
+                .cover-option:hover {
+                    transform: scale(1.05);
+                    border-color: var(--color-accent);
+                }
+                
+                .cover-option img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+                
+                .btn-xs {
+                    font-size: 10px;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    border: none;
+                    background: rgba(255,255,255,0.2);
+                    color: white;
+                    cursor: pointer;
+                    margin-top: 4px;
+                }
+                
+                .btn-xs:hover {
+                    background: rgba(255,255,255,0.3);
+                }
+                
+                .no-results {
+                    grid-column: 1 / -1;
+                    text-align: center;
+                    color: rgba(255,255,255,0.5);
+                    padding: var(--space-8);
+                }
+
             `}</style>
-        </div>
+        </div >
     );
 }
