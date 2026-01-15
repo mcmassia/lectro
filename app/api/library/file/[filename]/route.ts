@@ -170,10 +170,14 @@ export async function POST(
 
         fs.writeFileSync(filePath, buffer);
 
+        // Calculate relative path for client
+        const relativePath = path.relative(libraryPath, filePath);
+
         return NextResponse.json({
             success: true,
             message: 'File uploaded successfully',
-            path: filePath
+            path: filePath,
+            relativePath: relativePath
         });
 
     } catch (error) {

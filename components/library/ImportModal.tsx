@@ -109,33 +109,34 @@ export function ImportModal({ onClose }: ImportModalProps) {
         await dbAddBook(newBook);
         addBook(newBook);
 
-        // Save to file system if configured
+        // Upload to server immediately to ensure availability for Reader
         try {
-            console.log('Attempting to save to file system...');
+            console.log('Uploading to server...');
+            const { uploadBookToServer } = await import('@/lib/fileSystem');
+            await uploadBookToServer(newBook);
+            console.log('Upload complete');
+        } catch (e) {
+            console.error('Failed to upload to server:', e);
+            // Don't fail the whole import, but maybe warn?
+            // Ideally we show this in the error list but for now log it.
+        }
+
+        // Save to file system if configured (Client-side FS Access API)
+        try {
+            console.log('Attempting to save to client file system...');
             const { getSettings } = await import('@/lib/db');
             const { writeBookToFile, verifyPermission } = await import('@/lib/fileSystem');
             const settings = await getSettings();
-            console.log('Settings retrieved. Handle exists:', !!settings.libraryHandle);
 
             if (settings.libraryHandle) {
-                console.log('Verifying permission to write...');
+                // ... existing client FS logic ...
                 const hasPermission = await verifyPermission(settings.libraryHandle, true);
-                console.log('Permission status:', hasPermission);
-
                 if (hasPermission) {
                     await writeBookToFile(settings.libraryHandle, file);
-                    console.log('File written to system folder:', file.name);
-                    // alert(`Archivo guardado correctamente en: ${settings.libraryPath}`);
-                } else {
-                    console.warn('Permission denied for file system write');
-                    alert('No se pudo guardar el archivo en la carpeta: Permiso denegado.');
                 }
-            } else {
-                console.log('No library handle found in settings. Skipping write.');
             }
         } catch (e) {
-            console.error('Failed to save to file system:', e);
-            alert(`Error al guardar en la carpeta del sistema: ${(e as Error).message}`);
+            console.error('Failed to save to client file system:', e);
         }
     };
 

@@ -515,8 +515,18 @@ export async function uploadBookToServer(book: Book): Promise<boolean> {
             throw new Error('Upload failed');
         }
 
-        // Update local book to mark as on server
-        await updateBook(book.id, { isOnServer: true });
+        const result = await response.json();
+
+        // Update local book to mark as on server AND update path if server reorganized it
+        const updates: Partial<Book> = { isOnServer: true };
+        if (result.relativePath) {
+            updates.filePath = result.relativePath;
+            // Also update fileName to match basename if changed? 
+            // result.path is absolute, basename it?
+            // Let's trust relativePath is enough for the reader.
+        }
+
+        await updateBook(book.id, updates);
 
         return true;
     } catch (error) {
