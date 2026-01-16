@@ -1,11 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-// import { Sidebar } from "@/components/ui/Sidebar";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { TopBar } from "@/components/ui/TopBar";
-import { LeftSidebar } from "@/components/layout/LeftSidebar";
-import { RightSidebar } from "@/components/layout/RightSidebar";
+import { LayoutWrapper } from "@/components/layout/LayoutWrapper";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -44,13 +42,9 @@ export default function RootLayout({
         <ThemeProvider>
           <div className="app-container">
             <TopBar />
-            <div className="main-layout">
-              <LeftSidebar />
-              <main className="content-area">
-                {children}
-              </main>
-              <RightSidebar />
-            </div>
+            <LayoutWrapper>
+              {children}
+            </LayoutWrapper>
           </div>
         </ThemeProvider>
       </body>
