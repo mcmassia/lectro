@@ -105,6 +105,40 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
     }, [manifest, onTocLoaded]);
 
 
+    // Handle text selection in iframe
+    const handleIframeSelection = useCallback(() => {
+        if (!iframeRef.current || !iframeRef.current.contentDocument) return;
+
+        const doc = iframeRef.current.contentDocument;
+        const selection = doc.getSelection();
+
+        if (!selection || selection.isCollapsed) return;
+
+        const text = selection.toString().trim();
+        if (!text) return;
+
+        try {
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+
+            // Get the iframe position
+            const iframeRect = iframeRef.current.getBoundingClientRect();
+
+            // Convert iframe-relative coords to viewport coords
+            const viewportX = iframeRect.left + rect.left + (rect.width / 2);
+            const viewportY = iframeRect.top + rect.top;
+
+            // Generate a CFI-like identifier using the current resource href and text content
+            const currentResource = manifest?.readingOrder[currentResourceIndex];
+            const cfiLike = `${currentResource?.href || 'unknown'}#text=${encodeURIComponent(text.substring(0, 50))}`;
+
+            console.log('WebPub text selected:', text.substring(0, 50), 'at', viewportX, viewportY);
+            onTextSelect(text, cfiLike, { x: viewportX, y: viewportY });
+        } catch (err) {
+            console.warn('Could not get selection rect:', err);
+        }
+    }, [manifest, currentResourceIndex, onTextSelect]);
+
     // Inject Styles when iframe loads or settings change
     const injectStyles = useCallback(() => {
         if (!iframeRef.current || !iframeRef.current.contentDocument) return;
@@ -135,15 +169,19 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
         body.style.maxWidth = '900px';
         body.style.margin = '0 auto';
 
-        // Images max width
+        // Images max width and selection styling
         const styleEl = doc.createElement('style');
         styleEl.textContent = `
             img { max-width: 100%; height: auto; }
             a { color: inherit; }
+            ::selection { background-color: rgba(0, 122, 255, 0.3); }
         `;
         doc.head.appendChild(styleEl);
 
-    }, [settings]);
+        // Add mouseup listener for text selection
+        doc.addEventListener('mouseup', handleIframeSelection);
+
+    }, [settings, handleIframeSelection]);
 
     // Re-inject styles when settings change
     useEffect(() => {
