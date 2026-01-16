@@ -250,7 +250,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         if (activeCategory !== 'all') {
             filtered = filtered.filter((b) => {
                 if (activeCategory === 'favorites') return b.isFavorite;
-                if (activeCategory === 'unread') return b.status === 'unread';
+                if (activeCategory === 'unread') return !b.status || b.status === 'unread';
                 if (activeCategory === 'interesting') return b.status === 'interesting';
                 if (activeCategory === 'planToRead') return b.status === 'planToRead';
                 if (activeCategory === 'reading') return b.status === 'reading';
@@ -262,11 +262,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
                 // If we are in 'recientes' category, we likely already only have 12 books if we just loaded.
                 // If we have ALL books, we should probably filter/slice them here too.
                 if (activeCategory === 'recientes') {
-                    // Logic: if we have many books, filter top 12 by updatedAt
-                    // But wait, duplication of sort logic.
-                    // The getRecentBooks does usage of index.
-                    // Here we filter in memory.
-                    return true; // We'll handle sorting/slicing in the sort block or assume loaded
+                    // Logic: return top 12 by lastRead or addedAt
+                    // We need to sort by date before slicing to be accurate if we are filtering from 'books'
+                    // 'books' might be all books.
+                    return true;
                 }
                 return true;
             });
@@ -326,6 +325,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
             return sortOrder === 'asc' ? comparison : -comparison;
         });
+
+        // Limit to 12 for 'recientes' if we are filtering client side
+        if (activeCategory === 'recientes') {
+            return filtered.slice(0, 12);
+        }
 
         return filtered;
     },

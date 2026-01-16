@@ -12,9 +12,9 @@ interface ContinueReadingPanelProps {
 
 export function ContinueReadingPanel({ books, onOpenDetails }: ContinueReadingPanelProps) {
   return (
-    <section className="dashboard-section animate-slide-up">
-      <div className="section-header">
-        <h2 className="heading-3">Continuar leyendo</h2>
+    <section className="dashboard-section animate-slide-up mb-8">
+      <div className="section-header mb-4">
+        <h2 className="heading-3 dark:text-white">Continuar leyendo</h2>
       </div>
       <div className="continue-reading-grid">
         {books.map((book) => (
@@ -24,18 +24,15 @@ export function ContinueReadingPanel({ books, onOpenDetails }: ContinueReadingPa
       <style jsx>{`
         .dashboard-section {
           margin-bottom: var(--space-8);
-          background: #f5f5f5; /* Light gray background */
-          padding: var(--space-6);
-          border-radius: var(--radius-xl);
-          border: 1px solid var(--color-border);
+          /* Removed background, padding, border for clean look */
         }
         .section-header {
-          margin-bottom: var(--space-2); /* Reduced from space-4 */
+          margin-bottom: var(--space-4);
         }
         .continue-reading-grid {
-          display: grid; /* flex is another option if we want them tightly packed start */
-          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); /* Drastically reduced to ensure tight packing */
-          gap: var(--space-4); /* Restore standard gap for cleanliness, but the boxes will be smaller */
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          gap: var(--space-4);
         }
       `}</style>
     </section>

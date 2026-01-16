@@ -1,22 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
 import { getAllBooks, Book, deleteBook, syncTagsFromBooks, getAllTags } from '@/lib/db';
-import { OnboardingModal } from '@/components/library/OnboardingModal';
 import { BookCard } from '@/components/library/BookCard';
 import { ContinueReadingPanel } from '@/components/home/ContinueReadingPanel';
-// import { HomeSidebar } from '@/components/home/HomeSidebar';
 import { ImportModal } from '@/components/library/ImportModal';
 import { BookDetailsModal } from '@/components/library/BookDetailsModal';
 import { MassTagManagerModal } from '@/components/library/MassTagManagerModal';
 import { syncWithServer } from '@/lib/fileSystem';
-
 import { SyncReportModal } from '@/components/library/SyncReportModal';
+import TagManagerView from '@/components/library/TagManagerView';
+import { AuthorsView } from '@/components/library/AuthorsView';
+import { ArrowDownNarrowWide, ArrowUpNarrowWide } from 'lucide-react';
 
-// ... icons omitted for brevity, keeping existing
-
+// ... icons
 const GridIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
     <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -37,12 +35,6 @@ const ListIcon = () => (
   </svg>
 );
 
-const PlusIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="24" height="24">
-    <path d="M12 5v14M5 12h14" />
-  </svg>
-);
-
 const CheckSquareIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
     <polyline points="9 11 12 14 22 4" />
@@ -50,18 +42,14 @@ const CheckSquareIcon = () => (
   </svg>
 );
 
-import TagManagerView from '@/components/library/TagManagerView';
-
 export default function Home() {
-  const { books, isLoading, isFullyLoaded, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, activeFormat, sortOrder, setSortOrder, currentView, syncMetadata, loadRecentBooks, loadBooks } = useLibraryStore();
+  const { books, isLoading, isFullyLoaded, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, activeFormat, sortOrder, setSortOrder, currentView, setView, syncMetadata, loadRecentBooks, loadBooks, searchQuery } = useLibraryStore();
   const { onboardingComplete } = useAppStore();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  // const [showOnboarding, setShowOnboarding] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showSyncReport, setShowSyncReport] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResults, setSyncResults] = useState<{ added: number; removed: number; errors: string[] } | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
 
@@ -69,161 +57,91 @@ export default function Home() {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(new Set());
   const [showMassTagsModal, setShowMassTagsModal] = useState(false);
+  const [isGrouped, setIsGrouped] = useState(false);
 
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
 
-  // Handle Sync
+  // Handlers (handleSync, handleDeleteBook, handleToggleSelection, handleMassDelete) - keeping mostly same logic
   const handleSync = async () => {
     setIsSyncing(true);
-    setSyncLogs([]); // Reset logs
+    setSyncLogs([]);
     setShowSyncReport(true);
-
-    // Helper to add logs safely
-    const addLog = (msg: string) => {
-      setSyncLogs(prev => [...prev.slice(-19), msg]); // Keep last 20 logs
-    };
+    const addLog = (msg: string) => setSyncLogs(prev => [...prev.slice(-19), msg]);
 
     try {
-      console.log('Calling syncWithServer...');
       const results = await syncWithServer(addLog);
-      setSyncLogs(prev => [...prev, '¡Listo!']);
       setSyncResults(results);
-
-      // Refresh library
-      if (activeCategory === 'recientes') {
-        await loadRecentBooks();
-      } else {
-        await loadBooks();
-      }
+      if (activeCategory === 'recientes') await loadRecentBooks();
+      else await loadBooks();
     } catch (error) {
-      console.error('Sync failed:', error);
-      const msg = (error as Error).message || 'Unknown error';
-      addLog(`Error: ${msg}`);
-      setSyncResults({ added: 0, removed: 0, errors: [msg] });
+      console.error(error);
+      setSyncResults({ added: 0, removed: 0, errors: [(error as Error).message] });
     } finally {
       setIsSyncing(false);
     }
   };
 
   const handleDeleteBook = async (book: Book) => {
-    // BookCard handles the confirm dialog now, but we can double check or just call delete
-    // Actually, BookCard calling onDelete is enough signal to delete.
-    // If BookCard logic includes confirm, we don't need it here.
-    // Checking BookCard logic: yes, it has `confirm`.
     try {
       await deleteBook(book.id);
-      await deleteBook(book.id);
-      // Refresh based on current view
-      if (activeCategory === 'recientes' && !isFullyLoaded) {
-        await loadRecentBooks();
-      } else if (isFullyLoaded) {
-        await loadBooks();
-      } else {
-        // Fallback
-        const updatedBooks = await getAllBooks();
-        setBooks(updatedBooks);
-      }
+      if (activeCategory === 'recientes' && !isFullyLoaded) await loadRecentBooks();
+      else await loadBooks();
     } catch (error) {
-      console.error('Failed to delete book:', error);
-      alert('Error al eliminar el libro.');
+      alert('Error al eliminar');
     }
   };
 
   const handleToggleSelection = (book: Book) => {
     const newSelected = new Set(selectedBookIds);
-    if (newSelected.has(book.id)) {
-      newSelected.delete(book.id);
-    } else {
-      newSelected.add(book.id);
-    }
+    if (newSelected.has(book.id)) newSelected.delete(book.id);
+    else newSelected.add(book.id);
     setSelectedBookIds(newSelected);
   };
 
   const handleMassDelete = async () => {
-    if (!confirm(`¿Estás seguro de que quieres eliminar ${selectedBookIds.size} libros? Esta acción no se puede deshacer.`)) return;
-
+    if (!confirm(`¿Eliminar ${selectedBookIds.size} libros?`)) return;
     try {
-      // Ideally use a bulk delete function if available in DB, but sequential is fine for now
       await Promise.all(Array.from(selectedBookIds).map(id => deleteBook(id)));
-      await Promise.all(Array.from(selectedBookIds).map(id => deleteBook(id)));
-      if (activeCategory === 'recientes' && !isFullyLoaded) {
-        await loadRecentBooks();
-      } else {
-        await loadBooks();
-      }
+      if (activeCategory === 'recientes' && !isFullyLoaded) await loadRecentBooks();
+      else await loadBooks();
       setSelectedBookIds(new Set());
       setIsSelectionMode(false);
-    } catch (error) {
-      console.error('Mass delete failed:', error);
-      alert('Hubo un error al eliminar algunos libros.');
-    }
+    } catch (e) { alert('Error mass delete'); }
   };
 
-  // Filter books logic...
   useEffect(() => {
     let booksToFilter = books;
+    if (activeFormat !== 'all') booksToFilter = booksToFilter.filter(book => book.format === activeFormat);
 
-    // Format filter
-    if (activeFormat !== 'all') {
-      booksToFilter = booksToFilter.filter(book => book.format === activeFormat);
+    // Category filtering
+    if (activeCategory === 'favorites') booksToFilter = booksToFilter.filter(book => book.isFavorite);
+    else if (activeCategory === 'planToRead') booksToFilter = booksToFilter.filter(book => book.status === 'planToRead');
+    else if (activeCategory === 'interesting') booksToFilter = booksToFilter.filter(book => book.status === 'interesting');
+    else if (activeCategory === 'completed') booksToFilter = booksToFilter.filter(book => book.status === 'completed');
+    else if (activeCategory === 'unread') booksToFilter = booksToFilter.filter(book => !book.status || book.status === 'unread');
+    else if (activeCategory === 'reading') booksToFilter = booksToFilter.filter(book => book.status === 'reading');
+    else if (activeCategory === 're_read') booksToFilter = booksToFilter.filter(book => book.status === 're_read');
+    else if (activeCategory === 'recientes') {
+      // Sort by most recently updated or added, then take first 12
+      booksToFilter = [...booksToFilter].sort((a, b) => (new Date(b.updatedAt || b.addedAt || 0).getTime() - new Date(a.updatedAt || a.addedAt || 0).getTime()));
+      booksToFilter = booksToFilter.slice(0, 12);
     }
 
-    // Category filter
-    if (activeCategory === 'favorites') {
-      booksToFilter = booksToFilter.filter(book => book.isFavorite);
-    } else if (activeCategory === 'planToRead') {
-      booksToFilter = booksToFilter.filter(book => book.status === 'planToRead');
-    } else if (activeCategory === 'interesting') {
-      booksToFilter = booksToFilter.filter(book => book.status === 'interesting');
-    } else if (activeCategory === 'completed') {
-      booksToFilter = booksToFilter.filter(book => book.status === 'completed');
-    } else if (activeCategory === 're_read') {
-      booksToFilter = booksToFilter.filter(book => book.status === 're_read');
-    } else if (activeCategory === 'recientes') {
-      // If fully loaded, we need to filter to only the top 12 recent ones.
-      // If NOT fully loaded, 'books' already contains only the 12 recent ones (from loadRecentBooks).
-      // However, to be safe and consistent (e.g. if we switched from All -> Recientes), we sort and slice.
-      // We sort by updatedAt (modification/upload) descending.
-      if (isFullyLoaded) {
-        booksToFilter.sort((a, b) => {
-          const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : (a.addedAt ? new Date(a.addedAt).getTime() : 0);
-          const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : (b.addedAt ? new Date(b.addedAt).getTime() : 0);
-          return dateB - dateA;
-        });
-        booksToFilter = booksToFilter.slice(0, 12);
-      }
-    }
-
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       booksToFilter = booksToFilter.filter(book =>
         book.title.toLowerCase().includes(query) ||
-        book.author.toLowerCase().includes(query) ||
-        (book.metadata?.tags && book.metadata.tags.some(tag => tag.toLowerCase().includes(query)))
+        book.author.toLowerCase().includes(query)
       );
     }
 
     // Sort
     booksToFilter.sort((a, b) => {
       let comparison = 0;
-      if (sortBy === 'title') {
-        comparison = a.title.localeCompare(b.title);
-      } else if (sortBy === 'author') {
-        comparison = a.author.localeCompare(b.author);
-      } else if (sortBy === 'lastRead') {
-        const dateA = a.lastReadAt ? new Date(a.lastReadAt).getTime() : 0;
-        const dateB = b.lastReadAt ? new Date(b.lastReadAt).getTime() : 0;
-        comparison = dateA - dateB;
-      } else if (sortBy === 'addedDate') {
-        const dateA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
-        const dateB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
-        comparison = dateA - dateB;
-      } else if (sortBy === 'progress') {
-        comparison = (a.progress || 0) - (b.progress || 0);
-      } else if (sortBy === 'fileSize') {
-        comparison = (a.fileSize || 0) - (b.fileSize || 0);
-      }
+      if (sortBy === 'title') comparison = a.title.localeCompare(b.title);
+      else if (sortBy === 'author') comparison = a.author.localeCompare(b.author);
+      else if (sortBy === 'addedDate') comparison = (new Date(a.addedAt || 0).getTime() - new Date(b.addedAt || 0).getTime());
+      else if (sortBy === 'progress') comparison = (a.progress || 0) - (b.progress || 0);
 
       return sortOrder === 'asc' ? comparison : -comparison;
     });
@@ -232,565 +150,356 @@ export default function Home() {
   }, [books, searchQuery, activeCategory, activeFormat, sortBy, sortOrder]);
 
   useEffect(() => {
-    // Onboarding removed
-    // if (!onboardingComplete) {
-    //   setShowOnboarding(true);
-    // }
-
-
-    async function initBooks() {
-      // If we are already loaded, don't reload unless empty (or maybe we want fresh data on mount? existing logic did loadBooks())
-      // Standard pattern: load on mount.
-      if (activeCategory === 'recientes') {
-        await loadRecentBooks();
-      } else {
-        await loadBooks();
-      }
-
-      // Sync tags etc - maybe move to store actions or keep here?
-      // Keeping here for now but using store data would be better.
-      // Sync tags from loaded books (if only 12, syncs 12).
+    async function init() {
+      if (activeCategory === 'recientes') await loadRecentBooks();
+      else await loadBooks();
       const currentBooks = useLibraryStore.getState().books;
       await syncTagsFromBooks(currentBooks);
       const allTags = await getAllTags();
       useLibraryStore.getState().setTags(allTags);
-
-      // Auto-sync
       await syncMetadata();
     }
+    init();
+  }, []);
 
-    initBooks();
-  }, [onboardingComplete]);
-
-  const recentBooks = books
-    .filter(b => b.status === 'reading')
-    .sort((a, b) => (b.lastReadAt?.getTime() || 0) - (a.lastReadAt?.getTime() || 0))
-    .slice(0, 4);
-
+  const recentBooks = books.filter(b => b.status === 'reading').sort((a, b) => (b.lastReadAt?.getTime() || 0) - (a.lastReadAt?.getTime() || 0)).slice(0, 4);
   const displayBooks = filteredBooks;
 
-  if (currentView === 'tags') {
-    return <TagManagerView />;
-  }
+
+  if (currentView === 'tags') return <TagManagerView />;
+  if (activeCategory === 'authors') return <AuthorsView />;
 
   return (
     <>
-      <div className="page-container animate-fade-in full-width">
-        <div className="main-layout">
-          <div className="main-content">
-            {/* Continue Reading Panel - Always visible */}
-            {recentBooks.length > 0 && (
+      <div className="page-container animate-fade-in">
+        {/* Continue Reading Panel */}
+        {recentBooks.length > 0 && (
+          <div className="mb-8">
+            <div className="continue-reading-section">
+              {/* Pass the list of recent books to the panel, it handles the grid/list itself */}
               <ContinueReadingPanel books={recentBooks} onOpenDetails={setSelectedBook} />
-            )}
+            </div>
+          </div>
+        )}
 
-            {/* Library Header & Toolbar */}
-            <div className="library-toolbar-combined">
-              <div className="toolbar-section-left">
-                <h2 className="heading-3" style={{ margin: 0 }}>
-                  {activeCategory === 'authors' ? 'Autores' : 'Biblioteca'}
-                </h2>
-                {activeCategory !== 'authors' && (
-                  <div className="category-tabs">
-                    <button
-                      className={`category-tab ${activeCategory === 'recientes' ? 'active' : ''}`}
-                      onClick={() => {
-                        setActiveCategory('recientes');
-                        // No need to reload if we are fully loaded, effectively just filtering.
-                        // If we are NOT fully loaded, we likely started with Repositorio, so we have them.
-                        // Actually, if we are in 'recientes' state, we might strictly want to ensure we have the view.
-                        // But usually UI switching is enough if data is there.
-                        // If we want to force refresh? No.
-                      }}
-                    >
-                      Recientes
-                    </button>
-                    <button className={`category-tab ${activeCategory === 'all' ? 'active' : ''}`} onClick={() => {
-                      setActiveCategory('all');
-                      if (!isFullyLoaded) loadBooks();
-                    }}>Todos</button>
-                    <button className={`category-tab ${activeCategory === 'favorites' ? 'active' : ''}`} onClick={() => {
-                      setActiveCategory('favorites');
-                      if (!isFullyLoaded) loadBooks();
-                    }}>Favoritos</button>
-                    <button className={`category-tab ${activeCategory === 'interesting' ? 'active' : ''}`} onClick={() => {
-                      setActiveCategory('interesting');
-                      if (!isFullyLoaded) loadBooks();
-                    }}>Interesante</button>
-                    <button className={`category-tab ${activeCategory === 'planToRead' ? 'active' : ''}`} onClick={() => {
-                      setActiveCategory('planToRead');
-                      if (!isFullyLoaded) loadBooks();
-                    }}>Para leer</button>
-                    <button className={`category-tab ${activeCategory === 'completed' ? 'active' : ''}`} onClick={() => {
-                      setActiveCategory('completed');
-                      if (!isFullyLoaded) loadBooks();
-                    }}>Leído</button>
-                    <button className={`category-tab ${activeCategory === 're_read' ? 'active' : ''}`} onClick={() => {
-                      setActiveCategory('re_read');
-                      if (!isFullyLoaded) loadBooks();
-                    }}>Releer</button>
-                  </div>
-                )}
-              </div>
+        {/* Library Header & Controls */}
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-bold text-primary">Libros ({displayBooks.length})</h2>
 
-              <div className="toolbar-section-right">
-                <div className="search-container">
+            <div className="flex items-center gap-4">
+              {/* Text Filter Links - clearly separated */}
+              <button
+                onClick={() => { setActiveCategory('recientes'); setIsGrouped(false); }}
+                style={{
+                  color: activeCategory === 'recientes' ? '#0a84ff' : '#6b7280',
+                  fontWeight: activeCategory === 'recientes' ? 700 : 500,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  padding: '4px 8px'
+                }}
+              >
+                Reciente
+              </button>
+
+              <span style={{ color: '#4b5563' }}>|</span>
+
+              <button
+                onClick={() => { setActiveCategory('favorites'); setIsGrouped(false); }}
+                style={{
+                  color: activeCategory === 'favorites' ? '#0a84ff' : '#6b7280',
+                  fontWeight: activeCategory === 'favorites' ? 700 : 500,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  padding: '4px 8px'
+                }}
+              >
+                Favoritos
+              </button>
+
+              <span style={{ color: '#4b5563' }}>|</span>
+
+              <button
+                onClick={() => { setActiveCategory('all'); setIsGrouped(false); }}
+                style={{
+                  color: activeCategory === 'all' && !isGrouped ? '#0a84ff' : '#6b7280',
+                  fontWeight: activeCategory === 'all' && !isGrouped ? 700 : 500,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  padding: '4px 8px'
+                }}
+              >
+                Todos
+              </button>
+
+              {/* Separator */}
+              <div style={{ width: '1px', height: '20px', backgroundColor: '#4b5563', margin: '0 8px' }}></div>
+
+              {/* Toggle Switch with Label */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
+                <span style={{
+                  color: isGrouped ? '#0a84ff' : '#6b7280',
+                  fontWeight: isGrouped ? 600 : 500,
+                  fontSize: '0.875rem'
+                }}>
+                  Por autor
+                </span>
+                <div style={{ position: 'relative', width: '44px', height: '24px' }}>
                   <input
-                    type="text"
-                    className="input search-input"
-                    placeholder="Buscar..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-
-                {/* Sort Selector */}
-                <div className="sort-container" style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                  <select
-                    className="input sort-select"
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
+                    type="checkbox"
+                    checked={isGrouped}
+                    onChange={() => {
+                      setIsGrouped(!isGrouped);
+                      if (!isGrouped) setSortBy('author');
+                    }}
                     style={{
-                      padding: '6px 10px',
-                      height: '36px',
-                      fontSize: 'var(--text-sm)',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: 'var(--color-bg-secondary)',
-                      border: 'none',
-                      color: 'var(--color-text-secondary)',
+                      position: 'absolute',
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0,
                       cursor: 'pointer',
-                      outline: 'none'
+                      zIndex: 1
                     }}
-                  >
-                    <option value="title">Título</option>
-                    <option value="author">Autor</option>
-                    <option value="addedDate">Fecha inclusión</option>
-                    <option value="progress">% Progreso</option>
-                    <option value="fileSize">Tamaño archivo</option>
-                    <option value="lastRead">Último leído</option>
-                  </select>
-
-                  <button
-                    className="btn btn-icon"
-                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                    title={sortOrder === 'asc' ? 'Orden ascendente' : 'Orden descendente'}
-                    style={{
-                      height: '36px',
-                      width: '36px',
-                      backgroundColor: 'var(--color-bg-secondary)',
-                      color: 'var(--color-text-secondary)'
-                    }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-                      {sortOrder === 'asc' ? (
-                        <path d="M3 6h18M6 12h12m-9 6h6" /> // Descending bars visual, but typically ASC for text is A->Z. 
-                        // Let's use simple arrows for clarity
-                      ) : (
-                        <path d="M3 18h18M6 12h12m-9-6h6" />
-                      )}
-                      {/* Overriding with arrows for clearer direction */}
-                      {sortOrder === 'asc' ? (
-                        <path d="M7 15l5 5 5-5M12 3v17" /> // Arrow Down (A-Z usually means down list) - wait, Ascending (1-9, A-Z) usually implies getting bigger.
-                        // Actually standard icon for sort is list bars. Let's use arrows.
-                        // Ascending: Small to Large. Arrow Up? Or Arrow Down (A at top, Z at bottom)?
-                        // Context: List. A (top) -> Z (bottom) is standard.
-                        // Ascending A->Z.
-                      ) : (
-                        <path d="M7 9l5-5 5 5M12 21V3" /> // Arrow Up
-                      )}
-                      {/* Re-doing icons to be standard SortAsc / SortDesc */}
-                    </svg>
-                    {sortOrder === 'asc' ? (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-                        <path d="M11 5h10M11 9h7M11 13h4" />
-                        <path d="M3 17l3 3 3-3M6 18V4" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-                        <path d="M11 5h10M11 9h7M11 13h4" />
-                        <path d="M3 7l3-3 3 3M6 6v14" />
-                      </svg>
-                    )}
-                  </button>
+                  />
+                  <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: isGrouped ? '#0a84ff' : '#374151',
+                    borderRadius: '12px',
+                    transition: 'background-color 0.2s'
+                  }}></div>
+                  <div style={{
+                    position: 'absolute',
+                    top: '2px',
+                    left: isGrouped ? '22px' : '2px',
+                    width: '20px',
+                    height: '20px',
+                    backgroundColor: 'white',
+                    borderRadius: '50%',
+                    transition: 'left 0.2s',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                  }}></div>
                 </div>
+              </label>
+            </div>
+          </div>
 
-                <div className="view-toggle">
-                  <button
-                    className={`btn btn-icon ${isSelectionMode ? 'active' : ''}`}
-                    onClick={() => {
-                      setIsSelectionMode(!isSelectionMode);
-                      if (isSelectionMode) setSelectedBookIds(new Set());
-                    }}
-                    title="Modo selección"
-                  >
-                    <CheckSquareIcon />
-                  </button>
-                  <div style={{ width: 1, background: 'var(--color-border)', margin: '0 4px' }} />
-                  <button className={`btn btn-icon ${viewMode === 'grid' ? 'active' : ''}`} onClick={() => setViewMode('grid')}><GridIcon /></button>
-                  <button className={`btn btn-icon ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')}><ListIcon /></button>
-                </div>
-
-                <button
-                  className={`btn btn-secondary btn-icon ${isSyncing ? 'loading' : ''}`}
-                  onClick={handleSync}
-                  title="Sincronizar con servidor"
-                  disabled={isSyncing}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20" className={isSyncing ? 'animate-spin' : ''}>
-                    {isSyncing ? (
-                      <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
-                    ) : (
-                      <>
-                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
-                        <line x1="16" y1="3" x2="21" y2="3" />
-                        <line x1="21" y1="3" x2="21" y2="8" />
-                        <line x1="21" y1="3" x2="10" y2="14" />
-                      </>
-                    )}
-                  </svg>
-                </button>
-                <button className="btn btn-primary btn-import" onClick={() => setShowImport(true)} title="Importar">
-                  <PlusIcon />
-                </button>
-              </div>
+          <div className="flex items-center gap-2">
+            {/* Sort & View Controls */}
+            <div className="flex items-center gap-1 bg-secondary p-1 rounded-lg">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-transparent border-none text-sm text-secondary focus:outline-none cursor-pointer py-1 pl-2 pr-1"
+              >
+                <option value="title">Título</option>
+                <option value="author">Autor</option>
+                <option value="addedDate">Fecha inclusión</option>
+                <option value="progress">% Progreso</option>
+                <option value="fileSize">Tamaño archivo</option>
+                <option value="lastRead">Último leído</option>
+              </select>
+              <button onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} className="p-1 text-secondary hover:text-primary">
+                {/* Simple icon */}
+                {sortOrder === 'asc' ? <ArrowUpNarrowWide size={16} /> : <ArrowDownNarrowWide size={16} />}
+              </button>
             </div>
 
-            {/* Content Area */}
-            {isLoading ? (
-              <div className="book-grid">
-                {[...Array(8)].map((_, i) => <div key={i} className="book-card skeleton" />)}
-              </div>
-            ) : activeCategory === 'authors' ? (
-              <div className="authors-view">
-                {Object.entries(
-                  books.reduce((acc, book) => {
-                    const author = book.author || 'Unknown Author';
-                    if (!acc[author]) acc[author] = [];
-                    acc[author].push(book);
-                    return acc;
-                  }, {} as Record<string, Book[]>)
-                ).map(([author, authorBooks]) => (
-                  <div key={author} className="author-section">
-                    <h3 className="heading-4 author-name">{author}</h3>
-                    <div className="book-grid">
-                      {authorBooks.map(book => (
-                        <BookCard
-                          key={book.id}
-                          book={book}
-                          viewMode="grid"
-                          onClick={setSelectedBook}
-                          onDelete={handleDeleteBook}
-                          selectionMode={isSelectionMode}
-                          isSelected={selectedBookIds.has(book.id)}
-                          onToggleSelection={handleToggleSelection}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : displayBooks.length > 0 ? (
-              <div className={viewMode === 'grid' ? 'book-grid' : 'book-list'}>
-                {displayBooks.map((book) => (
-                  <BookCard
-                    key={book.id}
-                    book={book}
-                    viewMode={viewMode}
-                    onClick={setSelectedBook}
-                    onDelete={handleDeleteBook}
-                    selectionMode={isSelectionMode}
-                    isSelected={selectedBookIds.has(book.id)}
-                    onToggleSelection={handleToggleSelection}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="empty-library">
-                <p style={{ color: 'var(--color-text-secondary)' }}>No hay libros para mostrar.</p>
-                <button className="btn btn-primary" onClick={() => setShowImport(true)} style={{ marginTop: '1rem' }}>
-                  Importar libros
-                </button>
-              </div>
-            )}
+            <div className="w-px h-6 bg-border mx-2"></div>
+
+            <div className="flex bg-secondary rounded-lg p-0.5">
+              <button className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-elevated text-accent shadow-sm' : 'text-tertiary'}`} onClick={() => setViewMode('grid')}>
+                <GridIcon />
+              </button>
+              <button className={`p-2 rounded-md ${viewMode === 'list' ? 'bg-elevated text-accent shadow-sm' : 'text-tertiary'}`} onClick={() => setViewMode('list')}>
+                <ListIcon />
+              </button>
+            </div>
+
+            <button
+              className={`p-2 rounded-lg ml-2 ${isSelectionMode ? 'bg-accent text-white' : 'bg-secondary text-secondary'}`}
+              onClick={() => setIsSelectionMode(!isSelectionMode)}
+              title="Selección múltiple"
+            >
+              <CheckSquareIcon />
+            </button>
+
+            <button
+              className={`p-2 rounded-lg ml-2 bg-secondary text-secondary ${isSyncing ? 'animate-spin' : ''}`}
+              onClick={handleSync}
+              title="Sincronizar"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+              </svg>
+            </button>
           </div>
         </div>
+
+        {/* Books Grid */}
+        {isLoading ? (
+          <div className="book-grid">
+            {[...Array(8)].map((_, i) => <div key={i} className="book-card skeleton" style={{ aspectRatio: '2/3', background: 'var(--color-bg-tertiary)' }} />)}
+          </div>
+        ) : displayBooks.length > 0 ? (
+          /* Library Content */
+          isGrouped ? (
+            <div className="grouped-library animate-slide-up">
+              {Object.entries(displayBooks.reduce((acc, book) => {
+                const author = book.author || 'Sin autor';
+                if (!acc[author]) acc[author] = [];
+                acc[author].push(book);
+                return acc;
+              }, {} as Record<string, Book[]>)).sort((a, b) => a[0].localeCompare(b[0])).map(([author, authorBooks]) => (
+                <div key={author} className="author-group mb-10">
+                  <div className="flex items-center gap-3 mb-4 border-b border-border pb-2">
+                    <h3 className="text-xl font-bold text-primary">{author}</h3>
+                    <span className="text-sm text-secondary bg-secondary px-2 py-0.5 rounded-full">{authorBooks.length}</span>
+                  </div>
+                  <div className={viewMode === 'grid' ? 'book-grid' : 'book-list'}>
+                    {authorBooks.map(book => (
+                      <BookCard
+                        key={book.id}
+                        book={book}
+                        viewMode={viewMode}
+                        onClick={(b) => setSelectedBook(b)}
+                        selectionMode={isSelectionMode}
+                        isSelected={selectedBookIds.has(book.id)}
+                        onToggleSelection={handleToggleSelection}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={`${viewMode === 'grid' ? 'book-grid' : 'book-list'} animate-slide-up`}>
+              {displayBooks.map(book => (
+                <BookCard
+                  key={book.id}
+                  book={book}
+                  viewMode={viewMode}
+                  onClick={(b) => setSelectedBook(b)}
+                  selectionMode={isSelectionMode}
+                  isSelected={selectedBookIds.has(book.id)}
+                  onToggleSelection={handleToggleSelection}
+                />
+              ))}
+            </div>
+          )
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <p className="text-secondary mb-4">No se encontraron libros</p>
+            <button className="btn btn-primary" onClick={() => setShowImport(true)}>Importar Libros</button>
+          </div>
+        )}
       </div>
 
-      {/* Floating Selection Toolbar */}
+      {/* Modals */}
       <div className={`selection-toolbar ${isSelectionMode || selectedBookIds.size > 0 ? 'visible' : ''}`}>
         <div className="selection-count">
           <span className="count">{selectedBookIds.size}</span>
           <span className="label">seleccionados</span>
         </div>
         <div className="selection-actions">
-          <button className="btn-text" onClick={() => setSelectedBookIds(new Set())}>
-            Deseleccionar
-          </button>
-          <button className="btn-text" onClick={() => setSelectedBookIds(new Set(displayBooks.map(b => b.id)))}>
-            Seleccionar Todo
-          </button>
+          <button className="btn-text" onClick={() => setSelectedBookIds(new Set())}>Cancelar</button>
           <div className="separator" />
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowMassTagsModal(true)}
-            disabled={selectedBookIds.size === 0}
-          >
-            Etiquetas
-          </button>
-          <button
-            className="btn btn-danger"
-            onClick={handleMassDelete}
-            disabled={selectedBookIds.size === 0}
-          >
-            Eliminar
-          </button>
+          <button className="btn btn-secondary" disabled={selectedBookIds.size === 0} onClick={() => setShowMassTagsModal(true)}>Etiquetas</button>
+          <button className="btn btn-danger" disabled={selectedBookIds.size === 0} onClick={handleMassDelete}>Eliminar</button>
         </div>
       </div>
 
-      {/* {showOnboarding && <OnboardingModal onComplete={() => setShowOnboarding(false)} />} */}
-      {showImport && (
-        <ImportModal onClose={() => setShowImport(false)} />
-      )}
-
-      <SyncReportModal
-        isOpen={showSyncReport}
-        onClose={() => setShowSyncReport(false)}
-        results={syncResults}
-        isLoading={isSyncing}
-        progressLogs={syncLogs}
-      />
-
-      {selectedBook && (
-        <BookDetailsModal
-          book={selectedBook}
-          onClose={() => setSelectedBook(null)}
-        />
-      )}
-
-      <MassTagManagerModal
-        isOpen={showMassTagsModal}
-        onClose={() => setShowMassTagsModal(false)}
-        selectedBooks={books.filter(b => selectedBookIds.has(b.id))}
-        onSuccess={async () => {
-          // Refresh books
-          // Refresh books
-          if (activeCategory === 'recientes' && !isFullyLoaded) {
-            await loadRecentBooks();
-          } else {
-            await loadBooks();
-          }
-        }}
-      />
+      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
+      <SyncReportModal isOpen={showSyncReport} onClose={() => setShowSyncReport(false)} results={syncResults} isLoading={isSyncing} progressLogs={syncLogs} />
+      {selectedBook && <BookDetailsModal book={selectedBook} onClose={() => setSelectedBook(null)} />}
+      <MassTagManagerModal isOpen={showMassTagsModal} onClose={() => setShowMassTagsModal(false)} selectedBooks={books.filter(b => selectedBookIds.has(b.id))} onSuccess={async () => { if (activeCategory === 'recientes') await loadRecentBooks(); else await loadBooks(); }} />
 
       <style jsx>{`
-        .main-layout {
-            display: flex;
-            gap: var(--space-8);
-            align-items: flex-start;
-        }
-
-        .main-content {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .library-toolbar-combined {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: var(--space-6);
-            gap: var(--space-4);
-            flex-wrap: wrap;
-        }
-
-        .toolbar-section-left {
-            display: flex;
-            align-items: center;
-            gap: var(--space-6);
-        }
-
-        .toolbar-section-right {
+         .mb-8 { margin-bottom: 2rem; }
+         .mb-6 { margin-bottom: 1.5rem; }
+         .mb-4 { margin-bottom: 1rem; }
+         .flex { display: flex; }
+         .flex-col { flex-direction: column; }
+         .items-center { align-items: center; }
+         .justify-between { justify-content: space-between; }
+         .justify-center { justify-content: center; }
+         .gap-4 { gap: 1rem; }
+         .gap-2 { gap: 0.5rem; }
+         .gap-1 { gap: 0.25rem; }
+         .py-20 { padding-top: 5rem; padding-bottom: 5rem; }
+         .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+         .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+         .p-1 { padding: 0.25rem; }
+         .p-2 { padding: 0.5rem; }
+         .p-0.5 { padding: 0.125rem; }
+         .pl-2 { padding-left: 0.5rem; }
+         .pr-1 { padding-right: 0.25rem; }
+         .ml-2 { margin-left: 0.5rem; }
+         .rounded-full { border-radius: 9999px; }
+         .rounded-lg { border-radius: var(--radius-md); }
+         .rounded-md { border-radius: var(--radius-sm); }
+         .bg-secondary { background-color: var(--color-bg-secondary); }
+         .bg-elevated { background-color: var(--color-bg-elevated); }
+         .bg-transparent { background-color: transparent; }
+         .bg-accent { background-color: var(--color-accent); }
+         .text-xs { font-size: 0.75rem; }
+         .text-sm { font-size: 0.875rem; }
+         .font-medium { font-weight: 500; }
+         .text-secondary { color: var(--color-text-secondary); }
+         .text-tertiary { color: var(--color-text-tertiary); }
+         .text-primary { color: var(--color-text-primary); }
+         .text-accent { color: var(--color-accent); }
+         .text-white { color: white; }
+         .border-none { border: none; }
+         .focus\:outline-none:focus { outline: none; }
+         .cursor-pointer { cursor: pointer; }
+         .hover\:text-primary:hover { color: var(--color-text-primary); }
+         .shadow-sm { box-shadow: var(--shadow-sm); }
+         .w-px { width: 1px; }
+         .h-6 { height: 1.5rem; }
+         .bg-border { background-color: var(--color-border); }
+         .selection-toolbar {
+             position: fixed;
+             bottom: 32px;
+             left: 50%;
+             transform: translateX(-50%) translateY(100px);
+             background: rgba(26, 27, 30, 0.95);
+             backdrop-filter: blur(10px);
+             border: 1px solid rgba(255,255,255,0.1);
+             padding: 12px 24px;
+             border-radius: 99px;
              display: flex;
-            align-items: center;
-            gap: var(--space-3);
-            flex: 1;
-            justify-content: flex-end;
-        }
-
-        .category-tabs {
-            display: flex;
-            gap: var(--space-1);
-            background: var(--color-bg-secondary);
-            padding: 4px;
-            border-radius: var(--radius-lg);
-        }
-
-        .category-tab {
-            padding: 4px 12px;
-            border-radius: var(--radius-md);
-            font-size: var(--text-sm);
-            font-weight: 500;
-            color: var(--color-text-secondary);
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .category-tab:hover {
-            color: var(--color-text-primary);
-        }
-
-        .category-tab.active {
-            background: var(--color-bg-tertiary);
-            color: var(--color-text-primary);
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        }
-
-        .search-container {
-            width: 200px;
-        }
-
-        .view-toggle {
-            display: flex;
-            background: var(--color-bg-secondary);
-            border-radius: var(--radius-md);
-            padding: 2px;
-            gap: 2px;
-        }
-
-        .view-toggle .btn-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: var(--radius-sm);
-            color: var(--color-text-tertiary);
-        }
-
-        .view-toggle .btn-icon.active {
-            background: var(--color-bg-elevated);
-            color: var(--color-accent);
-            box-shadow: var(--shadow-sm);
-        }
-        
-        .btn-import {
-            width: 40px;
-            height: 40px;
-            padding: 0;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .book-list {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-3);
-        }
-        
-        @media (max-width: 1024px) {
-            .main-layout {
-                flex-direction: column;
-            }
-            .right-sidebar {
-                width: 100%;
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            }
-        }
-        
-        .authors-view {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-8);
-        }
-
-        .author-section {
-            display: flex;
-            flex-direction: column;
-            gap: var(--space-4);
-            margin-bottom: var(--space-8); /* Add significant spacing between authors */
-            padding-bottom: var(--space-4);
-            border-bottom: 1px dashed var(--color-divider); /* Optional visual separator */
-        }
-        
-        .author-section:last-child {
-            border-bottom: none;
-        }
-        
-        .author-name {
-            border-bottom: 1px solid var(--color-divider);
-            padding-bottom: var(--space-2);
-        }
-        
-        .selection-toolbar {
-            position: fixed;
-            bottom: 32px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: rgba(26, 27, 30, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-            padding: 12px 24px;
-            border-radius: 99px;
-            display: flex;
-            align-items: center;
-            gap: 24px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-            z-index: 100;
-            opacity: 0;
-            pointer-events: none;
-        }
-        
-        .selection-toolbar.visible {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
-            pointer-events: auto;
-        }
-        
-        .selection-count {
-            display: flex;
-            align-items: baseline;
-            gap: 6px;
-        }
-        
-        .selection-count .count {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--color-accent);
-        }
-        
-        .selection-count .label {
-            font-size: 0.875rem;
-            color: var(--color-text-secondary);
-        }
-        
-        .selection-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .btn-text {
-            background: none;
-            border: none;
-            color: var(--color-text-secondary);
-            font-size: 0.875rem;
-            cursor: pointer;
-            padding: 4px 8px;
-        }
-        
-        .btn-text:hover {
-            color: white;
-        }
-        
-        .separator {
-            width: 1px;
-            height: 24px;
-            background: rgba(255,255,255,0.1);
-            margin: 0 4px;
-        }
-      `}</style>
+             align-items: center;
+             gap: 24px;
+             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+             transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+             z-index: 100;
+             opacity: 0;
+             pointer-events: none;
+         }
+         .selection-toolbar.visible {
+             transform: translateX(-50%) translateY(0);
+             opacity: 1;
+             pointer-events: auto;
+         }
+         .selection-count { display: flex; align-items: baseline; gap: 6px; }
+         .selection-count .count { font-size: 1.25rem; font-weight: 700; color: var(--color-accent); }
+         .selection-count .label { font-size: 0.875rem; color: var(--color-text-secondary); }
+         .selection-actions { display: flex; align-items: center; gap: 12px; }
+         .btn-text { background: none; border: none; color: var(--color-text-secondary); cursor: pointer; }
+         .btn-text:hover { color: white; }
+         .separator { width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 4px; }
+         .book-list { display: flex; flex-direction: column; gap: var(--space-3); }
+       `}</style>
     </>
   );
 }

@@ -172,7 +172,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, timestamp: dataToSave.lastSync, mergedBooks: mergedBooks.length });
 
     } catch (error) {
-        console.error('Error saving metadata:', error);
-        return NextResponse.json({ error: 'Failed to save metadata' }, { status: 500 });
+        console.error('Error saving metadata FULL DETAILS:', error);
+        return NextResponse.json({
+            error: 'Failed to save metadata',
+            details: (error as Error).message,
+            stack: (error as Error).stack
+        }, { status: 500 });
     }
 }

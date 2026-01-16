@@ -125,11 +125,11 @@
    =================================== */
 
 [data-theme="dark"] {
-  --color-bg-primary: #000000;
-  --color-bg-secondary: #0a0a0a;
-  --color-bg-tertiary: #141414;
-  --color-bg-elevated: #1c1c1e;
-  --color-bg-glass: rgba(28, 28, 30, 0.85);
+  --color-bg-primary: #0f172a;
+  --color-bg-secondary: #0b1120;
+  --color-bg-tertiary: #1e293b;
+  --color-bg-elevated: #334155;
+  --color-bg-glass: rgba(15, 23, 42, 0.85);
 
   --color-text-primary: #f5f5f7;
   --color-text-secondary: #a1a1a6;
@@ -467,19 +467,34 @@ a {
 
 .app-container {
   display: flex;
-  min-height: 100vh;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
   width: 100%;
 }
 
-.main-content {
+.content-area {
   flex: 1;
-  margin-left: 0;
-  min-height: 100vh;
-  background: var(--color-bg-primary);
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
-  /* Prevent horizontal scroll */
+  overflow-y: auto;
+  background: var(--color-bg-primary);
+  min-width: 0;
+  /* Prevent flex child from growing beyond parent */
+}
+
+/* Legacy main-content kept for continuity if needed by pages, but mapped to content-area logic */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Ensure page content really takes full width */
