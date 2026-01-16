@@ -4,7 +4,7 @@ import { useLibraryStore } from '@/stores/appStore';
 import { User, BookOpen } from 'lucide-react';
 
 export function AuthorsView() {
-    const { books, setSearchQuery, setView, setActiveCategory } = useLibraryStore();
+    const { books, searchQuery, setSearchQuery, setView, setActiveCategory } = useLibraryStore();
 
     // Group books by author
     const authorsMap = books.reduce((acc, book) => {
@@ -20,7 +20,15 @@ export function AuthorsView() {
         return acc;
     }, {} as Record<string, { name: string; count: number; cover?: string }>);
 
-    const authors = Object.values(authorsMap).sort((a, b) => a.name.localeCompare(b.name));
+    // Filter authors based on search query
+    let authors = Object.values(authorsMap).sort((a, b) => a.name.localeCompare(b.name));
+
+    if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        authors = authors.filter(author =>
+            author.name.toLowerCase().includes(query)
+        );
+    }
 
     const handleAuthorClick = (authorName: string) => {
         setSearchQuery(authorName);
@@ -32,33 +40,40 @@ export function AuthorsView() {
         <div className="page-container animate-fade-in">
             <h2 className="heading-3 mb-6">Autores ({authors.length})</h2>
 
-            <div className="authors-grid">
-                {authors.map((author) => (
-                    <button
-                        key={author.name}
-                        className="author-card"
-                        onClick={() => handleAuthorClick(author.name)}
-                    >
-                        <div className="author-avatar">
-                            {author.cover ? (
-                                <img src={author.cover} alt={author.name} className="author-cover-bg" />
-                            ) : (
-                                <div className="placeholder-bg" />
-                            )}
-                            <div className="avatar-circle">
-                                <User size={32} />
+            {authors.length > 0 ? (
+                <div className="authors-grid">
+                    {authors.map((author) => (
+                        <button
+                            key={author.name}
+                            className="author-card"
+                            onClick={() => handleAuthorClick(author.name)}
+                        >
+                            <div className="author-avatar">
+                                {author.cover ? (
+                                    <img src={author.cover} alt={author.name} className="author-cover-bg" />
+                                ) : (
+                                    <div className="placeholder-bg" />
+                                )}
+                                <div className="avatar-circle">
+                                    <User size={32} />
+                                </div>
                             </div>
-                        </div>
-                        <div className="author-info">
-                            <h3 className="author-name">{author.name}</h3>
-                            <div className="author-stats">
-                                <BookOpen size={14} />
-                                <span>{author.count} {author.count === 1 ? 'libro' : 'libros'}</span>
+                            <div className="author-info">
+                                <h3 className="author-name">{author.name}</h3>
+                                <div className="author-stats">
+                                    <BookOpen size={14} />
+                                    <span>{author.count} {author.count === 1 ? 'libro' : 'libros'}</span>
+                                </div>
                             </div>
-                        </div>
-                    </button>
-                ))}
-            </div>
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                <div className="empty-state">
+                    <User size={48} />
+                    <p>No se encontraron autores que coincidan con &quot;{searchQuery}&quot;</p>
+                </div>
+            )}
 
             <style jsx>{`
                 .authors-grid {

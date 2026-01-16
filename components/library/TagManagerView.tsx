@@ -29,7 +29,7 @@ export default function TagManagerView() {
 
         // Count usage
         books.forEach(b => {
-            b.metadata.tags?.forEach(t => {
+            b.metadata?.tags?.forEach(t => {
                 if (usage[t] !== undefined) {
                     usage[t]++;
                 } else {
@@ -88,9 +88,9 @@ export default function TagManagerView() {
 
                 // If name changed, update all books
                 if (oldName !== tagName) {
-                    const booksToUpdate = books.filter(b => b.metadata.tags?.includes(oldName));
+                    const booksToUpdate = books.filter(b => b.metadata?.tags?.includes(oldName));
                     for (const book of booksToUpdate) {
-                        const newTags = book.metadata.tags!.map(t => t === oldName ? tagName : t);
+                        const newTags = (book.metadata?.tags || []).map(t => t === oldName ? tagName : t);
                         // We need to update book in DB and Store. 
                         // Assuming updateBook action exists or we modify local.
                         // Actually useLibraryStore has updateBook.

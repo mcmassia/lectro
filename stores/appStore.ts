@@ -278,7 +278,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
         // Filter by Tag
         if (activeTag) {
-            filtered = filtered.filter((b) => b.metadata.tags?.includes(activeTag));
+            filtered = filtered.filter((b) => b.metadata?.tags?.includes(activeTag));
         }
 
         // Filter by search

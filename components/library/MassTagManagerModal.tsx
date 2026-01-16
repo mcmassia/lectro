@@ -44,13 +44,13 @@ export function MassTagManagerModal({ isOpen, onClose, selectedBooks, onSuccess 
         // So let's compute purely from books first for ALL tags they have.
 
         const allTagsInSelection = new Set<string>();
-        selectedBooks.forEach(b => b.metadata.tags?.forEach(t => allTagsInSelection.add(t)));
+        selectedBooks.forEach(b => b.metadata?.tags?.forEach(t => allTagsInSelection.add(t)));
 
         // For each tag present in at least one book:
         allTagsInSelection.forEach(tagName => {
             let presentCount = 0;
             selectedBooks.forEach(b => {
-                if (b.metadata.tags?.includes(tagName)) presentCount++;
+                if (b.metadata?.tags?.includes(tagName)) presentCount++;
             });
 
             if (presentCount === selectedBooks.length) {
