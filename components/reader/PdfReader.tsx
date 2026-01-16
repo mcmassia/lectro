@@ -10,7 +10,9 @@ import { TocItem } from './EpubReader';
 
 // Use unpkg for worker to avoid build complexity with webpack/files
 // Ensure version matches exactly with package.json
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+if (typeof window !== 'undefined') {
+    pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+}
 
 interface PdfReaderProps {
     book: Book;
