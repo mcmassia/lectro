@@ -51,15 +51,15 @@ export function ImportModal({ onClose }: ImportModalProps) {
         book.destroy();
 
         return {
-            title: metadata.title || file.name.replace(/\.epub$/i, ''),
-            author: metadata.creator || 'Autor desconocido',
+            title: metadata?.title || file.name.replace(/\.epub$/i, ''),
+            author: metadata?.creator || 'Autor desconocido',
             cover: coverBase64,
             format: 'epub',
             totalPages: estimatedPages,
             metadata: {
-                publisher: metadata.publisher,
-                language: metadata.language,
-                description: metadata.description,
+                publisher: metadata?.publisher,
+                language: metadata?.language,
+                description: metadata?.description,
             },
         };
     };

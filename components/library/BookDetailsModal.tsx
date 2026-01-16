@@ -103,11 +103,11 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
             title: result.title || book.title, // Optionally update title too
             metadata: {
                 ...book.metadata,
-                description: result.description || book.metadata.description,
-                publisher: result.publisher || book.metadata.publisher,
-                publishedDate: result.publishedDate || book.metadata.publishedDate,
-                language: result.language || book.metadata.language,
-                tags: result.tags || book.metadata.tags
+                description: result.description || book.metadata?.description,
+                publisher: result.publisher || book.metadata?.publisher,
+                publishedDate: result.publishedDate || book.metadata?.publishedDate,
+                language: result.language || book.metadata?.language,
+                tags: result.tags || book.metadata?.tags
             }
         };
 
@@ -304,7 +304,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                             {isEditing ? (
                                 <textarea
                                     className="edit-textarea"
-                                    value={book.metadata.description || ''}
+                                    value={book.metadata?.description || ''}
                                     onChange={(e) => setBook({
                                         ...book,
                                         metadata: { ...book.metadata, description: e.target.value }
@@ -313,7 +313,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                 />
                             ) : (
                                 <div className="description-text">
-                                    {book.metadata.description || 'No description available.'}
+                                    {book.metadata?.description || 'No description available.'}
                                 </div>
                             )}
                         </div>
@@ -325,14 +325,14 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                     <input
                                         type="date"
                                         className="edit-input-sm"
-                                        value={book.metadata.publishedDate || ''}
+                                        value={book.metadata?.publishedDate || ''}
                                         onChange={(e) => setBook({
                                             ...book,
                                             metadata: { ...book.metadata, publishedDate: e.target.value }
                                         })}
                                     />
                                 ) : (
-                                    <span className="meta-value">{formatDate(book.metadata.publishedDate)}</span>
+                                    <span className="meta-value">{formatDate(book.metadata?.publishedDate)}</span>
                                 )}
                             </div>
                             <div className="metadata-item">
@@ -340,14 +340,14 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                 {isEditing ? (
                                     <input
                                         className="edit-input-sm"
-                                        value={book.metadata.language || ''}
+                                        value={book.metadata?.language || ''}
                                         onChange={(e) => setBook({
                                             ...book,
                                             metadata: { ...book.metadata, language: e.target.value }
                                         })}
                                     />
                                 ) : (
-                                    <span className="meta-value">{book.metadata.language || '-'}</span>
+                                    <span className="meta-value">{book.metadata?.language || '-'}</span>
                                 )}
                             </div>
                             <div className="metadata-item">
@@ -359,14 +359,14 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                 {isEditing ? (
                                     <input
                                         className="edit-input-sm"
-                                        value={book.metadata.publisher || ''}
+                                        value={book.metadata?.publisher || ''}
                                         onChange={(e) => setBook({
                                             ...book,
                                             metadata: { ...book.metadata, publisher: e.target.value }
                                         })}
                                     />
                                 ) : (
-                                    <span className="meta-value">{book.metadata.publisher || '-'}</span>
+                                    <span className="meta-value">{book.metadata?.publisher || '-'}</span>
                                 )}
                             </div>
                         </div>
@@ -376,12 +376,12 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                             {isEditing ? (
                                 <div className="tags-edit-container">
                                     <div className="current-tags-edit">
-                                        {book.metadata.tags?.map((tag, i) => (
+                                        {book.metadata?.tags?.map((tag, i) => (
                                             <span key={i} className="tag-chip-edit">
                                                 {tag}
                                                 <button
                                                     onClick={() => {
-                                                        const newTags = book.metadata.tags?.filter(t => t !== tag) || [];
+                                                        const newTags = book.metadata?.tags?.filter(t => t !== tag) || [];
                                                         setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
                                                     }}
                                                     className="tag-remove-btn"
@@ -398,8 +398,8 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                                 if (e.key === 'Enter') {
                                                     e.preventDefault();
                                                     const val = tagInput.trim();
-                                                    if (val && !book.metadata.tags?.includes(val)) {
-                                                        const newTags = [...(book.metadata.tags || []), val];
+                                                    if (val && !book.metadata?.tags?.includes(val)) {
+                                                        const newTags = [...(book.metadata?.tags || []), val];
                                                         setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
                                                         setTagInput('');
                                                     }
@@ -417,8 +417,8 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                             className="btn-xs btn-primary ml-2"
                                             onClick={() => {
                                                 const val = tagInput.trim();
-                                                if (val && !book.metadata.tags?.includes(val)) {
-                                                    const newTags = [...(book.metadata.tags || []), val];
+                                                if (val && !book.metadata?.tags?.includes(val)) {
+                                                    const newTags = [...(book.metadata?.tags || []), val];
                                                     setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
                                                     setTagInput('');
                                                 }
@@ -430,14 +430,14 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                     {/* Quick Suggestions */}
                                     <div className="quick-tags">
                                         {availableTags
-                                            .filter(t => !book.metadata.tags?.includes(t.name))
+                                            .filter(t => !book.metadata?.tags?.includes(t.name))
                                             .slice(0, 10) // Show top 10 unused
                                             .map(t => (
                                                 <button
                                                     key={t.id}
                                                     className="tag-suggestion"
                                                     onClick={() => {
-                                                        const newTags = [...(book.metadata.tags || []), t.name];
+                                                        const newTags = [...(book.metadata?.tags || []), t.name];
                                                         setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
                                                     }}
                                                 >
@@ -449,7 +449,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                 </div>
                             ) : (
                                 <div className="tags-list">
-                                    {book.metadata.tags?.map((tag, i) => (
+                                    {book.metadata?.tags?.map((tag, i) => (
                                         <span key={i} className={`tag ${tag.toLowerCase()}`}>{tag}</span>
                                     )) || (
                                             <span className="no-tags">-</span>
