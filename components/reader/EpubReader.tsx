@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
-import ePub, { Book as EpubBook, Rendition, Contents, NavItem } from 'epubjs';
+import type { Book as EpubBook, Rendition, Contents, NavItem } from 'epubjs';
 import { Book, Annotation, ReaderSettings } from '@/lib/db';
 
 export interface TocItem {
@@ -159,6 +159,7 @@ export const EpubReader = forwardRef<EpubReaderRef, EpubReaderProps>(function Ep
                 }
 
                 // Initialize epub
+                const ePub = (await import('epubjs')).default;
                 const epub = ePub(epubSource);
                 epubRef.current = epub;
 

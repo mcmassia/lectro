@@ -1,7 +1,7 @@
 import { db, Book, VectorChunk, addVectorChunks, updateBook } from '@/lib/db';
 import { generateEmbeddingAction } from '@/app/actions/ai';
 import { v4 as uuid } from 'uuid';
-import ePub from 'epubjs';
+// import ePub from 'epubjs';
 
 // Configuration
 const CHUNK_SIZE = 1000; // characters
@@ -106,6 +106,7 @@ export class LibraryIndexer {
 
     private async processEpub(blob: Blob): Promise<{ text: string, chapterTitle: string, cfi: string }[]> {
         const arrayBuffer = await blob.arrayBuffer();
+        const ePub = (await import('epubjs')).default;
         const book = ePub(arrayBuffer);
         await book.ready;
 
