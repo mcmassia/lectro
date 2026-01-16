@@ -186,8 +186,8 @@ export default function Home() {
       // We sort by updatedAt (modification/upload) descending.
       if (isFullyLoaded) {
         booksToFilter.sort((a, b) => {
-          const dateA = a.updatedAt?.getTime() || a.addedAt?.getTime() || 0;
-          const dateB = b.updatedAt?.getTime() || a.addedAt?.getTime() || 0;
+          const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : (a.addedAt ? new Date(a.addedAt).getTime() : 0);
+          const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : (b.addedAt ? new Date(b.addedAt).getTime() : 0);
           return dateB - dateA;
         });
         booksToFilter = booksToFilter.slice(0, 12);
@@ -212,11 +212,13 @@ export default function Home() {
       } else if (sortBy === 'author') {
         comparison = a.author.localeCompare(b.author);
       } else if (sortBy === 'lastRead') {
-        const dateA = a.lastReadAt?.getTime() || 0;
-        const dateB = b.lastReadAt?.getTime() || 0;
+        const dateA = a.lastReadAt ? new Date(a.lastReadAt).getTime() : 0;
+        const dateB = b.lastReadAt ? new Date(b.lastReadAt).getTime() : 0;
         comparison = dateA - dateB;
       } else if (sortBy === 'addedDate') {
-        comparison = (a.addedAt?.getTime() || 0) - (b.addedAt?.getTime() || 0);
+        const dateA = a.addedAt ? new Date(a.addedAt).getTime() : 0;
+        const dateB = b.addedAt ? new Date(b.addedAt).getTime() : 0;
+        comparison = dateA - dateB;
       } else if (sortBy === 'progress') {
         comparison = (a.progress || 0) - (b.progress || 0);
       } else if (sortBy === 'fileSize') {
