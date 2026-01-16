@@ -165,6 +165,22 @@ export function AuthorsView() {
                     font-size: 13px;
                     color: var(--color-text-secondary);
                 }
+
+                .empty-state {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 80px 20px;
+                    text-align: center;
+                    color: var(--color-text-secondary);
+                    gap: 16px;
+                }
+
+                .empty-state p {
+                    font-size: 16px;
+                    margin: 0;
+                }
             `}</style>
         </div>
     );

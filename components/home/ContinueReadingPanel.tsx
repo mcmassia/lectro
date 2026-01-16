@@ -86,13 +86,15 @@ function ContinueReadingCard({ book, onOpenDetails }: { book: Book; onOpenDetail
 
       <Link href={`/reader/${book.id}`} className="continue-card-content">
         <div className="card-cover">
-          {book.cover ? (
-            <img src={book.cover} alt={book.title} />
-          ) : (
-            <div className="placeholder-cover">
-              {book.title[0]}
-            </div>
-          )}
+          <img
+            src={book.cover || '/default-cover.png'}
+            alt={book.title}
+            onError={(e) => {
+              if ((e.target as HTMLImageElement).src !== '/default-cover.png') {
+                (e.target as HTMLImageElement).src = '/default-cover.png';
+              }
+            }}
+          />
         </div>
         <div className="card-content">
           <div className="card-info">

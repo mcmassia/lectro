@@ -62,27 +62,18 @@ export function BookCard({
           </div>
         )}
         <div className="book-list-cover">
-          {book.cover || book.filePath || book.isOnServer ? (
-            <img
-              src={book.isOnServer || book.filePath ? `/api/covers/${book.id}?width=100` : book.cover}
-              alt={book.title}
-              onError={(e) => {
-                // Fallback to local cover or placeholder if proxy fails
-                if (book.cover && (e.target as HTMLImageElement).src !== book.cover) {
-                  (e.target as HTMLImageElement).src = book.cover!;
-                } else {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                  // Show placeholder logic here would be complex in inline, 
-                  // ideally we toggle a state, but for now fallback to hiding 
-                  // which shows the background placeholder
-                }
-              }}
-            />
-          ) : (
-            <div className="book-placeholder-mini">
-              {book.title[0]}
-            </div>
-          )}
+          <img
+            src={book.isOnServer || book.filePath ? `/api/covers/${book.id}?width=100` : (book.cover || '/default-cover.png')}
+            alt={book.title}
+            onError={(e) => {
+              // Fallback to local cover or default cover if proxy fails
+              if (book.cover && (e.target as HTMLImageElement).src !== book.cover) {
+                (e.target as HTMLImageElement).src = book.cover!;
+              } else if ((e.target as HTMLImageElement).src !== '/default-cover.png') {
+                (e.target as HTMLImageElement).src = '/default-cover.png';
+              }
+            }}
+          />
         </div>
         <div className="book-list-info">
           <h3 className="book-list-title">{book.title}</h3>
@@ -244,25 +235,19 @@ export function BookCard({
           </div>
         )}
 
-        {book.cover || book.filePath || book.isOnServer ? (
-          <img
-            src={book.isOnServer || book.filePath ? `/api/covers/${book.id}?width=400` : book.cover}
-            loading="lazy"
-            alt={book.title}
-            className="book-card-cover"
-            onError={(e) => {
-              if (book.cover && (e.target as HTMLImageElement).src !== book.cover) {
-                (e.target as HTMLImageElement).src = book.cover!;
-              } else {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }
-            }}
-          />
-        ) : (
-          <div className="book-placeholder-grid">
-            <span className="book-initial">{book.title[0]}</span>
-          </div>
-        )}
+        <img
+          src={book.isOnServer || book.filePath ? `/api/covers/${book.id}?width=400` : (book.cover || '/default-cover.png')}
+          loading="lazy"
+          alt={book.title}
+          className="book-card-cover"
+          onError={(e) => {
+            if (book.cover && (e.target as HTMLImageElement).src !== book.cover) {
+              (e.target as HTMLImageElement).src = book.cover!;
+            } else if ((e.target as HTMLImageElement).src !== '/default-cover.png') {
+              (e.target as HTMLImageElement).src = '/default-cover.png';
+            }
+          }}
+        />
 
         {onDelete && !selectionMode && (
           <button className="delete-btn-grid" onClick={handleDelete} title="Eliminar libro">
