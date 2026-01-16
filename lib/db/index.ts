@@ -453,7 +453,7 @@ export async function syncTagsFromBooks(books?: Book[]): Promise<void> {
   const tagsToAdd = new Set<string>();
 
   targetBooks.forEach(book => {
-    book.metadata.tags?.forEach(tagName => {
+    book.metadata?.tags?.forEach(tagName => {
       if (!existingTagNames.has(tagName)) {
         tagsToAdd.add(tagName);
       }

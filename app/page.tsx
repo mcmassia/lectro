@@ -200,7 +200,7 @@ export default function Home() {
       booksToFilter = booksToFilter.filter(book =>
         book.title.toLowerCase().includes(query) ||
         book.author.toLowerCase().includes(query) ||
-        (book.metadata.tags && book.metadata.tags.some(tag => tag.toLowerCase().includes(query)))
+        (book.metadata?.tags && book.metadata.tags.some(tag => tag.toLowerCase().includes(query)))
       );
     }
 
