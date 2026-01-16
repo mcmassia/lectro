@@ -76,15 +76,38 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
 
     // Expose navigation
     useImperativeHandle(ref, () => ({
-        navigateTo: (href: string) => {
+        navigateTo: (hrefOrCfi: string) => {
             if (!manifest) return;
-            // Href might be full URL or relative
+
+            // Handle CFI-like identifiers from annotations
+            // Format: /api/readium/{bookId}/resource/OEBPS/Text/section.xhtml#text=...
+            // OR: OEBPS/Text/section.xhtml#text=...
+            let href = hrefOrCfi;
+
+            // Extract resource path from API URL if present
+            const apiMatch = hrefOrCfi.match(/\/api\/readium\/[^/]+\/resource\/(.+?)(?:#|$)/);
+            if (apiMatch) {
+                href = apiMatch[1];
+            }
+
+            // Remove fragment identifier (#text=... or #...)
+            href = href.split('#')[0];
+
             // Find index in readingOrder
-            const index = manifest.readingOrder.findIndex(link =>
-                link.href === href || href.endsWith(link.href) || link.href.endsWith(href)
-            );
+            const index = manifest.readingOrder.findIndex(link => {
+                const linkHref = link.href.split('#')[0];
+                // Try multiple matching strategies
+                return linkHref === href ||
+                    href.endsWith(linkHref) ||
+                    linkHref.endsWith(href) ||
+                    linkHref.includes(href) ||
+                    href.includes(linkHref.replace(/^.*\/resource\//, ''));
+            });
+
             if (index !== -1) {
                 setCurrentResourceIndex(index);
+            } else {
+                console.warn('WebPubReader: Could not find resource for', hrefOrCfi, '-> extracted href:', href);
             }
         },
     }));
@@ -234,6 +257,18 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
     return (
         <div className="webpub-reader">
             <div className="frame-container">
+                {/* Side Navigation - Left */}
+                <button
+                    className="side-nav-btn side-nav-prev"
+                    onClick={goPrev}
+                    disabled={currentResourceIndex === 0}
+                    title="Capítulo anterior"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24">
+                        <polyline points="15 18 9 12 15 6" />
+                    </svg>
+                </button>
+
                 <iframe
                     ref={iframeRef}
                     src={currentResource.href}
@@ -241,6 +276,18 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
                     onLoad={injectStyles}
                     title="Book Content"
                 />
+
+                {/* Side Navigation - Right */}
+                <button
+                    className="side-nav-btn side-nav-next"
+                    onClick={goNext}
+                    disabled={currentResourceIndex === manifest.readingOrder.length - 1}
+                    title="Capítulo siguiente"
+                >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24">
+                        <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                </button>
             </div>
 
             <div className="nav-controls">
@@ -281,6 +328,64 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
                     height: 100%;
                     border: none;
                 }
+                
+                /* Side Navigation Buttons */
+                .side-nav-btn {
+                    position: absolute;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    z-index: 50;
+                    width: 48px;
+                    height: 80px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: rgba(0, 0, 0, 0.1);
+                    border: none;
+                    cursor: pointer;
+                    color: var(--color-text-secondary);
+                    transition: all 0.2s ease;
+                    opacity: 0.3;
+                }
+                .side-nav-btn:hover {
+                    opacity: 1;
+                    background: rgba(0, 0, 0, 0.2);
+                    color: var(--color-text-primary);
+                }
+                .side-nav-btn:disabled {
+                    opacity: 0.1;
+                    cursor: not-allowed;
+                }
+                .side-nav-prev {
+                    left: 0;
+                    border-radius: 0 8px 8px 0;
+                }
+                .side-nav-next {
+                    right: 0;
+                    border-radius: 8px 0 0 8px;
+                }
+                
+                /* Theme-aware side nav colors */
+                ${settings.theme === 'dark' ? `
+                    .side-nav-btn {
+                        background: rgba(255, 255, 255, 0.05);
+                        color: rgba(255, 255, 255, 0.5);
+                    }
+                    .side-nav-btn:hover {
+                        background: rgba(255, 255, 255, 0.15);
+                        color: rgba(255, 255, 255, 0.9);
+                    }
+                ` : settings.theme === 'sepia' ? `
+                    .side-nav-btn {
+                        background: rgba(92, 75, 55, 0.1);
+                        color: rgba(92, 75, 55, 0.5);
+                    }
+                    .side-nav-btn:hover {
+                        background: rgba(92, 75, 55, 0.2);
+                        color: rgba(92, 75, 55, 0.9);
+                    }
+                ` : ''}
+
                 .nav-controls {
                     height: 50px;
                     display: flex;
