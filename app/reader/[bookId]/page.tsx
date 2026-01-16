@@ -241,28 +241,15 @@ export default function ReaderPage() {
 
                 <div className="reader-content" ref={contentRef}>
                     {book.format === 'epub' ? (
-                        // Use EpubReader for local books (has fileBlob), WebPubReader for server books
-                        book.isOnServer && book.filePath && !book.fileBlob ? (
-                            <WebPubReader
-                                ref={epubReaderRef}
-                                book={book}
-                                onLocationChange={handleLocationChange}
-                                onTextSelect={handleTextSelect}
-                                onTocLoaded={handleTocLoaded}
-                                annotations={annotations}
-                                settings={readerSettings}
-                            />
-                        ) : (
-                            <EpubReader
-                                ref={epubReaderRef}
-                                book={book}
-                                onLocationChange={handleLocationChange}
-                                onTextSelect={handleTextSelect}
-                                onTocLoaded={handleTocLoaded}
-                                annotations={annotations}
-                                settings={readerSettings}
-                            />
-                        )
+                        <EpubReader
+                            ref={epubReaderRef}
+                            book={book}
+                            onLocationChange={handleLocationChange}
+                            onTextSelect={handleTextSelect}
+                            onTocLoaded={handleTocLoaded}
+                            annotations={annotations}
+                            settings={readerSettings}
+                        />
                     ) : (
                         <PdfReader
                             book={book}
@@ -271,7 +258,7 @@ export default function ReaderPage() {
                             annotations={annotations}
                             settings={readerSettings}
                             onTocLoaded={handleTocLoaded}
-                            ref={epubReaderRef as any} // Cast if refs incompatible, ideally define a union type.
+                            ref={epubReaderRef as any}
                         />
                     )}
                 </div>
