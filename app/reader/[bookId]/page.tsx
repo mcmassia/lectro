@@ -241,15 +241,29 @@ export default function ReaderPage() {
 
                 <div className="reader-content" ref={contentRef}>
                     {book.format === 'epub' ? (
-                        <EpubReader
-                            ref={epubReaderRef}
-                            book={book}
-                            onLocationChange={handleLocationChange}
-                            onTextSelect={handleTextSelect}
-                            onTocLoaded={handleTocLoaded}
-                            annotations={annotations}
-                            settings={readerSettings}
-                        />
+                        // Production: Use WebPubReader (Readium) for server books
+                        // Development: Use EpubReader for local books with fileBlob
+                        book.isOnServer && book.filePath ? (
+                            <WebPubReader
+                                ref={epubReaderRef}
+                                book={book}
+                                onLocationChange={handleLocationChange}
+                                onTextSelect={handleTextSelect}
+                                onTocLoaded={handleTocLoaded}
+                                annotations={annotations}
+                                settings={readerSettings}
+                            />
+                        ) : (
+                            <EpubReader
+                                ref={epubReaderRef}
+                                book={book}
+                                onLocationChange={handleLocationChange}
+                                onTextSelect={handleTextSelect}
+                                onTocLoaded={handleTocLoaded}
+                                annotations={annotations}
+                                settings={readerSettings}
+                            />
+                        )
                     ) : (
                         <PdfReader
                             book={book}
