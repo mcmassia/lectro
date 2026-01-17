@@ -12,6 +12,7 @@ interface LayoutWrapperProps {
 export function LayoutWrapper({ children }: LayoutWrapperProps) {
     const pathname = usePathname();
     const isReaderMode = pathname?.startsWith('/reader');
+    const isNotesMode = pathname?.startsWith('/notes');
 
     if (isReaderMode) {
         // En modo lector, el contenido ocupa todo el espacio disponible
@@ -39,6 +40,16 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
                         min-width: 0;
                     }
                 `}</style>
+            </div>
+        );
+    }
+
+    if (isNotesMode) {
+        return (
+            <div className="main-layout notes-mode h-screen overflow-hidden">
+                <main className="flex-1 w-full bg-[var(--color-bg-primary)]">
+                    {children}
+                </main>
             </div>
         );
     }

@@ -26,7 +26,11 @@ function getLibraryPath(req: NextRequest): string {
         try {
             if (fs.existsSync(CONFIG_FILE)) {
                 const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-                if (config.libraryPath) candidatePath = config.libraryPath;
+                if (config.libraryPath) {
+                    candidatePath = path.isAbsolute(config.libraryPath)
+                        ? config.libraryPath
+                        : path.resolve(process.cwd(), config.libraryPath);
+                }
             }
         } catch (e) { /* ignore */ }
     }
@@ -49,13 +53,26 @@ function getLibraryPath(req: NextRequest): string {
     }
 
     // 4. Default Fallback (if candidate missing or invalid)
-    console.warn(`Configured path "${candidatePath}" not found. Falling back to default.`);
-    const defaultPath = path.join(process.cwd(), 'library');
+    if (candidatePath) {
+        console.warn(`Configured path "${candidatePath}" not found or invalid. Falling back to default.`);
+    }
+
+    // Force relative resolve to ensure we don't try to write to system root
+    // In Next.js dev, process.cwd() is project root.
+    // If not found, create it in CWD.
+    const defaultPath = path.resolve(process.cwd(), 'library');
+    console.log(`Resolved default path: ${defaultPath} (CWD: ${process.cwd()})`);
+
     // Ensure default exists
     if (!fs.existsSync(defaultPath)) {
         try {
+            console.log(`Attempting to create directory at: ${defaultPath}`);
             fs.mkdirSync(defaultPath, { recursive: true });
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+            console.error(`Failed to create default library path at ${defaultPath}:`, e);
+            // Last ditch fallback to temp dir if project root is read-only
+            return path.join('/tmp', 'lectro_library');
+        }
     }
     return defaultPath;
 }

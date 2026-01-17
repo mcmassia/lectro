@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useAppStore, useLibraryStore } from '@/stores/appStore';
 import { Search, Moon, Sun, Bell, Plus, User, Menu } from 'lucide-react';
 
@@ -14,7 +15,7 @@ export function TopBar() {
     return (
         <header className="topbound">
             <div className="logo-section">
-                <h1 className="app-logo">Lectro</h1>
+                <Link href="/" className="app-logo">Lectro</Link>
             </div>
 
             <div className="search-section">

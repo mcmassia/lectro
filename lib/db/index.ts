@@ -62,6 +62,11 @@ export interface Annotation {
   chapterTitle?: string;
   chapterIndex?: number;
   pageNumber?: number;
+  tags?: string[];
+  isFavorite?: boolean;
+  isFlashcard?: boolean; // For spaced repetition
+  embedding?: number[]; // For semantic search
+  deletedAt?: Date; // Soft delete
   createdAt: Date;
   updatedAt: Date;
 }
@@ -222,6 +227,10 @@ export class LectroDB extends Dexie {
     this.version(7).stores({
       books: 'id, title, author, format, addedAt, lastReadAt, updatedAt, progress, status, fileName, filePath, isOnServer, isFavorite',
       tags: 'id, &name, createdAt, updatedAt',
+    });
+
+    this.version(8).stores({
+      annotations: 'id, bookId, createdAt, color, chapterIndex, *tags, isFavorite, isFlashcard',
     });
   }
 }

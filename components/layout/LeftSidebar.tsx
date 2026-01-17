@@ -97,11 +97,13 @@ export function LeftSidebar() {
                         {!isCollapsed && <span className="badge-coming-soon">Próx</span>}
                     </button>
 
-                    <button className="nav-item">
+                    <Link
+                        href="/notes"
+                        className={`nav-item ${pathname === '/notes' ? 'active' : ''}`}
+                    >
                         <NotebookPen size={20} />
                         {!isCollapsed && <span>Notas</span>}
-                        {!isCollapsed && <span className="badge-coming-soon">Próx</span>}
-                    </button>
+                    </Link>
 
                     <button
                         className={`nav-item ${pathname === '/insights' ? 'active' : ''}`}

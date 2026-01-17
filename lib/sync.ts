@@ -115,7 +115,7 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
                 const sTime = getTime(sAnn.updatedAt);
                 const lTime = getTime(lAnn.updatedAt);
                 if (sTime > lTime) {
-                    await db.annotations.update(lAnn.id, hydrateAnnotationDates(sAnn));
+                    await db.annotations.update(lAnn.id, hydrateAnnotationDates(sAnn) as any);
                     hasChanges = true;
                 }
             }
@@ -190,7 +190,20 @@ async function pushLocalData() {
         });
 
         if (!res.ok) {
-            throw new Error(`Failed to push batch ${i + 1}: ${res.statusText}`);
+            const errorText = await res.text();
+            console.error('Push batch failed. Raw Server Response:', errorText);
+
+            let errorDetails = {};
+            try {
+                errorDetails = JSON.parse(errorText);
+            } catch (e) {
+                // Response was not JSON (likely 500 HTML page)
+                // Try to extract useful info from HTML title if possible
+                const match = errorText.match(/<title>(.*?)<\/title>/);
+                errorDetails = { error: 'Server returned non-JSON response', details: match ? match[1] : errorText.slice(0, 200) };
+            }
+
+            throw new Error(`Failed to push batch ${i + 1}: ${res.statusText} - ${(errorDetails as any).details || (errorDetails as any).error || 'Unknown error'}`);
         }
     }
     console.log('Push complete.');
