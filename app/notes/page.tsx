@@ -134,7 +134,7 @@ export default function NotesPage() {
             </div>
 
             {/* Center Column: Feed */}
-            <main className="flex-1 min-w-0 overflow-y-auto bg-[var(--color-bg-primary)] custom-scrollbar py-10 px-[6%]">
+            <main className="flex-1 min-w-0 overflow-y-auto bg-[var(--color-bg-primary)] custom-scrollbar py-10 px-10">
                 <div className="space-y-10">
 
                     {/* Header */}
@@ -174,7 +174,7 @@ export default function NotesPage() {
                     </div>
 
                     {/* Feed */}
-                    <div className="space-y-12">
+                    <div className="space-y-14">
                         {filteredNotes.length > 0 ? (
                             filteredNotes.map(note => {
                                 const book = books.find(b => b.id === note.bookId);
@@ -185,6 +185,7 @@ export default function NotesPage() {
                                         bookTitle={book?.title || 'Libro desconocido'}
                                         bookCover={book?.cover}
                                         bookAuthor={book?.author}
+                                        chapterInfo={note.chapterTitle || (note.pageNumber ? `Pág. ${note.pageNumber}` : undefined)}
                                         onUpdate={handleUpdateNote}
                                         onDelete={handleDeleteNote}
                                         onNavigate={handleNavigate}
