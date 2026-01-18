@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
-import { X, Upload, FileText, Check, AlertCircle, ChevronDown } from 'lucide-react';
+import { useState, useCallback, useRef, useMemo } from 'react';
+import { X, Upload, FileText, Check, AlertCircle, Search } from 'lucide-react';
 import { Book } from '@/lib/db';
 import { parseNotesFile, importNotes, ImportedNote, ImportResult } from '@/lib/notes/import';
 
@@ -18,10 +18,12 @@ export function ImportNotesModal({ books, onClose, onImportComplete }: ImportNot
     const [isDragging, setIsDragging] = useState(false);
     const [parsedNotes, setParsedNotes] = useState<ImportedNote[]>([]);
     const [selectedBookId, setSelectedBookId] = useState<string>('');
-    const [isBookDropdownOpen, setIsBookDropdownOpen] = useState(false);
     const [importResult, setImportResult] = useState<ImportResult | null>(null);
     const [error, setError] = useState<string>('');
+    const [bookSearchQuery, setBookSearchQuery] = useState<string>('');
+    const [isBookSearchFocused, setIsBookSearchFocused] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -104,6 +106,16 @@ export function ImportNotesModal({ books, onClose, onImportComplete }: ImportNot
     }, {} as Record<string, ImportedNote[]>);
 
     const selectedBook = books.find(b => b.id === selectedBookId);
+
+    // Filter books by search query
+    const filteredBooks = useMemo(() => {
+        if (!bookSearchQuery.trim()) return books.slice(0, 20); // Show first 20 if no search
+        const query = bookSearchQuery.toLowerCase();
+        return books.filter(book =>
+            book.title.toLowerCase().includes(query) ||
+            book.author?.toLowerCase().includes(query)
+        ).slice(0, 20);
+    }, [books, bookSearchQuery]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -205,41 +217,73 @@ export function ImportNotesModal({ books, onClose, onImportComplete }: ImportNot
                                     Asociar todas las notas a un libro (opcional)
                                 </label>
                                 <div className="relative">
-                                    <button
-                                        onClick={() => setIsBookDropdownOpen(!isBookDropdownOpen)}
-                                        className="w-full flex items-center justify-between px-4 py-3 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-xl text-left hover:border-[var(--color-text-tertiary)] transition-colors"
-                                    >
-                                        <span className={selectedBook ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-tertiary)]'}>
-                                            {selectedBook ? selectedBook.title : 'Detectar automáticamente por título'}
-                                        </span>
-                                        <ChevronDown size={16} className="text-[var(--color-text-tertiary)]" />
-                                    </button>
+                                    {/* Search Input */}
+                                    <div className="relative">
+                                        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)]" />
+                                        <input
+                                            ref={searchInputRef}
+                                            type="text"
+                                            value={selectedBook ? selectedBook.title : bookSearchQuery}
+                                            onChange={(e) => {
+                                                setBookSearchQuery(e.target.value);
+                                                setSelectedBookId('');
+                                            }}
+                                            onFocus={() => setIsBookSearchFocused(true)}
+                                            placeholder="Buscar libro o detectar automáticamente..."
+                                            className="w-full pl-11 pr-4 py-3 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] rounded-xl text-[var(--color-text-primary)] placeholder:text-[var(--color-text-tertiary)] focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+                                        />
+                                        {selectedBook && (
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedBookId('');
+                                                    setBookSearchQuery('');
+                                                    searchInputRef.current?.focus();
+                                                }}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-secondary)] rounded-full transition-colors"
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        )}
+                                    </div>
 
-                                    {isBookDropdownOpen && (
+                                    {/* Results Dropdown */}
+                                    {isBookSearchFocused && !selectedBook && (
                                         <>
-                                            <div className="fixed inset-0 z-10" onClick={() => setIsBookDropdownOpen(false)} />
-                                            <div className="absolute top-full left-0 right-0 mt-2 max-h-60 overflow-y-auto bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl shadow-xl z-20">
+                                            <div className="fixed inset-0 z-10" onClick={() => setIsBookSearchFocused(false)} />
+                                            <div className="absolute top-full left-0 right-0 mt-2 max-h-64 overflow-y-auto bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl shadow-xl z-20">
                                                 <button
-                                                    onClick={() => { setSelectedBookId(''); setIsBookDropdownOpen(false); }}
-                                                    className="w-full px-4 py-3 text-left text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]"
+                                                    onClick={() => { setSelectedBookId(''); setBookSearchQuery(''); setIsBookSearchFocused(false); }}
+                                                    className="w-full px-4 py-3 text-left text-sm text-[var(--color-accent)] hover:bg-[var(--color-bg-tertiary)] border-b border-[var(--color-border)]"
                                                 >
-                                                    Detectar automáticamente
+                                                    ✨ Detectar automáticamente por título
                                                 </button>
-                                                {books.map(book => (
-                                                    <button
-                                                        key={book.id}
-                                                        onClick={() => { setSelectedBookId(book.id); setIsBookDropdownOpen(false); }}
-                                                        className="w-full px-4 py-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] flex items-center gap-3"
-                                                    >
-                                                        {book.cover && (
-                                                            <img src={book.cover} alt="" className="w-8 h-10 object-cover rounded" />
-                                                        )}
-                                                        <div className="min-w-0 flex-1">
-                                                            <p className="truncate font-medium">{book.title}</p>
-                                                            <p className="text-xs text-[var(--color-text-tertiary)] truncate">{book.author}</p>
-                                                        </div>
-                                                    </button>
-                                                ))}
+                                                {filteredBooks.length > 0 ? (
+                                                    filteredBooks.map(book => (
+                                                        <button
+                                                            key={book.id}
+                                                            onClick={() => {
+                                                                setSelectedBookId(book.id);
+                                                                setBookSearchQuery('');
+                                                                setIsBookSearchFocused(false);
+                                                            }}
+                                                            className="w-full px-4 py-3 text-left text-sm text-[var(--color-text-primary)] hover:bg-[var(--color-bg-tertiary)] flex items-center gap-3"
+                                                        >
+                                                            {book.cover ? (
+                                                                <img src={book.cover} alt="" className="w-8 h-10 object-cover rounded flex-shrink-0" />
+                                                            ) : (
+                                                                <div className="w-8 h-10 bg-[var(--color-bg-tertiary)] rounded flex-shrink-0" />
+                                                            )}
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className="truncate font-medium">{book.title}</p>
+                                                                <p className="text-xs text-[var(--color-text-tertiary)] truncate">{book.author}</p>
+                                                            </div>
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="px-4 py-6 text-center text-sm text-[var(--color-text-tertiary)]">
+                                                        No se encontraron libros
+                                                    </div>
+                                                )}
                                             </div>
                                         </>
                                     )}
