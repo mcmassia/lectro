@@ -16,8 +16,9 @@ import { NoteCard } from '@/components/notes/NoteCard';
 import { NotesSidebar } from '@/components/notes/NotesSidebar';
 import { InsightsPanel } from '@/components/notes/InsightsPanel';
 import { useRouter } from 'next/navigation';
-import { Download, Filter, ArrowUpDown } from 'lucide-react';
+import { Download, Upload, Filter, ArrowUpDown } from 'lucide-react';
 import { exportNotes } from '@/lib/notes/export';
+import { ImportNotesModal } from '@/components/notes/ImportNotesModal';
 
 export default function NotesPage() {
     const router = useRouter();
@@ -32,6 +33,7 @@ export default function NotesPage() {
     // Filters
     const [selectedBookId, setSelectedBookId] = useState<string | undefined>(undefined);
     const [isExportOpen, setIsExportOpen] = useState(false);
+    const [isImportOpen, setIsImportOpen] = useState(false);
 
     // Compute books with notes, sorted by last note date
     const booksWithNotes = useMemo(() => {
@@ -175,6 +177,14 @@ export default function NotesPage() {
                                 Ordenar
                             </button>
 
+                            <button
+                                onClick={() => setIsImportOpen(true)}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs font-medium hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+                            >
+                                <Upload size={14} />
+                                Importar
+                            </button>
+
                             <div className="relative">
                                 <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs font-medium hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text-primary)] transition-colors" onClick={() => setIsExportOpen(!isExportOpen)}>
                                     <Download size={14} />
@@ -226,6 +236,15 @@ export default function NotesPage() {
 
             {/* Right Column */}
             <InsightsPanel notes={notes} />
+
+            {/* Import Modal */}
+            {isImportOpen && (
+                <ImportNotesModal
+                    books={books}
+                    onClose={() => setIsImportOpen(false)}
+                    onImportComplete={loadData}
+                />
+            )}
         </div>
     );
 }
