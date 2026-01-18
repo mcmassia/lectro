@@ -178,6 +178,7 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
     const applyAnnotationHighlights = useCallback(() => {
         if (!iframeRef.current || !iframeRef.current.contentDocument) return;
         if (!manifest) return;
+        if (!annotations || annotations.length === 0) return;
 
         const doc = iframeRef.current.contentDocument;
         const body = doc.body;
@@ -187,18 +188,47 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
         const currentResource = manifest.readingOrder[currentResourceIndex];
         if (!currentResource) return;
 
-        // Filter annotations for the current chapter/resource
-        const currentHref = currentResource.href.split('#')[0];
+        // Extract the resource path from current href for matching
+        // Format: /api/readium/{bookId}/resource/OEBPS/Text/section.xhtml
+        const currentHref = currentResource.href;
+        const currentPathMatch = currentHref.match(/\/resource\/(.+?)(?:#|$)/);
+        const currentPath = currentPathMatch ? currentPathMatch[1] : currentHref.split('#')[0];
+
+        console.log('Current resource path:', currentPath);
+        console.log('Total annotations:', annotations.length);
+
+        // Filter annotations for the current chapter/resource with flexible matching
         const relevantAnnotations = annotations.filter(ann => {
             if (!ann.cfi) return false;
-            // Match annotations by their CFI/href containing the current resource
-            return ann.cfi.includes(currentHref) ||
-                currentHref.includes(ann.cfi.split('#')[0].replace(/.*\/resource\//, ''));
+
+            // Extract path from annotation CFI
+            const annPathMatch = ann.cfi.match(/\/resource\/(.+?)(?:#|$)/);
+            const annPath = annPathMatch ? annPathMatch[1] : ann.cfi.split('#')[0];
+
+            // Multiple matching strategies
+            const matches =
+                currentPath === annPath ||
+                currentPath.endsWith(annPath) ||
+                annPath.endsWith(currentPath) ||
+                currentHref.includes(annPath) ||
+                ann.cfi.includes(currentPath);
+
+            if (matches) {
+                console.log('Annotation matches current chapter:', ann.text?.substring(0, 30));
+            }
+
+            return matches;
         });
 
-        if (relevantAnnotations.length === 0) return;
+        console.log(`Found ${relevantAnnotations.length} relevant annotations for this chapter`);
 
-        console.log(`Applying ${relevantAnnotations.length} annotations to current chapter`);
+        if (relevantAnnotations.length === 0) {
+            // Try to apply ALL annotations if no path matching works (fallback)
+            console.log('No path matches, trying to apply all annotations...');
+        }
+
+        // Use all annotations as fallback if none match by path
+        const annotationsToApply = relevantAnnotations.length > 0 ? relevantAnnotations : annotations;
 
         // Add highlight styles if not already present
         let highlightStyle = doc.getElementById('lectro-highlight-styles');
@@ -220,12 +250,24 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
             doc.head.appendChild(highlightStyle);
         }
 
+        // Helper function to normalize text for matching
+        const normalizeText = (text: string): string => {
+            return text
+                .replace(/\s+/g, ' ')  // Normalize whitespace
+                .replace(/[\u00A0]/g, ' ')  // Replace non-breaking spaces
+                .trim();
+        };
+
         // For each annotation, try to find and highlight the text
-        relevantAnnotations.forEach(annotation => {
+        annotationsToApply.forEach(annotation => {
             const searchText = annotation.text;
             if (!searchText || searchText.length < 3) return;
 
             const color = getHighlightColor(annotation.color);
+            const normalizedSearchText = normalizeText(searchText);
+
+            // Use first 40 chars for initial search (avoid issues with very long selections)
+            const searchPrefix = normalizedSearchText.substring(0, Math.min(40, normalizedSearchText.length));
 
             // Use TreeWalker to find text nodes containing the annotation text
             const walker = doc.createTreeWalker(
@@ -234,23 +276,44 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
                 null
             );
 
+            let found = false;
             let node: Text | null;
-            while ((node = walker.nextNode() as Text | null)) {
+            while ((node = walker.nextNode() as Text | null) && !found) {
                 const nodeText = node.textContent || '';
-                const searchIndex = nodeText.indexOf(searchText.substring(0, Math.min(50, searchText.length)));
+                const normalizedNodeText = normalizeText(nodeText);
+                const searchIndex = normalizedNodeText.indexOf(searchPrefix);
 
                 if (searchIndex !== -1) {
                     // Check if this text is already highlighted
                     const parent = node.parentElement;
                     if (parent && parent.classList.contains('lectro-highlight')) {
+                        found = true;
                         continue; // Already highlighted
                     }
 
                     try {
+                        // Find the actual position in the original node text
+                        // Account for whitespace normalization
+                        let originalIndex = 0;
+                        let normalizedIndex = 0;
+                        while (normalizedIndex < searchIndex && originalIndex < nodeText.length) {
+                            if (/\s/.test(nodeText[originalIndex])) {
+                                // Skip extra whitespace in original
+                                while (originalIndex < nodeText.length - 1 && /\s/.test(nodeText[originalIndex + 1])) {
+                                    originalIndex++;
+                                }
+                            }
+                            originalIndex++;
+                            normalizedIndex++;
+                        }
+
+                        // Calculate end position
+                        const highlightLength = Math.min(searchText.length, nodeText.length - originalIndex);
+
                         // Create a range for the matched text
                         const range = doc.createRange();
-                        range.setStart(node, searchIndex);
-                        range.setEnd(node, Math.min(searchIndex + searchText.length, nodeText.length));
+                        range.setStart(node, originalIndex);
+                        range.setEnd(node, originalIndex + highlightLength);
 
                         // Create highlight span
                         const highlightSpan = doc.createElement('span');
@@ -263,13 +326,17 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
                         // Wrap the range with the highlight span
                         range.surroundContents(highlightSpan);
 
-                        console.log(`Highlighted: "${searchText.substring(0, 30)}..."`);
-                        break; // Only highlight first occurrence
+                        console.log(`✓ Highlighted: "${searchText.substring(0, 30)}..."`);
+                        found = true;
                     } catch (e) {
                         // Range might cross element boundaries, skip this one
                         console.warn('Could not highlight annotation:', e);
                     }
                 }
+            }
+
+            if (!found) {
+                console.log(`✗ Could not find text: "${searchText.substring(0, 30)}..."`);
             }
         });
     }, [annotations, manifest, currentResourceIndex]);
