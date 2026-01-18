@@ -7,6 +7,7 @@ import {
     getAllBooks,
     getAllTags,
     getAllAnnotations,
+    getAllAnnotationsIncludingDeleted,
     addBook,
     updateBook,
     addTag,
@@ -54,7 +55,7 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
         // 2. Load all local data
         const localBooks = await getAllBooks();
         const localTags = await getAllTags();
-        const localAnnotations = await getAllAnnotations();
+        const localAnnotations = await getAllAnnotationsIncludingDeleted();
         const localSessions = await db.readingSessions.toArray();
 
         // 3. Merge Books
@@ -105,19 +106,24 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
             }
         }
 
-        // 5. Merge Annotations
+        // 5. Merge Annotations (respecting soft deletes)
         for (const sAnn of (serverData.annotations || [])) {
             const lAnn = localAnnotations.find(a => a.id === sAnn.id);
             if (!lAnn) {
-                await db.annotations.put(hydrateAnnotationDates(sAnn));
-                hasChanges = true;
+                // Only add if not deleted
+                if (!sAnn.deletedAt) {
+                    await db.annotations.put(hydrateAnnotationDates(sAnn));
+                    hasChanges = true;
+                }
             } else {
                 const sTime = getTime(sAnn.updatedAt);
                 const lTime = getTime(lAnn.updatedAt);
+                // Server is newer
                 if (sTime > lTime) {
                     await db.annotations.update(lAnn.id, hydrateAnnotationDates(sAnn) as any);
                     hasChanges = true;
                 }
+                // If local is deleted but server is not, keep local deletion (local wins if same time or newer)
             }
         }
 
@@ -137,7 +143,8 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
 async function pushLocalData() {
     const books = await getAllBooks();
     const tags = await getAllTags();
-    const annotations = await getAllAnnotations();
+    // Include deleted annotations so server knows about deletions
+    const annotations = await getAllAnnotationsIncludingDeleted();
     const readingSessions = await db.readingSessions.toArray();
 
     // Prepare headers

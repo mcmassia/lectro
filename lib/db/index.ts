@@ -292,18 +292,36 @@ export async function addAnnotation(annotation: Annotation): Promise<string> {
 }
 
 export async function getAnnotationsForBook(bookId: string): Promise<Annotation[]> {
-  return db.annotations.where('bookId').equals(bookId).toArray();
+  const all = await db.annotations.where('bookId').equals(bookId).toArray();
+  // Filter out soft-deleted annotations
+  return all.filter(a => !a.deletedAt);
 }
 
 export async function updateAnnotation(id: string, updates: Partial<Annotation>): Promise<number> {
   return db.annotations.update(id, { ...updates, updatedAt: new Date() });
 }
 
+// Soft delete - marks annotation as deleted instead of removing
 export async function deleteAnnotation(id: string): Promise<void> {
+  await db.annotations.update(id, {
+    deletedAt: new Date(),
+    updatedAt: new Date()
+  });
+}
+
+// Hard delete - actually removes from database (for cleanup)
+export async function hardDeleteAnnotation(id: string): Promise<void> {
   await db.annotations.delete(id);
 }
 
 export async function getAllAnnotations(): Promise<Annotation[]> {
+  const all = await db.annotations.orderBy('createdAt').reverse().toArray();
+  // Filter out soft-deleted annotations
+  return all.filter(a => !a.deletedAt);
+}
+
+// Get all annotations including deleted ones (for sync)
+export async function getAllAnnotationsIncludingDeleted(): Promise<Annotation[]> {
   return db.annotations.orderBy('createdAt').reverse().toArray();
 }
 
