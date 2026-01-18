@@ -63,6 +63,9 @@ export function NoteCard({
                     <p className="text-xs text-[var(--color-text-tertiary)] uppercase tracking-wide">
                         {bookAuthor}{locationInfo && ` • ${locationInfo}`}
                     </p>
+                    <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                        {new Date(note.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })} • {new Date(note.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
                 </div>
 
                 {/* More Menu */}

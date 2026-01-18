@@ -1,27 +1,25 @@
 'use client';
 
-import { Book, Tag } from '@/lib/db';
-import { Search, Calendar, ChevronRight } from 'lucide-react';
+import { Book, Annotation } from '@/lib/db';
+import { Calendar } from 'lucide-react';
+
+interface BookWithNotes {
+    book: Book;
+    notesCount: number;
+    lastNoteDate: Date;
+}
 
 interface NotesSidebarProps {
-    books: Book[];
-    tags: Tag[];
+    booksWithNotes: BookWithNotes[];
     selectedBookId?: string;
-    selectedTag?: string;
     onSelectBook: (id?: string) => void;
-    onSelectTag: (tag?: string) => void;
 }
 
 export function NotesSidebar({
-    books,
-    tags,
+    booksWithNotes,
     selectedBookId,
-    selectedTag,
-    onSelectBook,
-    onSelectTag
+    onSelectBook
 }: NotesSidebarProps) {
-    // Mock recent counts/logic
-    const recentBooks = books.slice(0, 5);
 
     return (
         <aside className="w-[280px] flex flex-col border-r border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)] h-full">
@@ -32,68 +30,53 @@ export function NotesSidebar({
                 {/* Books Section */}
                 <div>
                     <div className="flex items-center justify-between px-2 mb-3">
-                        <h2 className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-tertiary)]">Libros con notas recientes</h2>
-                        <button className="text-[10px] text-[var(--color-accent)] hover:brightness-110 font-medium transition-colors">Ver todos</button>
+                        <h2 className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-tertiary)]">Libros con notas</h2>
+                        <span className="text-[10px] text-[var(--color-text-tertiary)]">{booksWithNotes.length} libros</span>
                     </div>
 
-                    <div className="space-y-6">
-                        {recentBooks.map(book => {
-                            const isSelected = selectedBookId === book.id;
-                            const notesCount = Math.floor(Math.random() * 20) + 1; // Mock Data
-                            const isNew = Math.random() > 0.5;
+                    <div className="space-y-3">
+                        {booksWithNotes.length > 0 ? (
+                            booksWithNotes.map(({ book, notesCount, lastNoteDate }) => {
+                                const isSelected = selectedBookId === book.id;
 
-                            return (
-                                <button
-                                    key={book.id}
-                                    onClick={() => onSelectBook(isSelected ? undefined : book.id)}
-                                    className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all group ${isSelected ? 'bg-[var(--color-bg-elevated)] shadow-sm' : 'hover:bg-[var(--color-bg-tertiary)]'}`}
-                                >
-                                    {/* Book Cover Placeholder */}
-                                    <div className="w-14 h-20 bg-[var(--color-bg-tertiary)] rounded-md overflow-hidden flex-shrink-0 relative shadow-md border border-[var(--color-border)] group-hover:shadow-lg transition-all">
-                                        {book.cover ? (
-                                            <img src={book.cover} className="w-full h-full object-cover" alt="" />
-                                        ) : (
-                                            <div className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--color-text-tertiary)] font-serif p-2 text-center leading-tight">
-                                                {book.title.slice(0, 10)}
+                                return (
+                                    <button
+                                        key={book.id}
+                                        onClick={() => onSelectBook(isSelected ? undefined : book.id)}
+                                        className={`w-full flex items-center gap-4 p-3 rounded-xl transition-all group ${isSelected ? 'bg-[var(--color-bg-elevated)] shadow-sm' : 'hover:bg-[var(--color-bg-tertiary)]'}`}
+                                    >
+                                        {/* Book Cover */}
+                                        <div className="w-12 h-16 bg-[var(--color-bg-tertiary)] rounded-md overflow-hidden flex-shrink-0 relative shadow-md border border-[var(--color-border)] group-hover:shadow-lg transition-all">
+                                            {book.cover ? (
+                                                <img src={book.cover} className="w-full h-full object-cover" alt="" />
+                                            ) : (
+                                                <div className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--color-text-tertiary)] font-serif p-2 text-center leading-tight">
+                                                    {book.title.slice(0, 10)}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex-1 text-left min-w-0">
+                                            <div className={`text-sm font-medium truncate ${isSelected ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-primary)]'}`}>
+                                                {book.title}
                                             </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex-1 text-left min-w-0">
-                                        <div className={`text-sm font-medium truncate ${isSelected ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-primary)]'}`}>
-                                            {book.title}
+                                            <div className="text-xs text-[var(--color-text-tertiary)] truncate mb-1">
+                                                {book.author || 'Autor desconocido'}
+                                            </div>
+                                            <div className="text-[10px] text-[var(--color-text-tertiary)]">
+                                                {notesCount} nota{notesCount !== 1 ? 's' : ''} • {lastNoteDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                            </div>
                                         </div>
-                                        <div className="text-xs text-[var(--color-text-tertiary)] truncate">
-                                            {notesCount} notas {isNew && <span className="text-[var(--color-text-secondary)] font-medium">• nuevas</span>}
-                                        </div>
-                                    </div>
 
-                                    {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)]"></div>}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Tags Section */}
-                <div>
-                    <h2 className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-tertiary)] px-2 mb-3">Mis Etiquetas</h2>
-                    <div className="flex flex-wrap gap-3">
-                        <button
-                            onClick={() => onSelectTag(undefined)}
-                            className={`text-[11px] px-3 py-1 rounded-full border transition-colors ${!selectedTag ? 'bg-[var(--color-bg-elevated)] border-[var(--color-border)] text-[var(--color-text-primary)]' : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)]'}`}
-                        >
-                            Todas
-                        </button>
-                        {tags.map(tag => (
-                            <button
-                                key={tag.id}
-                                onClick={() => onSelectTag(selectedTag === tag.name ? undefined : tag.name)}
-                                className={`text-[11px] px-3 py-1 rounded-full border transition-colors ${selectedTag === tag.name ? 'bg-[var(--color-accent-subtle)] border-[var(--color-accent)] text-[var(--color-accent)]' : 'border-[var(--color-border)] bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:border-[var(--color-text-tertiary)]'}`}
-                            >
-                                #{tag.name}
-                            </button>
-                        ))}
+                                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)]"></div>}
+                                    </button>
+                                );
+                            })
+                        ) : (
+                            <div className="text-center py-8 text-[var(--color-text-tertiary)] text-sm">
+                                No hay libros con notas
+                            </div>
+                        )}
                     </div>
                 </div>
 

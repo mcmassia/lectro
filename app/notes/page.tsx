@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     getAllAnnotations,
     getAllBooks,
@@ -31,8 +31,36 @@ export default function NotesPage() {
 
     // Filters
     const [selectedBookId, setSelectedBookId] = useState<string | undefined>(undefined);
-    const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined);
     const [isExportOpen, setIsExportOpen] = useState(false);
+
+    // Compute books with notes, sorted by last note date
+    const booksWithNotes = useMemo(() => {
+        const bookNotesMap = new Map<string, { book: Book; notesCount: number; lastNoteDate: Date }>();
+
+        notes.forEach(note => {
+            const book = books.find(b => b.id === note.bookId);
+            if (!book) return;
+
+            const existing = bookNotesMap.get(book.id);
+            const noteDate = new Date(note.createdAt);
+
+            if (existing) {
+                existing.notesCount++;
+                if (noteDate > existing.lastNoteDate) {
+                    existing.lastNoteDate = noteDate;
+                }
+            } else {
+                bookNotesMap.set(book.id, {
+                    book,
+                    notesCount: 1,
+                    lastNoteDate: noteDate
+                });
+            }
+        });
+
+        return Array.from(bookNotesMap.values())
+            .sort((a, b) => b.lastNoteDate.getTime() - a.lastNoteDate.getTime());
+    }, [notes, books]);
 
     useEffect(() => {
         loadData();
@@ -83,9 +111,6 @@ export default function NotesPage() {
         // Book Filter
         if (selectedBookId && note.bookId !== selectedBookId) return false;
 
-        // Tag Filter
-        if (selectedTag && (!note.tags || !note.tags.includes(selectedTag))) return false;
-
         // Search Query Filter
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
@@ -124,12 +149,9 @@ export default function NotesPage() {
             {/* Left Column: Navigation & Filters */}
             <div className="flex-shrink-0">
                 <NotesSidebar
-                    books={books}
-                    tags={tags}
+                    booksWithNotes={booksWithNotes}
                     selectedBookId={selectedBookId}
-                    selectedTag={selectedTag}
                     onSelectBook={setSelectedBookId}
-                    onSelectTag={setSelectedTag}
                 />
             </div>
 
