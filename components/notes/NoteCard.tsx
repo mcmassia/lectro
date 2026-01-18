@@ -42,7 +42,7 @@ export function NoteCard({
     const locationInfo = chapterInfo || (note.chapterTitle ? `Cap. ${note.chapterIndex || ''}` : (note.pageNumber ? `Pág. ${note.pageNumber}` : ''));
 
     return (
-        <div className="bg-[var(--color-bg-elevated)] border-b border-[var(--color-border)] pb-10">
+        <div className="border-b border-[var(--color-border)] pt-4">
 
             {/* Header: Book info */}
             <div className="flex items-center gap-4 p-5 pb-4">
@@ -73,7 +73,10 @@ export function NoteCard({
 
             {/* Quote Block */}
             {isQuote && (
-                <div className={`mx-5 mb-4 p-5 rounded-xl ${currentStyle.bg} border-l-4 ${currentStyle.border}`}>
+                <div
+                    className="mx-5 mb-4 p-5 rounded-xl border-l-4 border-l-yellow-500"
+                    style={{ backgroundColor: 'color-mix(in oklab, oklch(0.97 0.01 0) 30%, transparent)' }}
+                >
                     <p className="text-base leading-relaxed text-[var(--color-text-primary)] font-serif italic">
                         "{note.text}"
                     </p>

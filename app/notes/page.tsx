@@ -174,7 +174,7 @@ export default function NotesPage() {
                     </div>
 
                     {/* Feed */}
-                    <div className="space-y-14">
+                    <div>
                         {filteredNotes.length > 0 ? (
                             filteredNotes.map(note => {
                                 const book = books.find(b => b.id === note.bookId);
