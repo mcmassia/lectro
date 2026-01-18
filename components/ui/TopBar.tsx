@@ -5,7 +5,7 @@ import { useAppStore, useLibraryStore } from '@/stores/appStore';
 import { Search, Moon, Sun, Bell, Plus, User, Menu } from 'lucide-react';
 
 export function TopBar() {
-    const { theme, setTheme } = useAppStore();
+    const { theme, setTheme, setShowImportModal } = useAppStore();
     const { searchQuery, setSearchQuery } = useLibraryStore();
 
     const toggleTheme = () => {
@@ -38,7 +38,7 @@ export function TopBar() {
                 <button className="btn-icon" title="Notificaciones">
                     <Bell size={20} />
                 </button>
-                <button className="btn-primary btn-add">
+                <button className="btn-primary btn-add" onClick={() => setShowImportModal(true)}>
                     <Plus size={18} />
                     <span>Añadir</span>
                 </button>
@@ -48,6 +48,7 @@ export function TopBar() {
                     </div>
                 </div>
             </div>
+
 
             <style jsx>{`
                 .topbound {

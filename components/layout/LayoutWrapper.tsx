@@ -4,6 +4,8 @@ import { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
+import { ImportModal } from '@/components/library/ImportModal';
+import { useAppStore } from '@/stores/appStore';
 
 interface LayoutWrapperProps {
     children: ReactNode;
@@ -13,6 +15,11 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
     const pathname = usePathname();
     const isReaderMode = pathname?.startsWith('/reader');
     const isNotesMode = pathname?.startsWith('/notes');
+    const { showImportModal, setShowImportModal } = useAppStore();
+
+    const importModal = showImportModal && (
+        <ImportModal onClose={() => setShowImportModal(false)} />
+    );
 
     if (isReaderMode) {
         // En modo lector, el contenido ocupa todo el espacio disponible
@@ -21,6 +28,7 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
                 <main className="content-area">
                     {children}
                 </main>
+                {importModal}
 
                 <style jsx>{`
                     .main-layout.reader-mode {
@@ -50,6 +58,7 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
                 <main className="flex-1 w-full bg-[var(--color-bg-primary)]">
                     {children}
                 </main>
+                {importModal}
             </div>
         );
     }
@@ -62,6 +71,7 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
                 {children}
             </main>
             <RightSidebar />
+            {importModal}
         </div>
     );
 }

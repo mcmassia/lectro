@@ -57,6 +57,10 @@ interface AppState {
     // AI Settings
     aiModel: string;
     setAIModel: (model: string) => void;
+
+    // Import Modal
+    showImportModal: boolean;
+    setShowImportModal: (show: boolean) => void;
 }
 
 // ===================================
@@ -114,6 +118,10 @@ export const useAppStore = create<AppState>()(
             // AI Settings
             aiModel: 'gemini-2.5-flash',
             setAIModel: (model) => set({ aiModel: model }),
+
+            // Import Modal
+            showImportModal: false,
+            setShowImportModal: (show) => set({ showImportModal: show }),
         }),
         {
             name: 'lectro-storage',

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
-import { getAllBooks, Book, deleteBook, syncTagsFromBooks, getAllTags } from '@/lib/db';
+import { getAllBooks, Book, deleteBook, syncTagsFromBooks, getAllTags, updateBook } from '@/lib/db';
 import { BookCard } from '@/components/library/BookCard';
 import { ContinueReadingPanel } from '@/components/home/ContinueReadingPanel';
 import { ImportModal } from '@/components/library/ImportModal';
@@ -58,6 +58,7 @@ export default function Home() {
   const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(new Set());
   const [showMassTagsModal, setShowMassTagsModal] = useState(false);
   const [isGrouped, setIsGrouped] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
 
@@ -107,6 +108,29 @@ export default function Home() {
       setSelectedBookIds(new Set());
       setIsSelectionMode(false);
     } catch (e) { alert('Error mass delete'); }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedBookIds.size === filteredBooks.length) {
+      setSelectedBookIds(new Set());
+    } else {
+      setSelectedBookIds(new Set(filteredBooks.map(b => b.id)));
+    }
+  };
+
+  const handleMassStatusChange = async (newStatus: Book['status']) => {
+    if (selectedBookIds.size === 0) return;
+    try {
+      await Promise.all(
+        Array.from(selectedBookIds).map(id => updateBook(id, { status: newStatus }))
+      );
+      if (activeCategory === 'recientes' && !isFullyLoaded) await loadRecentBooks();
+      else await loadBooks();
+      setShowStatusDropdown(false);
+    } catch (e) {
+      console.error('Error updating status:', e);
+      alert('Error al cambiar estado');
+    }
   };
 
   useEffect(() => {
@@ -411,8 +435,34 @@ export default function Home() {
           <span className="label">seleccionados</span>
         </div>
         <div className="selection-actions">
-          <button className="btn-text" onClick={() => setSelectedBookIds(new Set())}>Cancelar</button>
+          <button
+            className="btn btn-secondary"
+            onClick={handleSelectAll}
+          >
+            {selectedBookIds.size === filteredBooks.length ? 'Ninguno' : 'Todos'}
+          </button>
           <div className="separator" />
+          <button className="btn-text" onClick={() => { setSelectedBookIds(new Set()); setIsSelectionMode(false); }}>Cancelar</button>
+          <div className="separator" />
+          <div className="status-dropdown-container">
+            <button
+              className="btn btn-secondary"
+              disabled={selectedBookIds.size === 0}
+              onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+            >
+              Estado ▾
+            </button>
+            {showStatusDropdown && (
+              <div className="status-dropdown">
+                <button onClick={() => handleMassStatusChange('unread')}>📚 No leído</button>
+                <button onClick={() => handleMassStatusChange('planToRead')}>📋 Para leer</button>
+                <button onClick={() => handleMassStatusChange('reading')}>📖 Leyendo</button>
+                <button onClick={() => handleMassStatusChange('completed')}>✅ Leído</button>
+                <button onClick={() => handleMassStatusChange('interesting')}>⭐ Interesante</button>
+                <button onClick={() => handleMassStatusChange('re_read')}>🔄 Releer</button>
+              </div>
+            )}
+          </div>
           <button className="btn btn-secondary" disabled={selectedBookIds.size === 0} onClick={() => setShowMassTagsModal(true)}>Etiquetas</button>
           <button className="btn btn-danger" disabled={selectedBookIds.size === 0} onClick={handleMassDelete}>Eliminar</button>
         </div>
@@ -499,6 +549,42 @@ export default function Home() {
          .btn-text:hover { color: white; }
          .separator { width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 4px; }
          .book-list { display: flex; flex-direction: column; gap: var(--space-3); }
+         .status-dropdown-container { position: relative; }
+         .status-dropdown {
+             position: absolute;
+             bottom: 100%;
+             left: 50%;
+             transform: translateX(-50%);
+             margin-bottom: 8px;
+             background: rgba(26, 27, 30, 0.98);
+             border: 1px solid rgba(255,255,255,0.15);
+             border-radius: 12px;
+             padding: 8px;
+             min-width: 160px;
+             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+             z-index: 110;
+             display: flex;
+             flex-direction: column;
+             gap: 4px;
+         }
+         .status-dropdown button {
+             background: transparent;
+             border: none;
+             color: var(--color-text-secondary);
+             padding: 10px 12px;
+             text-align: left;
+             border-radius: 8px;
+             cursor: pointer;
+             font-size: 0.875rem;
+             transition: all 0.15s ease;
+             display: flex;
+             align-items: center;
+             gap: 8px;
+         }
+         .status-dropdown button:hover {
+             background: rgba(255,255,255,0.1);
+             color: white;
+         }
        `}</style>
     </>
   );
