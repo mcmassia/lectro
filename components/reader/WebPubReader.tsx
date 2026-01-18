@@ -162,6 +162,118 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
         }
     }, [manifest, currentResourceIndex, onTextSelect]);
 
+    // Helper function to get highlight color
+    const getHighlightColor = (color: Annotation['color']): string => {
+        const colors: Record<Annotation['color'], string> = {
+            yellow: '#ffeb3b',
+            green: '#4caf50',
+            blue: '#2196f3',
+            pink: '#e91e63',
+            orange: '#ff9800',
+        };
+        return colors[color] || colors.yellow;
+    };
+
+    // Apply annotation highlights in the iframe content
+    const applyAnnotationHighlights = useCallback(() => {
+        if (!iframeRef.current || !iframeRef.current.contentDocument) return;
+        if (!manifest) return;
+
+        const doc = iframeRef.current.contentDocument;
+        const body = doc.body;
+        if (!body) return;
+
+        // Get current resource href to filter relevant annotations
+        const currentResource = manifest.readingOrder[currentResourceIndex];
+        if (!currentResource) return;
+
+        // Filter annotations for the current chapter/resource
+        const currentHref = currentResource.href.split('#')[0];
+        const relevantAnnotations = annotations.filter(ann => {
+            if (!ann.cfi) return false;
+            // Match annotations by their CFI/href containing the current resource
+            return ann.cfi.includes(currentHref) ||
+                currentHref.includes(ann.cfi.split('#')[0].replace(/.*\/resource\//, ''));
+        });
+
+        if (relevantAnnotations.length === 0) return;
+
+        console.log(`Applying ${relevantAnnotations.length} annotations to current chapter`);
+
+        // Add highlight styles if not already present
+        let highlightStyle = doc.getElementById('lectro-highlight-styles');
+        if (!highlightStyle) {
+            highlightStyle = doc.createElement('style');
+            highlightStyle.id = 'lectro-highlight-styles';
+            highlightStyle.textContent = `
+                .lectro-highlight {
+                    border-radius: 2px;
+                    padding: 0 2px;
+                    margin: 0 -2px;
+                    cursor: pointer;
+                    transition: opacity 0.2s;
+                }
+                .lectro-highlight:hover {
+                    opacity: 0.8;
+                }
+            `;
+            doc.head.appendChild(highlightStyle);
+        }
+
+        // For each annotation, try to find and highlight the text
+        relevantAnnotations.forEach(annotation => {
+            const searchText = annotation.text;
+            if (!searchText || searchText.length < 3) return;
+
+            const color = getHighlightColor(annotation.color);
+
+            // Use TreeWalker to find text nodes containing the annotation text
+            const walker = doc.createTreeWalker(
+                body,
+                NodeFilter.SHOW_TEXT,
+                null
+            );
+
+            let node: Text | null;
+            while ((node = walker.nextNode() as Text | null)) {
+                const nodeText = node.textContent || '';
+                const searchIndex = nodeText.indexOf(searchText.substring(0, Math.min(50, searchText.length)));
+
+                if (searchIndex !== -1) {
+                    // Check if this text is already highlighted
+                    const parent = node.parentElement;
+                    if (parent && parent.classList.contains('lectro-highlight')) {
+                        continue; // Already highlighted
+                    }
+
+                    try {
+                        // Create a range for the matched text
+                        const range = doc.createRange();
+                        range.setStart(node, searchIndex);
+                        range.setEnd(node, Math.min(searchIndex + searchText.length, nodeText.length));
+
+                        // Create highlight span
+                        const highlightSpan = doc.createElement('span');
+                        highlightSpan.className = 'lectro-highlight';
+                        highlightSpan.style.backgroundColor = color;
+                        highlightSpan.style.opacity = '0.3';
+                        highlightSpan.dataset.annotationId = annotation.id;
+                        highlightSpan.title = annotation.note || 'Nota';
+
+                        // Wrap the range with the highlight span
+                        range.surroundContents(highlightSpan);
+
+                        console.log(`Highlighted: "${searchText.substring(0, 30)}..."`);
+                        break; // Only highlight first occurrence
+                    } catch (e) {
+                        // Range might cross element boundaries, skip this one
+                        console.warn('Could not highlight annotation:', e);
+                    }
+                }
+            }
+        });
+    }, [annotations, manifest, currentResourceIndex]);
+
     // Inject Styles when iframe loads or settings change
     const injectStyles = useCallback(() => {
         if (!iframeRef.current || !iframeRef.current.contentDocument) return;
@@ -204,12 +316,24 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
         // Add mouseup listener for text selection
         doc.addEventListener('mouseup', handleIframeSelection);
 
-    }, [settings, handleIframeSelection]);
+        // Apply annotation highlights after styles are injected
+        setTimeout(() => {
+            applyAnnotationHighlights();
+        }, 100);
+
+    }, [settings, handleIframeSelection, applyAnnotationHighlights]);
 
     // Re-inject styles when settings change
     useEffect(() => {
         injectStyles();
     }, [injectStyles]);
+
+    // Re-apply annotation highlights when annotations change
+    useEffect(() => {
+        if (iframeRef.current?.contentDocument?.body) {
+            applyAnnotationHighlights();
+        }
+    }, [annotations, applyAnnotationHighlights]);
 
 
     // Navigation Handlers
