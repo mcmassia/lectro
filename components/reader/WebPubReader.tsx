@@ -258,84 +258,173 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
                 .trim();
         };
 
+        // Helper function to find text range across multiple nodes
+        const findTextRangeInBody = (searchText: string): Range | null => {
+            const normalizedSearch = normalizeText(searchText);
+            if (normalizedSearch.length < 3) return null;
+
+            // Get all text content from body for matching
+            const bodyText = body.innerText || body.textContent || '';
+            const normalizedBody = normalizeText(bodyText);
+
+            // Find where the search text starts in the normalized body
+            const matchIndex = normalizedBody.indexOf(normalizedSearch);
+            if (matchIndex === -1) {
+                // Try with just the beginning for partial matches
+                const shortSearch = normalizedSearch.substring(0, Math.min(50, normalizedSearch.length));
+                const partialIndex = normalizedBody.indexOf(shortSearch);
+                if (partialIndex === -1) return null;
+            }
+
+            // Use TreeWalker to map character positions to nodes
+            const walker = doc.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
+            let currentPos = 0;
+            let startNode: Text | null = null;
+            let startOffset = 0;
+            let endNode: Text | null = null;
+            let endOffset = 0;
+
+            let node: Text | null;
+            let charCount = 0;
+
+            // Find target position accounting for whitespace normalization
+            let targetStartPos = 0;
+            let foundStart = false;
+
+            // Build position mapping
+            const textNodes: { node: Text; start: number; end: number; text: string }[] = [];
+            while ((node = walker.nextNode() as Text | null)) {
+                const nodeText = node.textContent || '';
+                if (nodeText.trim()) {
+                    textNodes.push({
+                        node,
+                        start: charCount,
+                        end: charCount + nodeText.length,
+                        text: nodeText
+                    });
+                    charCount += nodeText.length;
+                }
+            }
+
+            // Search through concatenated text
+            let concatenatedText = '';
+            for (const tn of textNodes) {
+                concatenatedText += tn.text;
+            }
+
+            const normalizedConcat = normalizeText(concatenatedText);
+            const searchStart = normalizedConcat.indexOf(normalizedSearch);
+
+            if (searchStart === -1) return null;
+
+            // Map normalized position back to original position
+            // This is approximate - we find nodes that cover the range
+            let normalizedPos = 0;
+            let originalPos = 0;
+            let startOriginalPos = -1;
+            let endOriginalPos = -1;
+
+            for (let i = 0; i < concatenatedText.length && normalizedPos <= searchStart + normalizedSearch.length; i++) {
+                const char = concatenatedText[i];
+
+                if (normalizedPos === searchStart && startOriginalPos === -1) {
+                    startOriginalPos = originalPos;
+                }
+                if (normalizedPos === searchStart + normalizedSearch.length) {
+                    endOriginalPos = originalPos;
+                    break;
+                }
+
+                // Advance normalized position (skip extra whitespace)
+                if (!/\s/.test(char) || (normalizedPos === 0 || !/\s/.test(normalizeText(concatenatedText.substring(0, i)).slice(-1)))) {
+                    if (!/\s/.test(char) || !/\s/.test(concatenatedText[i - 1] || '')) {
+                        normalizedPos++;
+                    }
+                }
+                originalPos++;
+            }
+
+            if (endOriginalPos === -1) {
+                endOriginalPos = startOriginalPos + searchText.length;
+            }
+
+            // Find which text nodes contain start and end positions
+            let runningPos = 0;
+            for (const tn of textNodes) {
+                const nodeEnd = runningPos + tn.text.length;
+
+                if (!startNode && startOriginalPos >= runningPos && startOriginalPos < nodeEnd) {
+                    startNode = tn.node;
+                    startOffset = startOriginalPos - runningPos;
+                }
+                if (startNode && endOriginalPos <= nodeEnd) {
+                    endNode = tn.node;
+                    endOffset = Math.min(endOriginalPos - runningPos, tn.text.length);
+                    break;
+                }
+                if (startNode && !endNode && endOriginalPos > nodeEnd) {
+                    // End is in a later node, continue
+                }
+
+                runningPos = nodeEnd;
+            }
+
+            // If we found start but not end, use the start node's end
+            if (startNode && !endNode) {
+                endNode = startNode;
+                endOffset = Math.min(startOffset + searchText.length, (startNode.textContent || '').length);
+            }
+
+            if (!startNode || !endNode) return null;
+
+            try {
+                const range = doc.createRange();
+                range.setStart(startNode, Math.max(0, startOffset));
+                range.setEnd(endNode, Math.min(endOffset, (endNode.textContent || '').length));
+                return range;
+            } catch (e) {
+                console.warn('Could not create range:', e);
+                return null;
+            }
+        };
+
         // For each annotation, try to find and highlight the text
         annotationsToApply.forEach(annotation => {
             const searchText = annotation.text;
             if (!searchText || searchText.length < 3) return;
 
             const color = getHighlightColor(annotation.color);
-            const normalizedSearchText = normalizeText(searchText);
 
-            // Use first 40 chars for initial search (avoid issues with very long selections)
-            const searchPrefix = normalizedSearchText.substring(0, Math.min(40, normalizedSearchText.length));
-
-            // Use TreeWalker to find text nodes containing the annotation text
-            const walker = doc.createTreeWalker(
-                body,
-                NodeFilter.SHOW_TEXT,
-                null
-            );
-
-            let found = false;
-            let node: Text | null;
-            while ((node = walker.nextNode() as Text | null) && !found) {
-                const nodeText = node.textContent || '';
-                const normalizedNodeText = normalizeText(nodeText);
-                const searchIndex = normalizedNodeText.indexOf(searchPrefix);
-
-                if (searchIndex !== -1) {
-                    // Check if this text is already highlighted
-                    const parent = node.parentElement;
-                    if (parent && parent.classList.contains('lectro-highlight')) {
-                        found = true;
-                        continue; // Already highlighted
-                    }
-
-                    try {
-                        // Find the actual position in the original node text
-                        // Account for whitespace normalization
-                        let originalIndex = 0;
-                        let normalizedIndex = 0;
-                        while (normalizedIndex < searchIndex && originalIndex < nodeText.length) {
-                            if (/\s/.test(nodeText[originalIndex])) {
-                                // Skip extra whitespace in original
-                                while (originalIndex < nodeText.length - 1 && /\s/.test(nodeText[originalIndex + 1])) {
-                                    originalIndex++;
-                                }
-                            }
-                            originalIndex++;
-                            normalizedIndex++;
-                        }
-
-                        // Calculate end position
-                        const highlightLength = Math.min(searchText.length, nodeText.length - originalIndex);
-
-                        // Create a range for the matched text
-                        const range = doc.createRange();
-                        range.setStart(node, originalIndex);
-                        range.setEnd(node, originalIndex + highlightLength);
-
-                        // Create highlight span
-                        const highlightSpan = doc.createElement('span');
-                        highlightSpan.className = 'lectro-highlight';
-                        highlightSpan.style.backgroundColor = color;
-                        highlightSpan.style.opacity = '0.3';
-                        highlightSpan.dataset.annotationId = annotation.id;
-                        highlightSpan.title = annotation.note || 'Nota';
-
-                        // Wrap the range with the highlight span
-                        range.surroundContents(highlightSpan);
-
-                        console.log(`✓ Highlighted: "${searchText.substring(0, 30)}..."`);
-                        found = true;
-                    } catch (e) {
-                        // Range might cross element boundaries, skip this one
-                        console.warn('Could not highlight annotation:', e);
-                    }
-                }
+            // Check if already highlighted
+            const existingHighlight = doc.querySelector(`[data-annotation-id="${annotation.id}"]`);
+            if (existingHighlight) {
+                console.log(`Already highlighted: "${searchText.substring(0, 30)}..."`);
+                return;
             }
 
-            if (!found) {
+            // Try to find the text range
+            const range = findTextRangeInBody(searchText);
+
+            if (range) {
+                try {
+                    // Create highlight span that wraps the range content
+                    const highlightSpan = doc.createElement('span');
+                    highlightSpan.className = 'lectro-highlight';
+                    highlightSpan.style.backgroundColor = color;
+                    highlightSpan.style.opacity = '0.3';
+                    highlightSpan.dataset.annotationId = annotation.id;
+                    highlightSpan.title = annotation.note || 'Nota';
+
+                    // Extract and wrap the contents
+                    const contents = range.extractContents();
+                    highlightSpan.appendChild(contents);
+                    range.insertNode(highlightSpan);
+
+                    console.log(`✓ Highlighted: "${searchText.substring(0, 30)}..."`);
+                } catch (e) {
+                    console.warn('Could not highlight annotation (may span complex elements):', e);
+                }
+            } else {
                 console.log(`✗ Could not find text: "${searchText.substring(0, 30)}..."`);
             }
         });
