@@ -67,6 +67,7 @@ export interface BookMetadata {
   seriesIndex?: number;
   tags?: string[];
   categories?: BookCategory[];     // Etiquetas temáticas (puede tener múltiples)
+  manualCategories?: BookCategory[]; // Etiquetas asignadas manualmente por usuario
   userRating?: UserBookRating;   // Valoración personal del usuario
 }
 

@@ -3,7 +3,7 @@ import { useLibraryStore } from '@/stores/appStore';
 import {
     Search, Filter, TrendingUp, BookOpen, BarChart3
 } from 'lucide-react';
-import { BookCategory } from '@/lib/db';
+import { BookCategory, db } from '@/lib/db';
 
 // Definición de categorías (Duplicada de BookDetailsModal para consistencia visual)
 const CATEGORIES: { id: BookCategory; icon: string; label: string; desc: string }[] = [
@@ -23,6 +23,37 @@ export default function TagManagerView() {
     const { books } = useLibraryStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [viewFilter, setViewFilter] = useState<'all' | 'active' | 'unused'>('all');
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const handleClearCategories = async () => {
+        if (!confirm('¿Estás seguro de que quieres RESTABLECER las categorías Automáticas?\n\nLas categorías que añadiste manualmente NO se borrarán.')) return;
+
+        setIsProcessing(true);
+        try {
+            const allBooks = await db.books.toArray();
+            await db.transaction('rw', db.books, async () => {
+                for (const book of allBooks) {
+                    if (book.metadata?.categories?.length || (book.metadata as any)?.category) {
+                        // Reset to manual only (preserving manual tags)
+                        const manualCats = book.metadata.manualCategories || [];
+                        const newMeta = {
+                            ...book.metadata,
+                            categories: manualCats,
+                            category: undefined
+                        };
+                        await db.books.update(book.id, { metadata: newMeta });
+                    }
+                }
+            });
+            await useLibraryStore.getState().loadBooks();
+            alert('Todas las categorías han sido eliminadas.');
+        } catch (e) {
+            console.error(e);
+            alert('Error al limpiar categorías.');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
     // Stats Calculation
     const stats = useMemo(() => {
@@ -88,6 +119,14 @@ export default function TagManagerView() {
                     <p className="page-subtitle">Visualiza la distribución temática de tu biblioteca.</p>
                 </div>
                 <div className="header-actions">
+                    <button
+                        className="filter-btn"
+                        onClick={handleClearCategories}
+                        disabled={isProcessing}
+                        style={{ color: '#ef4444', borderColor: '#ef4444' }}
+                    >
+                        {isProcessing ? 'Limpiando...' : 'Limpiar Categorías'}
+                    </button>
                     <div className="search-bar">
                         <Search size={18} className="search-icon" />
                         <input

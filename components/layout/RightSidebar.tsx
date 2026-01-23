@@ -18,10 +18,12 @@ export function RightSidebar() {
 
     if (pathname?.startsWith('/reader')) return null;
 
+    const uniqueCategories = new Set(books.flatMap(b => b.metadata?.categories || []));
+
     const stats = {
         books: books.length,
         authors: new Set(books.map(b => b.author)).size,
-        tags: tags.length
+        tags: uniqueCategories.size
     };
 
     // Mock data for X-Ray

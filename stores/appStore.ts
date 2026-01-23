@@ -153,7 +153,7 @@ interface LibraryState {
     isFullyLoaded: boolean;
     searchQuery: string;
     sortBy: 'title' | 'author' | 'lastRead' | 'addedDate' | 'progress' | 'fileSize' | 'relevance';
-    activeCategory: 'all' | 'recientes' | 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read' | 'favorites' | 'authors';
+    activeCategory: 'all' | 'recientes' | 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read' | 'favorites' | 'authors' | 'no-metadata' | 'no-cover';
     activeFormat: 'all' | 'epub' | 'pdf';
     activeTag: string | null;
     activeThematicCategory: BookCategory | null;  // Filtro por categoría temática

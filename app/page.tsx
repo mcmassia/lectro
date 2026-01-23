@@ -183,6 +183,15 @@ export default function Home() {
       booksToFilter = [...booksToFilter].sort((a, b) => (new Date(b.updatedAt || b.addedAt || 0).getTime() - new Date(a.updatedAt || a.addedAt || 0).getTime()));
       booksToFilter = booksToFilter.slice(0, 12);
     }
+    else if (activeCategory === 'no-metadata') {
+      booksToFilter = booksToFilter.filter(book =>
+        !book.author || book.author === 'Unknown Author' ||
+        !book.metadata?.description || book.metadata.description.length < 10
+      );
+    }
+    else if (activeCategory === 'no-cover') {
+      booksToFilter = booksToFilter.filter(book => !book.cover);
+    }
 
     if (searchQuery) {
       const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
@@ -270,22 +279,7 @@ export default function Home() {
                 Reciente
               </button>
 
-              <span style={{ color: '#4b5563' }}>|</span>
 
-              <button
-                onClick={() => { setActiveCategory('favorites'); setIsGrouped(false); }}
-                style={{
-                  color: activeCategory === 'favorites' ? '#0a84ff' : '#6b7280',
-                  fontWeight: activeCategory === 'favorites' ? 700 : 500,
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  padding: '4px 8px'
-                }}
-              >
-                Favoritos
-              </button>
 
               <span style={{ color: '#4b5563' }}>|</span>
 

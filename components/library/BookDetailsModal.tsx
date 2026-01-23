@@ -414,12 +414,29 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                             key={cat.id}
                                             className={`category-chip ${isActive ? 'active' : ''}`}
                                             onClick={async () => {
-                                                // Toggle: añadir o quitar de la lista
-                                                const currentCategories = book.metadata?.categories || [];
-                                                const newCategories = isActive
-                                                    ? currentCategories.filter(c => c !== cat.id)
-                                                    : [...currentCategories, cat.id];
-                                                const newMetadata = { ...book.metadata, categories: newCategories };
+                                                // Toggle logic respecting manual categories
+                                                const currentCategories = new Set(book.metadata?.categories || []);
+                                                const currentManual = new Set(book.metadata?.manualCategories || []);
+
+                                                if (isActive) {
+                                                    // Removing: remove from both lists
+                                                    currentCategories.delete(cat.id);
+                                                    currentManual.delete(cat.id);
+                                                } else {
+                                                    // Adding: add to both lists (explicit user action = manual)
+                                                    currentCategories.add(cat.id);
+                                                    currentManual.add(cat.id);
+                                                }
+
+                                                const newCategories = Array.from(currentCategories);
+                                                const newManual = Array.from(currentManual);
+
+                                                const newMetadata = {
+                                                    ...book.metadata,
+                                                    categories: newCategories,
+                                                    manualCategories: newManual
+                                                };
+
                                                 setBook({ ...book, metadata: newMetadata });
                                                 try {
                                                     await updateBook(book.id, { metadata: newMetadata });
@@ -1466,6 +1483,6 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     font-weight: 500;
                 }
       `}</style>
-        </div>
+        </div >
     );
 }

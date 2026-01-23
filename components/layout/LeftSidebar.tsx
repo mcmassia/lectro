@@ -17,7 +17,17 @@ import {
     Clock,
     CheckCircle,
     FileText,
-    Book
+    Book,
+    Star,
+    Heart,
+    Bookmark,
+    AlertCircle,
+    ImageOff,
+    ShieldAlert,
+    Award,
+    Repeat,
+    ThumbsUp,
+    Trash2
 } from 'lucide-react';
 
 export function LeftSidebar() {
@@ -26,6 +36,7 @@ export function LeftSidebar() {
         activeCategory, setActiveCategory,
         activeFormat, setActiveFormat,
         activeTag, setActiveTag,
+        activeUserRating, setActiveUserRating,
         setView,
         setTags
     } = useLibraryStore();
@@ -122,11 +133,51 @@ export function LeftSidebar() {
                    "Colecciones" can remain for custom lists later or Favoritos.
                 */}
                 <div className="nav-section">
-                    {!isCollapsed && <h3 className="section-title">Colecciones</h3>}
-                    <button className={`nav-item ${activeCategory === 'favorites' ? 'active-subtle' : ''}`} onClick={() => setActiveCategory('favorites')}>
-                        <Folders size={20} />
-                        {!isCollapsed && <span>Favoritos</span>}
-                        {!isCollapsed && <span className="count">{books.filter(b => b.isFavorite).length}</span>}
+                    {!isCollapsed && <h3 className="section-title">Valoraciones</h3>}
+                    <button className={`nav-item ${activeUserRating === 'imprescindible' ? 'active-subtle' : ''}`} onClick={() => { setActiveUserRating('imprescindible'); setActiveCategory('all'); }}>
+                        <Award size={18} color="#A855F7" />
+                        {!isCollapsed && <span>Imprescindible</span>}
+                        {!isCollapsed && <span className="count">{books.filter(b => b.metadata?.userRating === 'imprescindible').length}</span>}
+                    </button>
+                    <button className={`nav-item ${activeUserRating === 'favorito' ? 'active-subtle' : ''}`} onClick={() => { setActiveUserRating('favorito'); setActiveCategory('all'); }}>
+                        <Heart size={18} color="#EF4444" />
+                        {!isCollapsed && <span>Favorito</span>}
+                        {!isCollapsed && <span className="count">{books.filter(b => b.metadata?.userRating === 'favorito').length}</span>}
+                    </button>
+                    <button className={`nav-item ${activeUserRating === 'referencia' ? 'active-subtle' : ''}`} onClick={() => { setActiveUserRating('referencia'); setActiveCategory('all'); }}>
+                        <Star size={18} color="#F59E0B" />
+                        {!isCollapsed && <span>Referencia</span>}
+                        {!isCollapsed && <span className="count">{books.filter(b => b.metadata?.userRating === 'referencia').length}</span>}
+                    </button>
+                    <button className={`nav-item ${activeUserRating === 'releer' ? 'active-subtle' : ''}`} onClick={() => { setActiveUserRating('releer'); setActiveCategory('all'); }}>
+                        <Repeat size={18} color="#10B981" />
+                        {!isCollapsed && <span>Releer</span>}
+                        {!isCollapsed && <span className="count">{books.filter(b => b.metadata?.userRating === 'releer').length}</span>}
+                    </button>
+                    <button className={`nav-item ${activeUserRating === 'correcto' ? 'active-subtle' : ''}`} onClick={() => { setActiveUserRating('correcto'); setActiveCategory('all'); }}>
+                        <ThumbsUp size={18} color="#3B82F6" />
+                        {!isCollapsed && <span>Correcto</span>}
+                        {!isCollapsed && <span className="count">{books.filter(b => b.metadata?.userRating === 'correcto').length}</span>}
+                    </button>
+                    <button className={`nav-item ${activeUserRating === 'prescindible' ? 'active-subtle' : ''}`} onClick={() => { setActiveUserRating('prescindible'); setActiveCategory('all'); }}>
+                        <Trash2 size={18} color="#6B7280" />
+                        {!isCollapsed && <span>Prescindible</span>}
+                        {!isCollapsed && <span className="count">{books.filter(b => b.metadata?.userRating === 'prescindible').length}</span>}
+                    </button>
+                </div>
+
+                {/* Mantenimiento */}
+                <div className="nav-section">
+                    {!isCollapsed && <h3 className="section-title">Mantenimiento</h3>}
+                    <button className={`nav-item ${activeCategory === 'no-metadata' ? 'active-subtle' : ''}`} onClick={() => { setActiveCategory('no-metadata' as any); setActiveUserRating(null); }}>
+                        <ShieldAlert size={18} color="#F59E0B" />
+                        {!isCollapsed && <span>Sin Metadatos</span>}
+                        {!isCollapsed && <span className="count">{books.filter(b => !b.author || b.author === 'Unknown Author' || !b.metadata?.description).length}</span>}
+                    </button>
+                    <button className={`nav-item ${activeCategory === 'no-cover' ? 'active-subtle' : ''}`} onClick={() => { setActiveCategory('no-cover' as any); setActiveUserRating(null); }}>
+                        <ImageOff size={18} color="#EF4444" />
+                        {!isCollapsed && <span>Sin Portada</span>}
+                        {!isCollapsed && <span className="count">{books.filter(b => !b.cover).length}</span>}
                     </button>
                 </div>
 

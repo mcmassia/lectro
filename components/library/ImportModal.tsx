@@ -336,9 +336,13 @@ export function ImportModal({ onClose }: ImportModalProps) {
 
             const books = await getAllBooks();
             // Filter books without categories or with empty categories
-            const booksToClassify = books.filter(b =>
-                !b.metadata?.categories || b.metadata.categories.length === 0
-            );
+            const booksToClassify = books.filter(b => {
+                const cats = b.metadata?.categories || [];
+                const manuals = b.metadata?.manualCategories || [];
+                // Process if NO automatic tags exist (all current tags are manual, or no tags)
+                const hasAuto = cats.some(c => !manuals.includes(c));
+                return !hasAuto;
+            });
 
             if (booksToClassify.length === 0) {
                 alert('Todos los libros ya tienen etiquetas asignadas.');
@@ -359,8 +363,12 @@ export function ImportModal({ onClose }: ImportModalProps) {
                     );
 
                     if (result.categories.length > 0) {
+                        // Merge with manual categories
+                        const manualCats = book.metadata?.manualCategories || [];
+                        const newCategories = Array.from(new Set([...manualCats, ...result.categories]));
+
                         await dbUpdateBook(book.id, {
-                            metadata: { ...book.metadata, categories: result.categories }
+                            metadata: { ...book.metadata, categories: newCategories }
                         });
                         classified++;
                     } else {

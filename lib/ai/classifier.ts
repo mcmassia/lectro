@@ -40,6 +40,17 @@ const KEYWORD_MAP: Record<string, BookCategory> = {
     'dystopian': 'Narrativa',
     'distopía': 'Narrativa',
     'literary fiction': 'Narrativa',
+    'literature': 'Narrativa',
+    'literatura': 'Narrativa',
+    'story': 'Narrativa',
+    'stories': 'Narrativa',
+    'relato': 'Narrativa',
+    'cuento': 'Narrativa',
+    'cuentos': 'Narrativa',
+    'comic': 'Narrativa',
+    'manga': 'Narrativa',
+    'novels': 'Narrativa',
+    'general fiction': 'Narrativa',
 
     // Poesía y Drama
     'poetry': 'PoesíaDrama',
