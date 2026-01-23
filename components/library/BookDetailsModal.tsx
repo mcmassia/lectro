@@ -58,6 +58,66 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
     const router = useRouter();
     const modalRef = useRef<HTMLDivElement>(null);
 
+    // Focus modal on mount for accessibility and keyboard events
+    useEffect(() => {
+        if (modalRef.current) {
+            modalRef.current.focus();
+        }
+    }, []);
+
+    // Global Paste Handler
+    useEffect(() => {
+        const handleGlobalPaste = async (e: ClipboardEvent) => {
+            // Ignore if focus is inside an input or textarea
+            const target = e.target as HTMLElement;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+                return;
+            }
+
+            const items = e.clipboardData?.items;
+            if (!items) return;
+
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    if (blob) {
+                        const reader = new FileReader();
+                        reader.onload = async (event) => {
+                            const base64 = event.target?.result as string;
+                            if (base64) {
+                                // Update local state immediately for feedback
+                                setBook(prev => ({ ...prev, cover: base64 }));
+                                setIsEditing(true); // Switch to edit mode to allow saving
+
+                                // Optional: Auto-save or wait for user?
+                                // Let's auto-save the cover to DB but keep "editing" state for consistency if they want to change others
+                                // actually, previous behavior was immediate save. Let's keep immediate save for cover paste to match expectation of "just works"
+                                // BUT the code I'm replacing had immediate save. The issue was focus. 
+                                // Let's do immediate save for UX but also update IsEditing so they see it's "live".
+
+                                try {
+                                    await updateBook(book.id, { cover: base64 });
+                                    updateBookInStore(book.id, { cover: base64 });
+                                } catch (err) {
+                                    console.error('Failed to auto-save pasted cover:', err);
+                                    alert('Failed to save cover image.');
+                                }
+                            }
+                        };
+                        reader.readAsDataURL(blob);
+                    }
+                    // Prevent default to avoid double-pasting if focus happens to be in a weird spot
+                    e.preventDefault();
+                }
+            }
+        };
+
+        // We use document instead of window for better compatibility in some contexts, though window is fine too.
+        document.addEventListener('paste', handleGlobalPaste);
+        return () => document.removeEventListener('paste', handleGlobalPaste);
+    }, [book.id, updateBookInStore]); // Dependencies
+
+
     // Close on click outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -171,26 +231,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
         setShowCoverSelector(false);
     };
 
-    const handlePaste = async (e: React.ClipboardEvent) => {
-        const items = e.clipboardData.items;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].type.indexOf('image') !== -1) {
-                const blob = items[i].getAsFile();
-                if (blob) {
-                    const reader = new FileReader();
-                    reader.onload = async (event) => {
-                        const base64 = event.target?.result as string;
-                        if (base64) {
-                            await updateBook(book.id, { cover: base64 });
-                            updateBookInStore(book.id, { cover: base64 });
-                            setBook({ ...book, cover: base64 });
-                        }
-                    };
-                    reader.readAsDataURL(blob);
-                }
-            }
-        }
-    };
+    // Old handlePaste removed in favor of global listener
 
     const handleRead = () => {
         router.push(`/reader/${book.id}`);
@@ -233,7 +274,12 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
 
     return (
         <div className="modal-overlay open">
-            <div className="modal-container" ref={modalRef}>
+            <div
+                className="modal-container"
+                ref={modalRef}
+                tabIndex={-1} // Make it focusable programmatically
+                style={{ outline: 'none' }} // Remove focus ring
+            >
                 <button className="close-btn" onClick={onClose}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="24" height="24">
                         <line x1="18" y1="6" x2="6" y2="18" />
@@ -244,9 +290,8 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                 <div className="modal-content">
                     <div
                         className="cover-section"
-                        onPaste={handlePaste}
-                        tabIndex={0}
-                        title="Paste image to update cover"
+                        // onPaste removed - using global listener
+                        title="Paste image (Ctrl+V) anywhere in modal"
                     >
                         <div className="book-cover-wrapper">
                             {book.cover ? (
@@ -527,12 +572,23 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                     // Save changes
                                     console.log('Saving book changes...', book);
                                     try {
+                                        // Robust save: ensure metadata structure is valid
+                                        const cleanMetadata = {
+                                            ...(book.metadata || {}),
+                                            // Ensure critical fields are not undefined/null if that causes issues
+                                            description: book.metadata?.description || '',
+                                            publisher: book.metadata?.publisher || '',
+                                            publishedDate: book.metadata?.publishedDate || '',
+                                            language: book.metadata?.language || '',
+                                            tags: book.metadata?.tags || [],
+                                            categories: book.metadata?.categories || [],
+                                        };
+
                                         await updateBook(book.id, {
-                                            title: book.title,
-                                            author: book.author,
-                                            // Explicitly include cover update if present in book state
-                                            cover: book.cover,
-                                            metadata: book.metadata
+                                            title: book.title || 'Untitled',
+                                            author: book.author || 'Unknown Author',
+                                            cover: book.cover, // Explicitly include cover
+                                            metadata: cleanMetadata
                                         });
                                         console.log('DB update successful');
 
@@ -540,13 +596,17 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                             title: book.title,
                                             author: book.author,
                                             cover: book.cover,
-                                            metadata: book.metadata
+                                            metadata: cleanMetadata
                                         });
                                         console.log('Store update successful');
-                                        alert('Metadata saved successfully!'); // Feedback for user
+
+                                        // Optional: Visual feedback beyond alert?
+                                        // For now alert is fine, maybe a toast in future
                                     } catch (err) {
                                         console.error('Failed to save book:', err);
                                         alert('Failed to save changes: ' + (err as Error).message);
+                                        // Do NOT exit edit mode if save failed
+                                        return;
                                     }
                                 }
                                 setIsEditing(!isEditing);
