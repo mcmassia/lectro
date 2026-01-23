@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Book, updateBook, getAllTags, Tag } from '@/lib/db';
+import { Book, updateBook, getAllTags, Tag, BookCategory, UserBookRating } from '@/lib/db';
 import { useLibraryStore } from '@/stores/appStore';
 import { useRouter } from 'next/navigation';
 import { searchGoogleBooks, searchMetadata, findCovers, MetadataResult } from '@/lib/metadata';
@@ -11,6 +11,31 @@ interface BookDetailsModalProps {
     book: Book;
     onClose: () => void;
 }
+
+// Categorías temáticas con iconos
+const CATEGORIES: { id: BookCategory; icon: string; label: string }[] = [
+    { id: 'Pensamiento', icon: '🧠', label: 'Pensamiento' },
+    { id: 'Espiritualidad', icon: '✨', label: 'Espiritualidad' },
+    { id: 'Sociedad', icon: '🌍', label: 'Sociedad' },
+    { id: 'Ciencia', icon: '🔬', label: 'Ciencia' },
+    { id: 'Tecnología', icon: '💻', label: 'Tecnología' },
+    { id: 'Narrativa', icon: '📖', label: 'Narrativa' },
+    { id: 'PoesíaDrama', icon: '🎭', label: 'Poesía/Drama' },
+    { id: 'ArteCultura', icon: '🎨', label: 'Arte/Cultura' },
+    { id: 'Crecimiento', icon: '🌱', label: 'Crecimiento' },
+    { id: 'Práctica', icon: '🔧', label: 'Práctica' },
+];
+
+// Valoraciones personales del usuario
+const USER_RATINGS: { id: UserBookRating; icon: string; label: string; desc: string }[] = [
+    { id: 'imprescindible', icon: '💎', label: 'Imprescindible', desc: 'Cambió tu forma de pensar' },
+    { id: 'favorito', icon: '❤️', label: 'Favorito', desc: 'Placer estético/emocional alto' },
+    { id: 'referencia', icon: '⭐', label: 'Referencia', desc: 'Consulta recurrente' },
+    { id: 'releer', icon: '⏳', label: 'Releer', desc: 'Requiere múltiples lecturas' },
+    { id: 'correcto', icon: '♻️', label: 'Correcto', desc: 'Decente pero no memorable' },
+    { id: 'prescindible', icon: '🚮', label: 'Prescindible', desc: 'Sin valor real futuro' },
+];
+
 
 export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModalProps) {
     const [book, setBook] = useState<Book>(initialBook);
@@ -371,91 +396,74 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                             </div>
                         </div>
 
-                        <div className="tags-section">
-                            <h3 className="section-label">Tags</h3>
-                            {isEditing ? (
-                                <div className="tags-edit-container">
-                                    <div className="current-tags-edit">
-                                        {book.metadata?.tags?.map((tag, i) => (
-                                            <span key={i} className="tag-chip-edit">
-                                                {tag}
-                                                <button
-                                                    onClick={() => {
-                                                        const newTags = book.metadata?.tags?.filter(t => t !== tag) || [];
-                                                        setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
-                                                    }}
-                                                    className="tag-remove-btn"
-                                                >×</button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="tag-input-wrapper">
-                                        <input
-                                            className="edit-input-sm"
-                                            value={tagInput}
-                                            onChange={(e) => setTagInput(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    e.preventDefault();
-                                                    const val = tagInput.trim();
-                                                    if (val && !book.metadata?.tags?.includes(val)) {
-                                                        const newTags = [...(book.metadata?.tags || []), val];
-                                                        setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
-                                                        setTagInput('');
-                                                    }
-                                                }
-                                            }}
-                                            placeholder="Add tag..."
-                                            list="available-tags"
-                                        />
-                                        <datalist id="available-tags">
-                                            {availableTags.map(t => (
-                                                <option key={t.id} value={t.name} />
-                                            ))}
-                                        </datalist>
+                        {/* Etiquetas (Categorías Temáticas) */}
+                        <div className="category-section">
+                            <h3 className="section-label">
+                                Etiquetas
+                                {(!book.metadata?.categories || book.metadata.categories.length === 0) && (
+                                    <span className="category-warning" title="Sin etiquetas asignadas">
+                                        ⚠️
+                                    </span>
+                                )}
+                            </h3>
+                            <div className="category-selector">
+                                {CATEGORIES.map(cat => {
+                                    const isActive = book.metadata?.categories?.includes(cat.id) || false;
+                                    return (
                                         <button
-                                            className="btn-xs btn-primary ml-2"
-                                            onClick={() => {
-                                                const val = tagInput.trim();
-                                                if (val && !book.metadata?.tags?.includes(val)) {
-                                                    const newTags = [...(book.metadata?.tags || []), val];
-                                                    setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
-                                                    setTagInput('');
+                                            key={cat.id}
+                                            className={`category-chip ${isActive ? 'active' : ''}`}
+                                            onClick={async () => {
+                                                // Toggle: añadir o quitar de la lista
+                                                const currentCategories = book.metadata?.categories || [];
+                                                const newCategories = isActive
+                                                    ? currentCategories.filter(c => c !== cat.id)
+                                                    : [...currentCategories, cat.id];
+                                                const newMetadata = { ...book.metadata, categories: newCategories };
+                                                setBook({ ...book, metadata: newMetadata });
+                                                try {
+                                                    await updateBook(book.id, { metadata: newMetadata });
+                                                    updateBookInStore(book.id, { metadata: newMetadata });
+                                                } catch (e) {
+                                                    console.error('Failed to update categories:', e);
                                                 }
                                             }}
                                         >
-                                            Add
+                                            <span className="cat-icon">{cat.icon}</span>
+                                            <span className="cat-label">{cat.label}</span>
                                         </button>
-                                    </div>
-                                    {/* Quick Suggestions */}
-                                    <div className="quick-tags">
-                                        {availableTags
-                                            .filter(t => !book.metadata?.tags?.includes(t.name))
-                                            .slice(0, 10) // Show top 10 unused
-                                            .map(t => (
-                                                <button
-                                                    key={t.id}
-                                                    className="tag-suggestion"
-                                                    onClick={() => {
-                                                        const newTags = [...(book.metadata?.tags || []), t.name];
-                                                        setBook({ ...book, metadata: { ...book.metadata, tags: newTags } });
-                                                    }}
-                                                >
-                                                    + {t.name}
-                                                </button>
-                                            ))
-                                        }
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="tags-list">
-                                    {book.metadata?.tags?.map((tag, i) => (
-                                        <span key={i} className={`tag ${tag.toLowerCase()}`}>{tag}</span>
-                                    )) || (
-                                            <span className="no-tags">-</span>
-                                        )}
-                                </div>
-                            )}
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Valoración Personal */}
+                        <div className="rating-section">
+                            <h3 className="section-label">Tu Valoración</h3>
+                            <div className="rating-selector">
+                                {USER_RATINGS.map(rating => (
+                                    <button
+                                        key={rating.id}
+                                        className={`rating-chip ${book.metadata?.userRating === rating.id ? 'active' : ''}`}
+                                        onClick={async () => {
+                                            // Toggle: si ya está seleccionado, deseleccionar
+                                            const newRating = book.metadata?.userRating === rating.id ? undefined : rating.id;
+                                            const newMetadata = { ...book.metadata, userRating: newRating };
+                                            setBook({ ...book, metadata: newMetadata });
+                                            try {
+                                                await updateBook(book.id, { metadata: newMetadata });
+                                                updateBookInStore(book.id, { metadata: newMetadata });
+                                            } catch (e) {
+                                                console.error('Failed to update rating:', e);
+                                            }
+                                        }}
+                                        title={rating.desc}
+                                    >
+                                        <span className="rating-icon">{rating.icon}</span>
+                                        <span className="rating-label">{rating.label}</span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -477,15 +485,6 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     </div>
 
                     <div className="footer-actions">
-                        <button
-                            className={`btn-icon ${book.isFavorite ? 'active-fav' : ''}`}
-                            onClick={toggleFavorite}
-                            title="Toggle Favorite"
-                        >
-                            <svg viewBox="0 0 24 24" fill={book.isFavorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" width="20" height="20">
-                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                            </svg>
-                        </button>
                         <button
                             className="btn-icon"
                             onClick={handleSearchMetadata}
@@ -1319,6 +1318,152 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     text-align: center;
                     color: rgba(255,255,255,0.5);
                     padding: var(--space-8);
+                }
+
+                /* Category Section Styles */
+                .category-section {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--space-3);
+                    margin-top: var(--space-4);
+                }
+
+                .category-section .section-label {
+                    display: flex;
+                    align-items: center;
+                    gap: var(--space-2);
+                }
+
+                .category-warning {
+                    font-size: var(--text-sm);
+                    cursor: help;
+                }
+
+                .category-selector {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 6px;
+                }
+
+                .category-chip {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    padding: 4px 10px;
+                    border-radius: 99px;
+                    background: rgba(255,255,255,0.08);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    color: rgba(255,255,255,0.7);
+                    font-size: 11px;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }
+
+                .category-chip:hover {
+                    background: rgba(255,255,255,0.12);
+                    border-color: rgba(255,255,255,0.2);
+                    color: white;
+                }
+
+                .category-chip.active {
+                    background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(168, 85, 247, 0.3));
+                    border-color: rgba(139, 92, 246, 0.5);
+                    color: white;
+                    box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+                }
+
+                .cat-icon {
+                    font-size: 12px;
+                }
+
+                .cat-label {
+                    font-weight: 500;
+                }
+
+                /* Rating Section Styles */
+                .rating-section {
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--space-3);
+                    margin-top: var(--space-4);
+                    padding-top: var(--space-4);
+                    border-top: 1px solid rgba(255,255,255,0.1);
+                }
+
+                .rating-selector {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                }
+
+                .rating-chip {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 6px 12px;
+                    border-radius: var(--radius-md);
+                    background: rgba(255,255,255,0.06);
+                    border: 1px solid rgba(255,255,255,0.08);
+                    color: rgba(255,255,255,0.6);
+                    font-size: 12px;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+
+                .rating-chip:hover {
+                    background: rgba(255,255,255,0.1);
+                    border-color: rgba(255,255,255,0.15);
+                    color: rgba(255,255,255,0.9);
+                    transform: translateY(-1px);
+                }
+
+                .rating-chip.active {
+                    border-color: rgba(255,255,255,0.3);
+                    color: white;
+                }
+
+                /* Rating-specific active states */
+                .rating-chip.active[title*="Cambió"] {
+                    background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(99, 102, 241, 0.25));
+                    border-color: rgba(56, 189, 248, 0.5);
+                    box-shadow: 0 0 16px rgba(56, 189, 248, 0.2);
+                }
+
+                .rating-chip.active[title*="Placer"] {
+                    background: linear-gradient(135deg, rgba(244, 63, 94, 0.25), rgba(251, 113, 133, 0.25));
+                    border-color: rgba(244, 63, 94, 0.5);
+                    box-shadow: 0 0 16px rgba(244, 63, 94, 0.2);
+                }
+
+                .rating-chip.active[title*="Consulta"] {
+                    background: linear-gradient(135deg, rgba(250, 204, 21, 0.25), rgba(251, 191, 36, 0.25));
+                    border-color: rgba(250, 204, 21, 0.5);
+                    box-shadow: 0 0 16px rgba(250, 204, 21, 0.15);
+                }
+
+                .rating-chip.active[title*="múltiples"] {
+                    background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(192, 132, 252, 0.25));
+                    border-color: rgba(168, 85, 247, 0.5);
+                    box-shadow: 0 0 16px rgba(168, 85, 247, 0.2);
+                }
+
+                .rating-chip.active[title*="Decente"] {
+                    background: rgba(255,255,255,0.1);
+                    border-color: rgba(255,255,255,0.25);
+                }
+
+                .rating-chip.active[title*="Sin valor"] {
+                    background: rgba(255,255,255,0.05);
+                    border-color: rgba(255,255,255,0.15);
+                    opacity: 0.7;
+                }
+
+                .rating-icon {
+                    font-size: 14px;
+                }
+
+                .rating-label {
+                    font-weight: 500;
                 }
       `}</style>
         </div>

@@ -8,9 +8,12 @@ import {
     defaultAppSettings,
     defaultReaderSettings,
     Tag,
+    BookCategory,
+    UserBookRating,
     getAllBooks,
     getRecentBooks,
-    getAllTags
+    getAllTags,
+    db
 } from '@/lib/db';
 import { syncData } from '@/lib/sync';
 
@@ -153,6 +156,9 @@ interface LibraryState {
     activeCategory: 'all' | 'recientes' | 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read' | 'favorites' | 'authors';
     activeFormat: 'all' | 'epub' | 'pdf';
     activeTag: string | null;
+    activeThematicCategory: BookCategory | null;  // Filtro por categoría temática
+    activeUserRating: UserBookRating | null;      // Filtro por valoración personal
+    xrayKeywords: Record<string, string>;         // Keywords for search from X-Ray
     tags: Tag[];
     sortOrder: 'asc' | 'desc';
     currentView: 'library' | 'tags';
@@ -173,9 +179,12 @@ interface LibraryState {
     setSortOrder: (order: 'asc' | 'desc') => void;
     setIsLoading: (loading: boolean) => void;
     setView: (view: 'library' | 'tags') => void;
+    setActiveThematicCategory: (cat: BookCategory | null) => void;
+    setActiveUserRating: (rating: UserBookRating | null) => void;
     loadBooks: () => Promise<void>;
     loadRecentBooks: () => Promise<void>;
     syncMetadata: () => Promise<void>;
+    loadXRayKeywords: () => Promise<void>;
 
     // Computed
     filteredBooks: () => Book[];
@@ -190,6 +199,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     activeCategory: 'recientes',
     activeFormat: 'all',
     activeTag: null,
+    activeThematicCategory: null,
+    activeUserRating: null,
+    xrayKeywords: {},
     tags: [],
     sortOrder: 'desc',
     currentView: 'library',
@@ -200,6 +212,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         try {
             const books = await getAllBooks();
             const tags = await getAllTags();
+            await get().loadXRayKeywords();
             set({ books, tags, isLoading: false, isFullyLoaded: true });
         } catch (e) {
             console.error(e);
@@ -211,6 +224,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         try {
             const books = await getRecentBooks(12);
             const tags = await getAllTags();
+            await get().loadXRayKeywords();
             set({ books, tags, isLoading: false, isFullyLoaded: false });
         } catch (e) {
             console.error(e);
@@ -225,6 +239,23 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
             await get().loadBooks();
         } catch (e) {
             console.error('Sync error:', e);
+        }
+    },
+    loadXRayKeywords: async () => {
+        try {
+            const allXRay = await db.xrayData.toArray();
+            const keywordsMap: Record<string, string> = {};
+            allXRay.forEach(x => {
+                const terms = [
+                    ...(x.characters || []).map(c => c.name),
+                    ...(x.places || []).map(p => p.name),
+                    ...(x.terms || []).map(t => t.name)
+                ].join(' ');
+                keywordsMap[x.bookId] = terms;
+            });
+            set({ xrayKeywords: keywordsMap });
+        } catch (e) {
+            console.error('Failed to load X-Ray keywords', e);
         }
     },
     addBook: (book) => set((state) => ({ books: [book, ...state.books] })),
@@ -248,6 +279,8 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     setSortOrder: (order) => set({ sortOrder: order }),
     setIsLoading: (loading) => set({ isLoading: loading }),
     setView: (view) => set({ currentView: view }),
+    setActiveThematicCategory: (cat) => set({ activeThematicCategory: cat }),
+    setActiveUserRating: (rating) => set({ activeUserRating: rating }),
 
     filteredBooks: () => {
         const { books, searchQuery, sortBy, sortOrder, activeCategory, activeFormat, activeTag } = get();
@@ -257,7 +290,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         // Filter by category
         if (activeCategory !== 'all') {
             filtered = filtered.filter((b) => {
-                if (activeCategory === 'favorites') return b.isFavorite;
+                if (activeCategory === 'favorites') return b.metadata?.userRating === 'favorito';
                 if (activeCategory === 'unread') return !b.status || b.status === 'unread';
                 if (activeCategory === 'interesting') return b.status === 'interesting';
                 if (activeCategory === 'planToRead') return b.status === 'planToRead';
@@ -289,12 +322,25 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
             filtered = filtered.filter((b) => b.metadata?.tags?.includes(activeTag));
         }
 
+        // Filter by Thematic Category
+        const { activeThematicCategory, activeUserRating } = get();
+        if (activeThematicCategory) {
+            filtered = filtered.filter((b) => b.metadata?.categories?.includes(activeThematicCategory));
+        }
+
+        // Filter by User Rating
+        if (activeUserRating) {
+            filtered = filtered.filter((b) => b.metadata?.userRating === activeUserRating);
+        }
+
         // Filter by search
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter((b) =>
                 b.title.toLowerCase().includes(query) ||
-                b.author.toLowerCase().includes(query)
+                b.author.toLowerCase().includes(query) ||
+                b.metadata?.categories?.some(c => c.toLowerCase().includes(query)) ||
+                b.metadata?.userRating?.toLowerCase().includes(query)
             );
         }
 

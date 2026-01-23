@@ -52,6 +52,10 @@ export default function LibraryPage() {
         setSortBy,
         activeCategory,
         setActiveCategory,
+        activeThematicCategory,
+        setActiveThematicCategory,
+        activeUserRating,
+        setActiveUserRating,
         filteredBooks
     } = useLibraryStore();
     const [showImport, setShowImport] = useState(false);
@@ -129,6 +133,68 @@ export default function LibraryPage() {
                     </div>
 
                     <div className="toolbar-section-right">
+                        {/* Filter: Category */}
+                        <div className="sort-container">
+                            <button className="btn btn-secondary sort-btn" style={{ minWidth: 'auto', color: activeThematicCategory ? 'var(--color-accent)' : 'inherit' }}>
+                                <span className="sort-label">
+                                    {activeThematicCategory ? (
+                                        <>
+                                            <span style={{ opacity: 0.7 }}>Tema:</span> {activeThematicCategory}
+                                        </>
+                                    ) : 'Tema'}
+                                </span>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                                    <path d="M6 9l6 6 6-6" />
+                                </svg>
+                            </button>
+                            <select
+                                className="sort-select-absolute"
+                                value={activeThematicCategory || ''}
+                                onChange={(e) => setActiveThematicCategory(e.target.value as any || null)}
+                            >
+                                <option value="">Todos los Temas</option>
+                                <option value="Narrativa">📖 Narrativa</option>
+                                <option value="Pensamiento">🧠 Pensamiento</option>
+                                <option value="Espiritualidad">✨ Espiritualidad</option>
+                                <option value="Sociedad">🌍 Sociedad</option>
+                                <option value="Ciencia">🔬 Ciencia</option>
+                                <option value="Tecnología">💻 Tecnología</option>
+                                <option value="PoesíaDrama">🎭 Poesía/Drama</option>
+                                <option value="ArteCultura">🎨 Arte/Cultura</option>
+                                <option value="Crecimiento">🌱 Crecimiento</option>
+                                <option value="Práctica">🔧 Práctica</option>
+                            </select>
+                        </div>
+
+                        {/* Filter: Rating */}
+                        <div className="sort-container">
+                            <button className="btn btn-secondary sort-btn" style={{ minWidth: 'auto', color: activeUserRating ? 'var(--color-accent)' : 'inherit' }}>
+                                <span className="sort-label">
+                                    {activeUserRating ? (
+                                        <>
+                                            <span style={{ opacity: 0.7 }}>Valor:</span> {activeUserRating.charAt(0).toUpperCase() + activeUserRating.slice(1)}
+                                        </>
+                                    ) : 'Valor'}
+                                </span>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                                    <path d="M6 9l6 6 6-6" />
+                                </svg>
+                            </button>
+                            <select
+                                className="sort-select-absolute"
+                                value={activeUserRating || ''}
+                                onChange={(e) => setActiveUserRating(e.target.value as any || null)}
+                            >
+                                <option value="">Cualquier Valoración</option>
+                                <option value="esencial">💎 Esencial</option>
+                                <option value="excelente">🌟 Excelente</option>
+                                <option value="bueno">👍 Bueno</option>
+                                <option value="interesante">🤔 Interesante</option>
+                                <option value="regular">😐 Regular</option>
+                                <option value="favorito">❤️ Favorito</option>
+                            </select>
+                        </div>
+
                         <div className="sort-container">
                             <button className="btn btn-secondary sort-btn" onClick={() => {/* Toggle dropdown */ }}>
                                 <span className="sort-label">Ordenar</span>

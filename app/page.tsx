@@ -43,7 +43,13 @@ const CheckSquareIcon = () => (
 );
 
 export default function Home() {
-  const { books, isLoading, isFullyLoaded, setBooks, setIsLoading, sortBy, setSortBy, activeCategory, setActiveCategory, activeFormat, sortOrder, setSortOrder, currentView, setView, syncMetadata, loadRecentBooks, loadBooks, searchQuery } = useLibraryStore();
+  const {
+    books, isLoading, isFullyLoaded, setBooks, setIsLoading,
+    sortBy, setSortBy, activeCategory, setActiveCategory,
+    activeFormat, sortOrder, setSortOrder, currentView, setView,
+    syncMetadata, loadRecentBooks, loadBooks, searchQuery,
+    activeThematicCategory, activeUserRating, setActiveThematicCategory, setActiveUserRating, xrayKeywords
+  } = useLibraryStore();
   const { onboardingComplete } = useAppStore();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showImport, setShowImport] = useState(false);
@@ -62,7 +68,7 @@ export default function Home() {
 
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
 
-  // Handlers (handleSync, handleDeleteBook, handleToggleSelection, handleMassDelete) - keeping mostly same logic
+  // Handlers
   const handleSync = async () => {
     setIsSyncing(true);
     setSyncLogs([]);
@@ -133,12 +139,40 @@ export default function Home() {
     }
   };
 
+  // Auto-clear filters when searching to avoid "no results" due to hidden filters
+  useEffect(() => {
+    if (searchQuery) {
+      if (activeThematicCategory) setActiveThematicCategory(null);
+      if (activeUserRating) setActiveUserRating(null);
+      if (activeCategory !== 'all') setActiveCategory('all');
+    }
+  }, [searchQuery, activeThematicCategory, activeUserRating, activeCategory, setActiveThematicCategory, setActiveUserRating, setActiveCategory]);
+
+  // Auto-clear filters when searching to avoid "no results" due to hidden filters
+  useEffect(() => {
+    if (searchQuery) {
+      if (activeThematicCategory) setActiveThematicCategory(null);
+      if (activeUserRating) setActiveUserRating(null);
+      if (activeCategory !== 'all') setActiveCategory('all');
+    }
+  }, [searchQuery, activeThematicCategory, activeUserRating, activeCategory, setActiveThematicCategory, setActiveUserRating, setActiveCategory]);
+
   useEffect(() => {
     let booksToFilter = books;
     if (activeFormat !== 'all') booksToFilter = booksToFilter.filter(book => book.format === activeFormat);
 
-    // Category filtering
-    if (activeCategory === 'favorites') booksToFilter = booksToFilter.filter(book => book.isFavorite);
+    // Thematic Category filtering
+    if (activeThematicCategory) {
+      booksToFilter = booksToFilter.filter(book => book.metadata?.categories?.includes(activeThematicCategory));
+    }
+
+    // User Rating filtering
+    if (activeUserRating) {
+      booksToFilter = booksToFilter.filter(book => book.metadata?.userRating === activeUserRating);
+    }
+
+    // Category filtering (Tabs)
+    if (activeCategory === 'favorites') booksToFilter = booksToFilter.filter(book => book.isFavorite || book.metadata?.userRating === 'favorito');
     else if (activeCategory === 'planToRead') booksToFilter = booksToFilter.filter(book => book.status === 'planToRead');
     else if (activeCategory === 'interesting') booksToFilter = booksToFilter.filter(book => book.status === 'interesting');
     else if (activeCategory === 'completed') booksToFilter = booksToFilter.filter(book => book.status === 'completed');
@@ -146,17 +180,25 @@ export default function Home() {
     else if (activeCategory === 'reading') booksToFilter = booksToFilter.filter(book => book.status === 'reading');
     else if (activeCategory === 're_read') booksToFilter = booksToFilter.filter(book => book.status === 're_read');
     else if (activeCategory === 'recientes') {
-      // Sort by most recently updated or added, then take first 12
       booksToFilter = [...booksToFilter].sort((a, b) => (new Date(b.updatedAt || b.addedAt || 0).getTime() - new Date(a.updatedAt || a.addedAt || 0).getTime()));
       booksToFilter = booksToFilter.slice(0, 12);
     }
 
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      booksToFilter = booksToFilter.filter(book =>
-        book.title.toLowerCase().includes(query) ||
-        book.author.toLowerCase().includes(query)
-      );
+      const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+      booksToFilter = booksToFilter.filter(book => {
+        const searchableText = [
+          book.title,
+          book.author,
+          ...(book.metadata?.categories || []),
+          book.metadata?.userRating || '',
+          ...(book.metadata?.subjects || []),
+          xrayKeywords[book.id] || ''
+        ].join(' ').toLowerCase();
+
+        // All terms must be present
+        return terms.every(term => searchableText.includes(term));
+      });
     }
 
     // Sort
@@ -171,7 +213,7 @@ export default function Home() {
     });
 
     setFilteredBooks(booksToFilter);
-  }, [books, searchQuery, activeCategory, activeFormat, sortBy, sortOrder]);
+  }, [books, searchQuery, activeCategory, activeFormat, sortBy, sortOrder, activeThematicCategory, activeUserRating]);
 
   useEffect(() => {
     async function init() {
@@ -248,10 +290,16 @@ export default function Home() {
               <span style={{ color: '#4b5563' }}>|</span>
 
               <button
-                onClick={() => { setActiveCategory('all'); setIsGrouped(false); }}
+                onClick={() => {
+                  setActiveCategory('all');
+                  setIsGrouped(false);
+                  // Reset filters
+                  setActiveThematicCategory(null);
+                  setActiveUserRating(null);
+                }}
                 style={{
-                  color: activeCategory === 'all' && !isGrouped ? '#0a84ff' : '#6b7280',
-                  fontWeight: activeCategory === 'all' && !isGrouped ? 700 : 500,
+                  color: activeCategory === 'all' && !isGrouped && !activeThematicCategory && !activeUserRating ? '#0a84ff' : '#6b7280',
+                  fontWeight: activeCategory === 'all' && !isGrouped && !activeThematicCategory && !activeUserRating ? 700 : 500,
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',

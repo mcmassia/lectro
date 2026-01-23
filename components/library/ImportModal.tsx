@@ -90,6 +90,22 @@ export function ImportModal({ onClose }: ImportModalProps) {
             bookData = await processPdf(file);
         }
 
+        // Clasificar automáticamente el libro
+        let categories: import('@/lib/db').BookCategory[] = [];
+        try {
+            const { classifyBookCategories } = await import('@/lib/ai/classifier');
+            const result = await classifyBookCategories(
+                bookData.title || file.name,
+                bookData.author || '',
+                bookData.metadata?.description,
+                bookData.metadata?.subjects
+            );
+            categories = result.categories;
+            console.log(`Book classified as: ${categories.join(', ')} (method: ${result.method})`);
+        } catch (e) {
+            console.warn('Classification failed:', e);
+        }
+
         const newBook: Book = {
             id: uuid(),
             title: bookData.title || '',
@@ -103,12 +119,16 @@ export function ImportModal({ onClose }: ImportModalProps) {
             progress: 0,
             currentPosition: '',
             totalPages: bookData.totalPages,
-            metadata: bookData.metadata || {},
+            metadata: {
+                ...bookData.metadata,
+                categories  // Añadir categorías automáticas
+            },
             status: 'unread' // Default to unread for imported books
         };
 
         await dbAddBook(newBook);
         addBook(newBook);
+
 
         // Upload to server immediately to ensure availability for Reader
         try {
@@ -306,6 +326,66 @@ export function ImportModal({ onClose }: ImportModalProps) {
         }
     };
 
+    const handleBatchClassify = async () => {
+        try {
+            setServerSyncing(true);
+            setErrors([]);
+
+            const { getAllBooks, updateBook: dbUpdateBook } = await import('@/lib/db');
+            const { classifyBookCategories } = await import('@/lib/ai/classifier');
+
+            const books = await getAllBooks();
+            // Filter books without categories or with empty categories
+            const booksToClassify = books.filter(b =>
+                !b.metadata?.categories || b.metadata.categories.length === 0
+            );
+
+            if (booksToClassify.length === 0) {
+                alert('Todos los libros ya tienen etiquetas asignadas.');
+                setServerSyncing(false);
+                return;
+            }
+
+            let classified = 0;
+            let skipped = 0;
+
+            for (const book of booksToClassify) {
+                try {
+                    const result = await classifyBookCategories(
+                        book.title,
+                        book.author,
+                        book.metadata?.description,
+                        book.metadata?.subjects
+                    );
+
+                    if (result.categories.length > 0) {
+                        await dbUpdateBook(book.id, {
+                            metadata: { ...book.metadata, categories: result.categories }
+                        });
+                        classified++;
+                    } else {
+                        skipped++;
+                    }
+                } catch (e) {
+                    console.error(`Failed to classify ${book.title}:`, e);
+                    skipped++;
+                }
+            }
+
+            // Refresh store
+            const updatedBooks = await getAllBooks();
+            useLibraryStore.getState().setBooks(updatedBooks);
+
+            alert(`Clasificación completada:\n• ${classified} libros etiquetados\n• ${skipped} libros sin metadatos suficientes`);
+
+        } catch (e) {
+            console.error('Batch classify error:', e);
+            setErrors(['Error al clasificar libros: ' + (e as Error).message]);
+        } finally {
+            setServerSyncing(false);
+        }
+    };
+
     // ... existing processFile ...
 
     const processFiles = async (files: File[]) => {
@@ -479,6 +559,17 @@ export function ImportModal({ onClose }: ImportModalProps) {
                                 Sincronizar Carpetas
                             </button>
                             <p className="hint-text">Busca y añade archivos copiados manualmente en la carpeta del servidor.</p>
+
+                            <div className="divider" style={{ margin: '12px 0' }}></div>
+
+                            <button className="btn btn-secondary btn-full btn-classify" onClick={handleBatchClassify}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18" style={{ marginRight: '8px' }}>
+                                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                                    <line x1="7" y1="7" x2="7.01" y2="7" />
+                                </svg>
+                                Asignar Etiquetas Automáticas
+                            </button>
+                            <p className="hint-text">Clasifica automáticamente los libros sin etiqueta según sus metadatos.</p>
                         </div>
                     )}
 

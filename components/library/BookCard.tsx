@@ -270,11 +270,36 @@ export function BookCard({
       <div className="book-card-info">
         <p className="book-card-author">{book.author}</p>
         <h3 className="book-card-title" title={book.title}>{book.title}</h3>
-        {book.isFavorite && (
-          <div className="status-indicator favorite">
-            <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
+
+        {/* Categories Chips */}
+        {book.metadata?.categories && book.metadata.categories.length > 0 && (
+          <div className="book-card-categories">
+            {book.metadata.categories.slice(0, 3).map(cat => {
+              // Simple mapping for icon, ideally moved to shared constant
+              const icons: Record<string, string> = {
+                'Pensamiento': '🧠', 'Espiritualidad': '✨', 'Sociedad': '🌍',
+                'Ciencia': '🔬', 'Tecnología': '💻', 'Narrativa': '📖',
+                'PoesíaDrama': '🎭', 'ArteCultura': '🎨', 'Crecimiento': '🌱', 'Práctica': '🔧'
+              };
+              return (
+                <span key={cat} className="category-chip-mini" title={cat}>
+                  {icons[cat]} {cat}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* User Rating Indicator */}
+        {book.metadata?.userRating && (
+          <div className="status-indicator user-rating" title="Valoración personal">
+            {(() => {
+              const ratings: Record<string, string> = {
+                'esencial': '💎', 'excelente': '🌟', 'bueno': '👍',
+                'interesante': '🤔', 'regular': '😐', 'favorito': '❤️'
+              };
+              return ratings[book.metadata.userRating] || '⭐';
+            })()}
           </div>
         )}
       </div>
@@ -442,6 +467,33 @@ export function BookCard({
                 
                 .book-card-container:hover .delete-btn-grid {
                     opacity: 1;
+                }
+
+                .book-card-categories {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 4px;
+                    margin-top: 4px;
+                }
+                
+                .category-chip-mini {
+                    font-size: 9px;
+                    background: var(--color-bg-elevated);
+                    color: var(--color-text-secondary);
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    border: 1px solid var(--color-border);
+                    white-space: nowrap;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                }
+
+                .status-indicator {
+                    position: absolute;
+                    right: 0;
+                    top: 0;
+                    font-size: 14px;
                 }
             `}</style>
     </div>

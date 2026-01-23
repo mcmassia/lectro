@@ -5,6 +5,30 @@ import { v4 as uuidv4 } from 'uuid';
 // Type Definitions
 // ===================================
 
+// Categorías temáticas de alta jerarquía (automáticas)
+export type BookCategory =
+  | 'Pensamiento'    // Filosofía, ética, lógica, epistemología
+  | 'Espiritualidad' // Religión, teología, mística, mitología
+  | 'Sociedad'       // Historia, política, sociología, economía
+  | 'Ciencia'        // Física, biología, matemáticas, divulgación
+  | 'Tecnología'     // IA, informática, ingeniería, innovación
+  | 'Narrativa'      // Novela, cuento, ficción general
+  | 'PoesíaDrama'    // Poesía lírica, teatro, drama
+  | 'ArteCultura'    // Pintura, música, cine, biografías artistas
+  | 'Crecimiento'    // Psicología, productividad, liderazgo
+  | 'Práctica'       // Manuales, idiomas, guías, cocina, viajes
+  | 'SinClasificar'; // No se pudo clasificar (sin metadatos)
+
+// Valoraciones personales del usuario
+export type UserBookRating =
+  | 'imprescindible'  // 💎 Libros que cambiaron tu forma de pensar
+  | 'favorito'        // ❤️ Placer estético/emocional alto
+  | 'referencia'      // ⭐ Consulta recurrente técnica
+  | 'releer'          // ⏳ Denso, requiere relectura
+  | 'correcto'        // ♻️ Decente pero no memorable
+  | 'prescindible';   // 🚮 Sin valor real para el futuro
+
+
 export interface Book {
   id: string;
   title: string;
@@ -42,6 +66,8 @@ export interface BookMetadata {
   series?: string;
   seriesIndex?: number;
   tags?: string[];
+  categories?: BookCategory[];     // Etiquetas temáticas (puede tener múltiples)
+  userRating?: UserBookRating;   // Valoración personal del usuario
 }
 
 export interface Tag {
