@@ -567,7 +567,10 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                         </button>
                         <button
                             className={`btn-icon ${isEditing ? 'active-edit' : ''}`}
-                            onClick={async () => {
+                            onClick={async (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+
                                 if (isEditing) {
                                     // Save changes
                                     console.log('Saving book changes...', book);
@@ -575,7 +578,6 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                         // Robust save: ensure metadata structure is valid
                                         const cleanMetadata = {
                                             ...(book.metadata || {}),
-                                            // Ensure critical fields are not undefined/null if that causes issues
                                             description: book.metadata?.description || '',
                                             publisher: book.metadata?.publisher || '',
                                             publishedDate: book.metadata?.publishedDate || '',
@@ -584,13 +586,14 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                             categories: book.metadata?.categories || [],
                                         };
 
-                                        await updateBook(book.id, {
+                                        const updatedCount = await updateBook(book.id, {
                                             title: book.title || 'Untitled',
                                             author: book.author || 'Unknown Author',
-                                            cover: book.cover, // Explicitly include cover
+                                            cover: book.cover,
                                             metadata: cleanMetadata
                                         });
-                                        console.log('DB update successful');
+
+                                        console.log('DB update successful', updatedCount);
 
                                         updateBookInStore(book.id, {
                                             title: book.title,
@@ -600,11 +603,10 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                         });
                                         console.log('Store update successful');
 
-                                        // Optional: Visual feedback beyond alert?
-                                        // For now alert is fine, maybe a toast in future
-                                    } catch (err) {
+                                    } catch (err: any) {
                                         console.error('Failed to save book:', err);
-                                        alert('Failed to save changes: ' + (err as Error).message);
+                                        const msg = err?.message || (typeof err === 'string' ? err : 'Unknown error');
+                                        alert(`Failed to save changes: ${msg}`);
                                         // Do NOT exit edit mode if save failed
                                         return;
                                     }
