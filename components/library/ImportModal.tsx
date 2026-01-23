@@ -394,7 +394,157 @@ export function ImportModal({ onClose }: ImportModalProps) {
         }
     };
 
-    // ... existing processFile ...
+    // Helper for cleaning titles
+    const cleanTitle = (title: string) => {
+        return title
+            .replace(/\(.*\)/g, '') // Remove (text)
+            .replace(/\[.*\]/g, '') // Remove [text]
+            .replace(/\.epub$/i, '')
+            .replace(/\.pdf$/i, '')
+            .replace(/_/g, ' ')
+            .trim();
+    };
+
+    // Helpler for validating matches
+    const isGoodMatch = (originalTitle: string, matchTitle: string) => {
+        const t1 = cleanTitle(originalTitle).toLowerCase();
+        const t2 = cleanTitle(matchTitle).toLowerCase();
+
+        // Exact containment (one is substring of another)
+        if (t1.includes(t2) || t2.includes(t1)) return true;
+
+        // Word overlap (>50%)
+        const words1 = t1.split(/\s+/).filter(w => w.length > 3);
+        const words2 = t2.split(/\s+/).filter(w => w.length > 3);
+
+        if (words1.length === 0 || words2.length === 0) return true; // Fallback for short titles
+
+        const intersection = words1.filter(w => words2.some(w2 => w2 === w || w2.includes(w) || w.includes(w2)));
+        return (intersection.length / Math.min(words1.length, words2.length)) >= 0.5;
+    };
+
+    const handleBatchEnrichMetadata = async () => {
+        try {
+            const { getAllBooks, updateBook: dbUpdateBook } = await import('@/lib/db');
+            const { searchMetadata } = await import('@/lib/metadata');
+
+            setImporting(true);
+            setErrors([]);
+
+            const books = await getAllBooks();
+            const booksToEnrich = books.filter(b =>
+            // Only enrich if description is missing/short or publisher/publishedDate is missing
+            // OR Author is unknown
+            // AND it's not a ghost book
+            // Increased threshold to 50 chars to catch "No description available."
+            ((!b.metadata?.description || b.metadata.description.length < 50) ||
+                !b.metadata?.publisher ||
+                !b.cover ||
+                !b.author || b.author === 'Unknown Author' || b.author === 'Autor desconocido')
+            );
+
+            if (booksToEnrich.length === 0) {
+                alert('No hay libros que necesiten enriquecimiento de metadatos (descripción, portada, autor, etc).');
+                setImporting(false);
+                return;
+            }
+
+            if (!confirm(`Se han encontrado ${booksToEnrich.length} libros candidatos para enriquecer metadatos.\n\nEste proceso tardará aproximadamente ${Math.ceil(booksToEnrich.length * 1.5 / 60)} minutos.\n\n¿Deseas comenzar?`)) {
+                setImporting(false);
+                return;
+            }
+
+            setProgress({ current: 0, total: booksToEnrich.length });
+
+            let enriched = 0;
+            let skipped = 0;
+
+            for (let i = 0; i < booksToEnrich.length; i++) {
+                const book = booksToEnrich[i];
+                setProgress({ current: i + 1, total: booksToEnrich.length });
+
+                try {
+                    // Delay 1.5s
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+
+                    const cleanedTitle = cleanTitle(book.title);
+                    // Handle unknown author for query
+                    const authorQuery = (book.author === 'Unknown Author' || book.author === 'Autor desconocido') ? '' : book.author;
+                    const query = `${cleanedTitle} ${authorQuery}`.trim();
+
+                    const results = await searchMetadata(query);
+
+                    // Filter to ONLY good matches
+                    const goodMatches = results.filter(r => isGoodMatch(book.title, r.title));
+
+                    // Pick the BEST match (prioritize description presence)
+                    // Sort: Has Evaluable Description > Has Cover > Index
+                    goodMatches.sort((a, b) => {
+                        const hasDescA = (a.description && a.description.length > 50) ? 1 : 0;
+                        const hasDescB = (b.description && b.description.length > 50) ? 1 : 0;
+                        if (hasDescA !== hasDescB) return hasDescB - hasDescA; // Desc first
+                        return 0; // Keep original order otherwise (relevance)
+                    });
+
+                    const match = goodMatches[0];
+
+                    if (match) {
+                        const updates: any = { metadata: { ...book.metadata } };
+                        let updated = false;
+
+                        // Only apply descriptions if they are substantial
+                        // We check if current description is poor (<50) AND match is good (>50)
+                        if ((!book.metadata?.description || book.metadata.description.length < 50) && match.description && match.description.length > 50) {
+                            updates.metadata.description = match.description;
+                            updated = true;
+                        }
+                        if (!book.metadata?.publisher && match.publisher) {
+                            updates.metadata.publisher = match.publisher;
+                            updated = true;
+                        }
+                        if (!book.metadata?.publishedDate && match.publishedDate) {
+                            updates.metadata.publishedDate = match.publishedDate;
+                            updated = true;
+                        }
+                        if (!book.cover && match.cover) {
+                            updates.cover = match.cover;
+                            updated = true;
+                        }
+
+                        // Update Author if missing/unknown
+                        if ((!book.author || book.author === 'Unknown Author' || book.author === 'Autor desconocido') && match.author && match.author !== 'Unknown') {
+                            updates.author = match.author;
+                            updated = true;
+                        }
+
+                        if (updated) {
+                            await dbUpdateBook(book.id, updates);
+                            enriched++;
+                        } else {
+                            skipped++;
+                        }
+                    } else {
+                        skipped++;
+                    }
+                } catch (e) {
+                    console.error(`Error enriching ${book.title}`, e);
+                    skipped++;
+                }
+            }
+
+            // Refresh store
+            const finalBooks = await getAllBooks();
+            useLibraryStore.getState().setBooks(finalBooks);
+
+            alert(`Proceso finalizado:\n• ${enriched} libros enriquecidos\n• ${skipped} sin resultados o sin coincidencia válida`);
+
+        } catch (e) {
+            console.error('Enrich error:', e);
+            setErrors(['Error al enriquecer metadatos: ' + (e as Error).message]);
+        } finally {
+            setImporting(false);
+        }
+    };
 
     const processFiles = async (files: File[]) => {
         const validFiles = files.filter(f => {
@@ -489,12 +639,30 @@ export function ImportModal({ onClose }: ImportModalProps) {
                     {permissionRequired ? (
                         // ... existing permission block ...
                         <div className="permission-request">
-                            {/* ... content ... */}
+                            <p className="permission-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="48" height="48">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                                    <line x1="12" y1="11" x2="12" y2="17" />
+                                    <line x1="9" y1="14" x2="15" y2="14" />
+                                </svg>
+                            </p>
+                            <h3>Permiso de Acceso Requerido</h3>
+                            <p>Para gestionar tu biblioteca local, necesitamos acceso a la carpeta donde guardas tus libros.</p>
+                            <button className="btn btn-primary" onClick={grantPermission}>Conceder Acceso</button>
                         </div>
                     ) : importing ? (
                         // ... existing importing block ...
                         <div className="import-progress">
-                            {/* ... content ... */}
+                            <div className="progress-spinner" />
+                            <p className="progress-text">
+                                Procesando {progress.current} de {progress.total}...
+                            </p>
+                            <div className="progress-bar">
+                                <div
+                                    className="progress-fill"
+                                    style={{ width: `${(progress.current / progress.total) * 100}%` }}
+                                />
+                            </div>
                         </div>
                     ) : (
                         <>
@@ -578,6 +746,16 @@ export function ImportModal({ onClose }: ImportModalProps) {
                                 Asignar Etiquetas Automáticas
                             </button>
                             <p className="hint-text">Clasifica automáticamente los libros sin etiqueta según sus metadatos.</p>
+
+                            <div className="divider" style={{ margin: '12px 0' }}></div>
+
+                            <button className="btn btn-secondary btn-full btn-enrich" onClick={handleBatchEnrichMetadata}>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18" style={{ marginRight: '8px' }}>
+                                    <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-6h2zm0-8h-2V7h2z" />
+                                </svg>
+                                Enriquecer Metadatos (Beta)
+                            </button>
+                            <p className="hint-text">Busca en Internet descripciones y portadas para libros incompletos. Lento pero efectivo.</p>
                         </div>
                     )}
 
