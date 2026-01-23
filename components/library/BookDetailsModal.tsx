@@ -571,9 +571,12 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                 e.preventDefault();
                                 e.stopPropagation();
 
+                                alert(`Click! Editing mode: ${isEditing}`);
+
                                 if (isEditing) {
                                     // Save changes
                                     console.log('Saving book changes...', book);
+                                    alert('Starting save process...');
                                     try {
                                         // Robust save: ensure metadata structure is valid
                                         const cleanMetadata = {
@@ -593,7 +596,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                             metadata: cleanMetadata
                                         });
 
-                                        console.log('DB update successful', updatedCount);
+                                        alert(`DB Update finished. Count: ${updatedCount}`);
 
                                         updateBookInStore(book.id, {
                                             title: book.title,
@@ -601,7 +604,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                             cover: book.cover,
                                             metadata: cleanMetadata
                                         });
-                                        console.log('Store update successful');
+                                        alert('Store updated.');
 
                                     } catch (err: any) {
                                         console.error('Failed to save book:', err);
