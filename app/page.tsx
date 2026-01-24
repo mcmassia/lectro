@@ -265,7 +265,11 @@ export default function Home() {
             <div className="flex items-center gap-4">
               {/* Text Filter Links - clearly separated */}
               <button
-                onClick={() => { setActiveCategory('recientes'); setIsGrouped(false); }}
+                onClick={() => {
+                  setActiveCategory('recientes');
+                  loadRecentBooks();
+                  setIsGrouped(false);
+                }}
                 style={{
                   color: activeCategory === 'recientes' ? '#0a84ff' : '#6b7280',
                   fontWeight: activeCategory === 'recientes' ? 700 : 500,
@@ -286,6 +290,7 @@ export default function Home() {
               <button
                 onClick={() => {
                   setActiveCategory('all');
+                  loadBooks(); // Force load all books
                   setIsGrouped(false);
                   // Reset filters
                   setActiveThematicCategory(null);
