@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Book, updateBook, getAllTags, Tag, BookCategory, UserBookRating } from '@/lib/db';
-import { pushSingleBook } from '@/lib/sync';
 import { useLibraryStore } from '@/stores/appStore';
 import { useRouter } from 'next/navigation';
 import { searchGoogleBooks, searchMetadata, findCovers, MetadataResult } from '@/lib/metadata';
@@ -161,80 +160,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
         }
     };
 
-    // Dedicated save function - extracted for reliability
-    const handleSaveChanges = async () => {
-        console.log('[SAVE] handleSaveChanges called, isEditing:', isEditing);
 
-        if (!isEditing) {
-            // Enter edit mode
-            console.log('[SAVE] Entering edit mode');
-            setIsEditing(true);
-            return;
-        }
-
-        // Save changes
-        console.log('[SAVE] Starting save process for book:', book.id);
-        try {
-            const cleanMetadata = {
-                ...(book.metadata || {}),
-                description: book.metadata?.description || '',
-                publisher: book.metadata?.publisher || '',
-                publishedDate: book.metadata?.publishedDate || '',
-                language: book.metadata?.language || '',
-                tags: book.metadata?.tags || [],
-                categories: book.metadata?.categories || [],
-            };
-
-            console.log('[SAVE] Calling updateBook...');
-            const updatedCount = await updateBook(book.id, {
-                title: book.title || 'Untitled',
-                author: book.author || 'Unknown Author',
-                cover: book.cover,
-                metadata: cleanMetadata
-            });
-            console.log('[SAVE] DB update successful, count:', updatedCount);
-
-            updateBookInStore(book.id, {
-                title: book.title,
-                author: book.author,
-                cover: book.cover,
-                metadata: cleanMetadata
-            });
-            console.log('[SAVE] Store update successful');
-
-            // Optimistic update: Push ONLY this book to server
-            // We don't await this to keep UI snappy, or we can await if we want to ensure it saved
-            // Given the importance, we'll try to await but not block exit if it fails? 
-            // Better to log it clearly.
-            try {
-                // Construct the full object to push (with new metadata)
-                const bookToPush = {
-                    ...book,
-                    title: book.title || 'Untitled',
-                    author: book.author || 'Unknown Author',
-                    cover: book.cover,
-                    metadata: cleanMetadata,
-                    // updated date is handled by server or local update, but best to refresh from what we just saved if possible?
-                    // simpler: just push the object we have + new metadata
-                };
-
-                await pushSingleBook(bookToPush);
-                console.log('[SAVE] Single book pushed to server successfully');
-            } catch (serverErr) {
-                console.error('[SAVE] Failed to push book to server:', serverErr);
-                // Optional: Show toast warning
-            }
-
-            // Exit edit mode on success
-            setIsEditing(false);
-            console.log('[SAVE] Save complete, exited edit mode');
-
-        } catch (err: any) {
-            console.error('[SAVE] Failed to save book:', err);
-            alert('Error al guardar: ' + (err?.message || 'Error desconocido'));
-            // Stay in edit mode on failure
-        }
-    };
 
     const handleSearchMetadata = async () => {
         if (isSearching) return;
@@ -643,73 +569,81 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                         </button>
                         {/* Edit/Save toggle button */}
                         <button
-                            id="edit-toggle-btn"
+                            id="save-metadata-btn"
                             type="button"
                             className={`btn-icon ${isEditing ? 'active-edit' : ''}`}
-                            style={{ position: 'relative', zIndex: 10 }}
-                            onMouseDown={(e) => {
+                            style={{ position: 'relative', zIndex: 20 }}
+                            onClick={async (e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                console.log('[BUTTON] Edit toggle clicked via onMouseDown');
-                                if (!isEditing) {
+
+                                if (isEditing) {
+                                    console.log('Saving changes (Local Only)...');
+                                    try {
+                                        const cleanMetadata = {
+                                            ...(book.metadata || {}),
+                                            description: book.metadata?.description || '',
+                                            publisher: book.metadata?.publisher || '',
+                                            publishedDate: book.metadata?.publishedDate || '',
+                                            language: book.metadata?.language || '',
+                                            tags: book.metadata?.tags || [],
+                                            categories: book.metadata?.categories || [],
+                                        };
+
+                                        // 1. Update DB
+                                        await updateBook(book.id, {
+                                            title: book.title || 'Untitled',
+                                            author: book.author || 'Unknown Author',
+                                            cover: book.cover,
+                                            metadata: cleanMetadata
+                                        });
+                                        console.log('DB updated');
+
+                                        // 2. Update Store
+                                        updateBookInStore(book.id, {
+                                            title: book.title,
+                                            author: book.author,
+                                            cover: book.cover,
+                                            metadata: cleanMetadata
+                                        });
+                                        console.log('Store updated');
+
+                                        // NO server sync call here to avoid errors
+
+                                        setIsEditing(false);
+                                    } catch (err: any) {
+                                        console.error('Save failed:', err);
+                                        alert('Error al guardar localmente');
+                                    }
+                                } else {
                                     setIsEditing(true);
                                 }
                             }}
-                            title={isEditing ? "Editando..." : "Editar Metadatos"}
+                            title={isEditing ? "Guardar Cambios" : "Editar Metadatos"}
                         >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                        </button>
-                        {/* Explicit Save Button - only shown when editing */}
-                        {isEditing && (
-                            <button
-                                id="save-changes-btn"
-                                type="button"
-                                className="btn-save-explicit"
-                                style={{
-                                    position: 'relative',
-                                    zIndex: 20,
-                                    background: '#22c55e',
-                                    color: 'white',
-                                    border: 'none',
-                                    padding: '8px 16px',
-                                    borderRadius: '8px',
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px'
-                                }}
-                                onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    console.log('[BUTTON] Save button clicked via onMouseDown');
-                                    handleSaveChanges();
-                                }}
-                                title="Guardar cambios"
-                            >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                            {isEditing ? (
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
                                     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                                     <polyline points="17 21 17 13 7 13 7 21" />
                                     <polyline points="7 3 7 8 15 8" />
                                 </svg>
-                                Guardar
-                            </button>
-                        )}
+                            ) : (
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                            )}
+                        </button>
                         {isEditing && (
                             <button
-                                type="button"
                                 className="btn-icon"
-                                onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    if (confirm('¿Revertir todos los cambios?')) {
+                                onClick={() => {
+                                    if (confirm('Revert all changes to original metadata?')) {
                                         setBook(initialBook);
                                         setIsEditing(false);
                                     }
                                 }}
-                                title="Revertir Cambios"
+                                title="Revert Changes"
                             >
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
                                     <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
