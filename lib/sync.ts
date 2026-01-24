@@ -140,7 +140,7 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
     }
 }
 
-async function pushLocalData() {
+export async function pushLocalData() {
     const books = await getAllBooks();
     const tags = await getAllTags();
     // Include deleted annotations so server knows about deletions
