@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Book, updateBook, getAllTags, Tag, BookCategory, UserBookRating } from '@/lib/db';
-import { syncData } from '@/lib/sync';
 import { useLibraryStore } from '@/stores/appStore';
 import { useRouter } from 'next/navigation';
 import { searchGoogleBooks, searchMetadata, findCovers, MetadataResult } from '@/lib/metadata';
@@ -201,14 +200,6 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                 metadata: cleanMetadata
             });
             console.log('[SAVE] Store update successful');
-
-            // Sync to server for production persistence
-            try {
-                await syncData();
-                console.log('[SAVE] Sync to server successful');
-            } catch (syncErr) {
-                console.warn('[SAVE] Sync to server failed:', syncErr);
-            }
 
             // Exit edit mode on success
             setIsEditing(false);
