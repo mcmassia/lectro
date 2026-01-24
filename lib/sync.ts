@@ -247,3 +247,42 @@ function hydrateAnnotationDates(ann: any): Annotation {
         updatedAt: ann.updatedAt ? new Date(ann.updatedAt) : undefined,
     };
 }
+
+export async function pushSingleBook(book: Book): Promise<void> {
+    try {
+        const { fileBlob, cover, ...bookPayload } = book;
+
+        // Prepare headers
+        const customPath = localStorage.getItem('lectro_server_path');
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (customPath) headers['x-library-path'] = customPath;
+
+        const payload = {
+            books: [bookPayload], // Send as array of 1
+            tags: [],
+            annotations: [],
+            readingSessions: [],
+            lastSync: new Date().toISOString()
+        };
+
+        console.log(`[SYNC-SINGLE] Pushing single book update: ${book.title}`);
+
+        const res = await fetch('/api/library/metadata', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error('[SYNC-SINGLE] Push failed. Response:', errorText);
+            throw new Error(`Failed to push book: ${res.statusText}`);
+        }
+
+        console.log('[SYNC-SINGLE] Push successful');
+
+    } catch (error) {
+        console.error('[SYNC-SINGLE] Error pushing book:', error);
+        throw error;
+    }
+}

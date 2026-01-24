@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Book, updateBook, getAllTags, Tag, BookCategory, UserBookRating } from '@/lib/db';
+import { pushSingleBook } from '@/lib/sync';
 import { useLibraryStore } from '@/stores/appStore';
 import { useRouter } from 'next/navigation';
 import { searchGoogleBooks, searchMetadata, findCovers, MetadataResult } from '@/lib/metadata';
@@ -200,6 +201,29 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                 metadata: cleanMetadata
             });
             console.log('[SAVE] Store update successful');
+
+            // Optimistic update: Push ONLY this book to server
+            // We don't await this to keep UI snappy, or we can await if we want to ensure it saved
+            // Given the importance, we'll try to await but not block exit if it fails? 
+            // Better to log it clearly.
+            try {
+                // Construct the full object to push (with new metadata)
+                const bookToPush = {
+                    ...book,
+                    title: book.title || 'Untitled',
+                    author: book.author || 'Unknown Author',
+                    cover: book.cover,
+                    metadata: cleanMetadata,
+                    // updated date is handled by server or local update, but best to refresh from what we just saved if possible?
+                    // simpler: just push the object we have + new metadata
+                };
+
+                await pushSingleBook(bookToPush);
+                console.log('[SAVE] Single book pushed to server successfully');
+            } catch (serverErr) {
+                console.error('[SAVE] Failed to push book to server:', serverErr);
+                // Optional: Show toast warning
+            }
 
             // Exit edit mode on success
             setIsEditing(false);
