@@ -567,7 +567,10 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                             )}
                         </button>
                         <button
+                            id="save-metadata-btn"
+                            type="button"
                             className={`btn-icon ${isEditing ? 'active-edit' : ''}`}
+                            style={{ position: 'relative', zIndex: 10 }}
                             onClick={async (e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -992,13 +995,6 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     position: relative;
                     min-width: 140px;
                 }
-                
-                .status-dropdown-wrapper::after {
-                    content: '';
-                    position: absolute;
-                    top: 0; bottom: 0; right: 0; left: 0;
-                    pointer-events: none;
-                }
 
                 .status-select {
                     background: rgba(255,255,255,0.1);
@@ -1257,6 +1253,8 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
             .footer-actions {
                 display: flex;
                 gap: var(--space-2);
+                position: relative;
+                z-index: 5;
             }
 
             .btn-icon {
