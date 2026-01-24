@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Book, updateBook, getAllTags, Tag, BookCategory, UserBookRating } from '@/lib/db';
+import { syncData } from '@/lib/sync';
 import { useLibraryStore } from '@/stores/appStore';
 import { useRouter } from 'next/navigation';
 import { searchGoogleBooks, searchMetadata, findCovers, MetadataResult } from '@/lib/metadata';
@@ -571,12 +572,9 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                 e.preventDefault();
                                 e.stopPropagation();
 
-                                alert(`Click! Editing mode: ${isEditing}`);
-
                                 if (isEditing) {
                                     // Save changes
                                     console.log('Saving book changes...', book);
-                                    alert('Starting save process...');
                                     try {
                                         // Robust save: ensure metadata structure is valid
                                         const cleanMetadata = {
@@ -596,7 +594,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                             metadata: cleanMetadata
                                         });
 
-                                        alert(`DB Update finished. Count: ${updatedCount}`);
+                                        console.log('DB update successful', updatedCount);
 
                                         updateBookInStore(book.id, {
                                             title: book.title,
@@ -604,12 +602,20 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                             cover: book.cover,
                                             metadata: cleanMetadata
                                         });
-                                        alert('Store updated.');
+                                        console.log('Store update successful');
+
+                                        // Sync to server for production persistence
+                                        try {
+                                            await syncData();
+                                            console.log('Sync to server successful');
+                                        } catch (syncErr) {
+                                            console.warn('Sync to server failed, changes saved locally only:', syncErr);
+                                        }
 
                                     } catch (err: any) {
                                         console.error('Failed to save book:', err);
                                         const msg = err?.message || (typeof err === 'string' ? err : 'Unknown error');
-                                        alert(`Failed to save changes: ${msg}`);
+                                        console.error(`Failed to save changes: ${msg}`);
                                         // Do NOT exit edit mode if save failed
                                         return;
                                     }
