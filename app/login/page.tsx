@@ -23,14 +23,17 @@ export default function LoginPage() {
     useEffect(() => {
         async function init() {
             try {
-                // Sync users from server so we can login with them
-                await syncData();
+                // 1. Ensure local default user exists (Critical for finding 'mcmassia')
                 await ensureDefaultUser();
             } catch (e) {
-                console.error('Failed to seed user or sync', e);
+                console.error('Failed to seed user', e);
             } finally {
+                // 2. Unblock UI immediately so user can interact
                 setIsInitializing(false);
             }
+
+            // 3. Sync other users/data in background (Non-blocking)
+            syncData().catch(e => console.warn('Background sync failed:', e));
         }
         init();
     }, []);
