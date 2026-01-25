@@ -30,9 +30,9 @@ export function RightSidebar() {
         getAllTags().then(setTags);
     }, [setTags, currentUser]);
 
-    const currentlyReading = books.filter(b => b.progress > 0 && b.progress < 100).slice(0, 3);
+    const currentlyReading = books.filter(b => (b.progress || 0) > 0 && (b.progress || 0) < 100).slice(0, 3);
     const readingStates = {
-        unread: books.filter(b => b.progress === 0 && !b.lastReadAt).length,
+        unread: books.filter(b => (b.progress || 0) === 0 && !b.lastReadAt).length,
         toRead: books.filter(b => b.status === 'planToRead').length,
         reading: currentlyReading.length,
     };
