@@ -128,9 +128,7 @@ export default function LoginPage() {
                     </button>
                 </form>
 
-                <div className="footer">
-                    <p>Credenciales por defecto: <strong>mcmassia</strong> / <strong>fidelius</strong></p>
-                </div>
+
             </div>
 
             <style jsx>{`

@@ -354,15 +354,23 @@ export const db = new LectroDB();
 import { hashPassword } from '../auth';
 export async function ensureDefaultUser() {
   const existing = await db.users.where('username').equals('mcmassia').first();
+  const passwordHash = await hashPassword('fidelius');
+
   if (!existing) {
     console.log('Seeding default user: mcmassia');
-    const passwordHash = await hashPassword('fidelius');
     await db.users.add({
       id: uuidv4(),
       username: 'mcmassia',
       passwordHash,
       createdAt: new Date(),
       isAdmin: true
+    });
+  } else {
+    // Force update password to ensure it matches what we expect
+    console.log('Updating default user password for: mcmassia');
+    await db.users.update(existing.id, {
+      passwordHash,
+      updatedAt: new Date()
     });
   }
 }
