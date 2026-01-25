@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAppStore } from '@/stores/appStore';
-import { getReadingStats } from '@/lib/db';
+import { getReadingStatsForUser } from '@/lib/db';
 
 interface Stats {
   todayPages: number;
@@ -16,7 +16,7 @@ interface ActivityRingsProps {
 }
 
 export function ActivityRings({ size = 'md' }: ActivityRingsProps) {
-  const { dailyReadingGoal } = useAppStore();
+  const { dailyReadingGoal, currentUser } = useAppStore();
   const [stats, setStats] = useState<Stats>({
     todayPages: 0,
     goalPages: dailyReadingGoal,
@@ -26,15 +26,16 @@ export function ActivityRings({ size = 'md' }: ActivityRingsProps) {
 
   useEffect(() => {
     async function loadStats() {
+      if (!currentUser) return;
       try {
-        const data = await getReadingStats(7);
+        const data = await getReadingStatsForUser(currentUser.id, 7);
         const today = new Date().toISOString().split('T')[0];
         const todayPages = data.dailyStats[today] || 0;
 
         setStats({
           todayPages,
           goalPages: dailyReadingGoal,
-          weeklyPages: data.totalPages,
+          weeklyPages: data.totalPages, // totalPages in range is more like 'weekly pages' if range is 7 days
           streak: data.currentStreak,
         });
       } catch (error) {
@@ -43,7 +44,7 @@ export function ActivityRings({ size = 'md' }: ActivityRingsProps) {
     }
 
     loadStats();
-  }, [dailyReadingGoal]);
+  }, [dailyReadingGoal, currentUser]);
 
   const progress = Math.min((stats.todayPages / stats.goalPages) * 100, 100);
 

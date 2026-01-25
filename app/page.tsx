@@ -57,7 +57,169 @@ export default function Home() {
   const { onboardingComplete, currentUser } = useAppStore();
   const router = useRouter();
 
-  // ... (rest of state)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showImport, setShowImport] = useState(false);
+  const [showSyncReport, setShowSyncReport] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncResults, setSyncResults] = useState<{ added: number; removed: number; errors: string[] } | null>(null);
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+  const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
+
+  // Selection Mode State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(new Set());
+  const [showMassTagsModal, setShowMassTagsModal] = useState(false);
+  const [isGrouped, setIsGrouped] = useState(false);
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
+  const [syncLogs, setSyncLogs] = useState<string[]>([]);
+
+  // Handlers
+  const handleSync = async () => {
+    setIsSyncing(true);
+    setSyncLogs([]);
+    setShowSyncReport(true);
+    const addLog = (msg: string) => setSyncLogs(prev => [...prev.slice(-19), msg]);
+
+    try {
+      const results = await syncWithServer(addLog);
+      setSyncResults(results);
+      if (activeCategory === 'recientes') await loadRecentBooks();
+      else await loadBooks();
+    } catch (error) {
+      console.error(error);
+      setSyncResults({ added: 0, removed: 0, errors: [(error as Error).message] });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteBook = async (book: Book) => {
+    try {
+      await deleteBook(book.id);
+      if (activeCategory === 'recientes' && !isFullyLoaded) await loadRecentBooks();
+      else await loadBooks();
+    } catch (error) {
+      alert('Error al eliminar');
+    }
+  };
+
+  const handleToggleSelection = (book: Book) => {
+    const newSelected = new Set(selectedBookIds);
+    if (newSelected.has(book.id)) newSelected.delete(book.id);
+    else newSelected.add(book.id);
+    setSelectedBookIds(newSelected);
+  };
+
+  const handleMassDelete = async () => {
+    if (!confirm(`¿Eliminar ${selectedBookIds.size} libros?`)) return;
+    try {
+      await Promise.all(Array.from(selectedBookIds).map(id => deleteBook(id)));
+      if (activeCategory === 'recientes' && !isFullyLoaded) await loadRecentBooks();
+      else await loadBooks();
+      setSelectedBookIds(new Set());
+      setIsSelectionMode(false);
+    } catch (e) { alert('Error mass delete'); }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedBookIds.size === filteredBooks.length) {
+      setSelectedBookIds(new Set());
+    } else {
+      setSelectedBookIds(new Set(filteredBooks.map(b => b.id)));
+    }
+  };
+
+  const handleMassStatusChange = async (newStatus: Book['status']) => {
+    if (selectedBookIds.size === 0) return;
+    try {
+      await Promise.all(
+        Array.from(selectedBookIds).map(id => updateBook(id, { status: newStatus }))
+      );
+      if (activeCategory === 'recientes' && !isFullyLoaded) await loadRecentBooks();
+      else await loadBooks();
+      setShowStatusDropdown(false);
+    } catch (e) {
+      console.error('Error updating status:', e);
+      alert('Error al cambiar estado');
+    }
+  };
+
+  // Auto-clear filters when searching to avoid "no results" due to hidden filters
+  useEffect(() => {
+    if (searchQuery) {
+      if (activeThematicCategory) setActiveThematicCategory(null);
+      if (activeUserRating) setActiveUserRating(null);
+      if (activeCategory !== 'all') setActiveCategory('all');
+    }
+  }, [searchQuery, activeThematicCategory, activeUserRating, activeCategory, setActiveThematicCategory, setActiveUserRating, setActiveCategory]);
+
+  useEffect(() => {
+    let booksToFilter = books;
+    if (activeFormat !== 'all') booksToFilter = booksToFilter.filter(book => book.format === activeFormat);
+
+    // Thematic Category filtering
+    if (activeThematicCategory) {
+      booksToFilter = booksToFilter.filter(book => book.metadata?.categories?.includes(activeThematicCategory));
+    }
+
+    // User Rating filtering
+    if (activeUserRating) {
+      booksToFilter = booksToFilter.filter(book => book.metadata?.userRating === activeUserRating);
+    }
+
+    // Category filtering (Tabs)
+    if (activeCategory === 'favorites') booksToFilter = booksToFilter.filter(book => book.isFavorite || book.metadata?.userRating === 'favorito');
+    else if (activeCategory === 'planToRead') booksToFilter = booksToFilter.filter(book => book.status === 'planToRead');
+    else if (activeCategory === 'interesting') booksToFilter = booksToFilter.filter(book => book.status === 'interesting');
+    else if (activeCategory === 'completed') booksToFilter = booksToFilter.filter(book => book.status === 'completed');
+    else if (activeCategory === 'unread') booksToFilter = booksToFilter.filter(book => !book.status || book.status === 'unread');
+    else if (activeCategory === 'reading') booksToFilter = booksToFilter.filter(book => book.status === 'reading');
+    else if (activeCategory === 're_read') booksToFilter = booksToFilter.filter(book => book.status === 're_read');
+    else if (activeCategory === 'recientes') {
+      booksToFilter = [...booksToFilter].sort((a, b) => (new Date(b.updatedAt || b.addedAt || 0).getTime() - new Date(a.updatedAt || a.addedAt || 0).getTime()));
+      booksToFilter = booksToFilter.slice(0, 12);
+    }
+    else if (activeCategory === 'no-metadata') {
+      booksToFilter = booksToFilter.filter(book =>
+        !book.author || book.author === 'Unknown Author' ||
+        !book.metadata?.description || book.metadata.description.length < 10
+      );
+    }
+    else if (activeCategory === 'no-cover') {
+      booksToFilter = booksToFilter.filter(book => !book.cover);
+    }
+
+    if (searchQuery) {
+      const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+      booksToFilter = booksToFilter.filter(book => {
+        const searchableText = [
+          book.title,
+          book.author,
+          ...(book.metadata?.categories || []),
+          book.metadata?.userRating || '',
+          ...(book.metadata?.subjects || []),
+          xrayKeywords[book.id] || ''
+        ].join(' ').toLowerCase();
+
+        // All terms must be present
+        return terms.every(term => searchableText.includes(term));
+      });
+    }
+
+    // Sort
+    booksToFilter.sort((a, b) => {
+      let comparison = 0;
+      if (sortBy === 'title') comparison = a.title.localeCompare(b.title);
+      else if (sortBy === 'author') comparison = a.author.localeCompare(b.author);
+      else if (sortBy === 'addedDate') comparison = (new Date(a.addedAt || 0).getTime() - new Date(b.addedAt || 0).getTime());
+      else if (sortBy === 'progress') comparison = (a.progress || 0) - (b.progress || 0);
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    setFilteredBooks(booksToFilter);
+  }, [books, searchQuery, activeCategory, activeFormat, sortBy, sortOrder, activeThematicCategory, activeUserRating]);
 
   // Auth Check & Init
   useEffect(() => {
