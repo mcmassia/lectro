@@ -63,6 +63,16 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         );
     }
 
+    if (pathname === '/login') {
+        return (
+            <div className="main-layout login-mode h-screen overflow-hidden">
+                <main className="flex-1 w-full bg-[var(--color-bg-primary)]">
+                    {children}
+                </main>
+            </div>
+        );
+    }
+
     // Layout normal con sidebars
     return (
         <div className="main-layout">

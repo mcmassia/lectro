@@ -350,6 +350,23 @@ export class LectroDB extends Dexie {
 
 export const db = new LectroDB();
 
+// Seed default user
+import { hashPassword } from '../auth';
+export async function ensureDefaultUser() {
+  const existing = await db.users.where('username').equals('mcmassia').first();
+  if (!existing) {
+    console.log('Seeding default user: mcmassia');
+    const passwordHash = await hashPassword('fidelius');
+    await db.users.add({
+      id: uuidv4(),
+      username: 'mcmassia',
+      passwordHash,
+      createdAt: new Date(),
+      isAdmin: true
+    });
+  }
+}
+
 // ===================================
 // Database Operations
 // ===================================

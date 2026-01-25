@@ -1,12 +1,18 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useAppStore, useLibraryStore } from '@/stores/appStore';
 import { Search, Moon, Sun, Bell, Plus, User, Menu } from 'lucide-react';
 
 export function TopBar() {
     const { theme, setTheme, setShowImportModal } = useAppStore();
     const { searchQuery, setSearchQuery } = useLibraryStore();
+
+    const pathname = usePathname();
+
+    // Hide on login page
+    if (pathname === '/login') return null;
 
     const toggleTheme = () => {
         setTheme(theme === 'dark' ? 'light' : 'dark');
