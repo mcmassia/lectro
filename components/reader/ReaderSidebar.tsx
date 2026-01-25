@@ -74,17 +74,35 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
     }, [book.id]);
 
     const handleGenerateXRay = async () => {
-        if (!book || !book.fileBlob) {
-            console.error('Book content not available');
+        if (!book) {
+            console.error('Book not available');
             return;
         }
 
         setIsGeneratingXray(true);
         try {
+            // Get book content - either from local blob or download from server
+            let bookContent: ArrayBuffer;
+
+            if (book.fileBlob) {
+                bookContent = await book.fileBlob.arrayBuffer();
+            } else if (book.isOnServer) {
+                // Download from server
+                console.log('Downloading book from server for X-Ray...');
+                const response = await fetch(`/api/books/${book.id}/content`);
+                if (!response.ok) {
+                    throw new Error('Failed to download book from server');
+                }
+                bookContent = await response.arrayBuffer();
+            } else {
+                console.error('Book content not available');
+                setIsGeneratingXray(false);
+                return;
+            }
+
             // Import epubjs dynamically
             const ePub = (await import('epubjs')).default;
-            const arrayBuffer = await book.fileBlob.arrayBuffer();
-            const bookInstance = ePub(arrayBuffer);
+            const bookInstance = ePub(bookContent);
 
             await bookInstance.ready;
 
@@ -106,7 +124,7 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
             console.log(`X-Ray: Processing ${sections.length} sections`);
             // Strategy: Use JSZip directly to read files. This bypasses all browser/CORS/iframe issues.
             const JSZip = (await import('jszip')).default;
-            const zip = await JSZip.loadAsync(book.fileBlob);
+            const zip = await JSZip.loadAsync(bookContent);
 
             for (const item of sections) {
                 if (fullText.length >= limit) break;
