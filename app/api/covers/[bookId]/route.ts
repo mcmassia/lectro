@@ -71,11 +71,28 @@ export async function GET(
             return NextResponse.json({ error: 'Book file not found' }, { status: 404 });
         }
 
-        // 2. Extract Cover
+        // 2. First, check for external cover file in the same directory (cover.jpg, cover.png, cover.webp)
+        const bookDir = path.dirname(filePath);
+        const coverExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
         let coverBuffer: Buffer | null = null;
+
+        for (const ext of coverExtensions) {
+            const externalCoverPath = path.join(bookDir, `cover.${ext}`);
+            if (fs.existsSync(externalCoverPath)) {
+                try {
+                    coverBuffer = fs.readFileSync(externalCoverPath);
+                    console.log(`[Covers] Using external cover file: ${externalCoverPath}`);
+                    break;
+                } catch (e) {
+                    console.error(`Failed to read external cover: ${externalCoverPath}`, e);
+                }
+            }
+        }
+
+        // 3. If no external cover, try extracting from EPUB
         const ext = path.extname(filePath).toLowerCase();
 
-        if (ext === '.epub') {
+        if (!coverBuffer && ext === '.epub') {
             try {
                 const zip = new AdmZip(filePath);
 
