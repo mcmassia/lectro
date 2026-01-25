@@ -9,13 +9,16 @@ type Props = {
     }>;
 };
 
+import { getLibraryPath } from '@/lib/server/config';
+
+// ...
+
 export async function GET(
     req: NextRequest,
     { params }: Props
 ) {
     try {
-        const customPath = req.headers.get('x-library-path');
-        let libraryPath = customPath || process.env.LECTRO_LIBRARY_PATH;
+        const libraryPath = getLibraryPath();
 
         // Check query param 'path' first, fallback to filename param
         // We need to parse searchParams from req.url
@@ -25,23 +28,6 @@ export async function GET(
         // Await params as per Next.js 15+ requirements
         const { filename } = await params;
 
-        // ... libraryPath initialization logic (omitted for brevity, assume existing)
-        if (!libraryPath) {
-            // Fallback for local development
-            if (process.env.NODE_ENV === 'development') {
-                const defaultPath = path.join(process.cwd(), 'library');
-                if (!fs.existsSync(defaultPath)) {
-                    try {
-                        fs.mkdirSync(defaultPath, { recursive: true });
-                    } catch (e) {
-                        console.error('Failed to create default library path:', e);
-                    }
-                }
-                if (fs.existsSync(defaultPath)) {
-                    libraryPath = defaultPath;
-                }
-            }
-        }
 
         if (!libraryPath) {
             return NextResponse.json(
@@ -104,28 +90,10 @@ export async function POST(
         const author = req.headers.get('x-book-author');
         const title = req.headers.get('x-book-title');
 
-        let libraryPath = customPath || process.env.LECTRO_LIBRARY_PATH;
+        const libraryPath = getLibraryPath();
 
         // Await params as per Next.js 15+ requirements
         const { filename } = await params;
-
-        // ... libraryPath initialization (omitted, same as existing)
-        if (!libraryPath) {
-            // Fallback for local development
-            if (process.env.NODE_ENV === 'development') {
-                const defaultPath = path.join(process.cwd(), 'library');
-                if (!fs.existsSync(defaultPath)) {
-                    try {
-                        fs.mkdirSync(defaultPath, { recursive: true });
-                    } catch (e) {
-                        console.error('Failed to create default library path:', e);
-                    }
-                }
-                if (fs.existsSync(defaultPath)) {
-                    libraryPath = defaultPath;
-                }
-            }
-        }
 
         if (!libraryPath) {
             return NextResponse.json(

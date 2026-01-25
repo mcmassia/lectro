@@ -1,85 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { getLibraryPath } from '@/lib/server/config';
 
-const CONFIG_FILE = path.join(process.cwd(), 'server-config.json');
+// Function getLibraryPath removed (deprecated)
 
-function getLibraryPath(req: NextRequest): string {
-    // 4. Validate and Fallback
-    // If we found a path from any source (Config, Env, Header), check if it exists.
-    // If not, fall back to default project library.
-
-    // We need to keep the "candidate" path to check existence
-    let candidatePath = '';
-
-    // Re-evaluating priority structure to include validation:
-
-    // 1. Header
-    const headerPath = req.headers.get('x-library-path');
-    if (headerPath) candidatePath = headerPath;
-
-    // 2. Env
-    else if (process.env.LECTRO_LIBRARY_PATH) candidatePath = process.env.LECTRO_LIBRARY_PATH;
-
-    // 3. Config
-    else {
-        try {
-            if (fs.existsSync(CONFIG_FILE)) {
-                const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-                if (config.libraryPath) {
-                    candidatePath = path.isAbsolute(config.libraryPath)
-                        ? config.libraryPath
-                        : path.resolve(process.cwd(), config.libraryPath);
-                }
-            }
-        } catch (e) { /* ignore */ }
-    }
-
-    // Validate Candidate
-    if (candidatePath && fs.existsSync(candidatePath)) {
-        // If header provided valid path, verify we persist it if it's new? 
-        // Logic in original code persisted header path. We should keep that behavior if desired, 
-        // but robustly.
-        if (headerPath && headerPath === candidatePath) {
-            try {
-                // simple comparison to avoid unnecessary writes
-                const currentConfig = fs.existsSync(CONFIG_FILE) ? JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) : {};
-                if (currentConfig.libraryPath !== headerPath) {
-                    fs.writeFileSync(CONFIG_FILE, JSON.stringify({ libraryPath: headerPath }, null, 2));
-                }
-            } catch (e) { /* ignore */ }
-        }
-        return candidatePath;
-    }
-
-    // 4. Default Fallback (if candidate missing or invalid)
-    if (candidatePath) {
-        console.warn(`Configured path "${candidatePath}" not found or invalid. Falling back to default.`);
-    }
-
-    // Force relative resolve to ensure we don't try to write to system root
-    // In Next.js dev, process.cwd() is project root.
-    // If not found, create it in CWD.
-    const defaultPath = path.resolve(process.cwd(), 'library');
-    console.log(`Resolved default path: ${defaultPath} (CWD: ${process.cwd()})`);
-
-    // Ensure default exists
-    if (!fs.existsSync(defaultPath)) {
-        try {
-            console.log(`Attempting to create directory at: ${defaultPath}`);
-            fs.mkdirSync(defaultPath, { recursive: true });
-        } catch (e) {
-            console.error(`Failed to create default library path at ${defaultPath}:`, e);
-            // Last ditch fallback to temp dir if project root is read-only
-            return path.join('/tmp', 'lectro_library');
-        }
-    }
-    return defaultPath;
-}
 
 export async function GET(req: NextRequest) {
     try {
-        const libraryPath = getLibraryPath(req);
+        const libraryPath = getLibraryPath();
         console.log(`[GET] Using library path: ${libraryPath}`);
 
         if (!libraryPath || !fs.existsSync(libraryPath)) {
@@ -119,7 +48,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const libraryPath = getLibraryPath(req);
+        const libraryPath = getLibraryPath();
         console.log(`[POST] Using library path: ${libraryPath}`);
 
         if (!fs.existsSync(libraryPath)) {

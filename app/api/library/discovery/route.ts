@@ -4,22 +4,10 @@ import path from 'path';
 import AdmZip from 'adm-zip';
 import { v4 as uuidv4 } from 'uuid';
 
-const CONFIG_FILE = path.join(process.cwd(), 'server-config.json');
+import { getLibraryPath } from '@/lib/server/config';
 
-function getLibraryPath(req: NextRequest): string {
-    const headerPath = req.headers.get('x-library-path');
-    if (headerPath) return headerPath;
-    if (process.env.LECTRO_LIBRARY_PATH) return process.env.LECTRO_LIBRARY_PATH;
+// getLibraryPath removed (use import)
 
-    try {
-        if (fs.existsSync(CONFIG_FILE)) {
-            const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-            if (config.libraryPath) return config.libraryPath;
-        }
-    } catch (e) { }
-
-    return path.join(process.cwd(), 'library');
-}
 
 // Helper to extract metadata from EPUB using adm-zip directly
 function extractEpubMetadata(filePath: string): any {
@@ -59,7 +47,7 @@ function extractEpubMetadata(filePath: string): any {
 
 export async function POST(req: NextRequest) {
     try {
-        const libraryPath = getLibraryPath(req);
+        const libraryPath = getLibraryPath();
         console.log(`[Discovery] Starting discovery in: ${libraryPath}`);
 
         const dbPath = path.join(libraryPath, 'lectro_data.json');

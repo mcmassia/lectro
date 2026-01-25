@@ -22,23 +22,10 @@ function getContentType(filePath: string): string {
     }
 }
 
-// Helper to get library path (reused logic)
-function getLibraryPath(): string {
-    // 1. Try server config
-    const configPath = path.join(process.cwd(), 'server-config.json');
-    try {
-        if (fs.existsSync(configPath)) {
-            const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-            if (config.libraryPath) return config.libraryPath;
-        }
-    } catch (e) { /* ignore */ }
+import { getLibraryPath } from '@/lib/server/config';
 
-    // 2. Env
-    if (process.env.LECTRO_LIBRARY_PATH) return process.env.LECTRO_LIBRARY_PATH;
+// Helper to get library path (removed local implementation)
 
-    // 3. Default
-    return path.join(process.cwd(), 'library');
-}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
     try {
