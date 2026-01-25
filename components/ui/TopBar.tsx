@@ -17,8 +17,6 @@ export function TopBar() {
     const pathname = usePathname();
     const userMenuRef = useRef<HTMLDivElement>(null);
 
-    // Hide on login page
-    if (pathname === '/login') return null;
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -40,6 +38,8 @@ export function TopBar() {
         logout();
         router.push('/login');
     };
+
+    if (pathname === '/login') return null;
 
     return (
         <header className="topbound">
