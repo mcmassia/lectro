@@ -6,7 +6,7 @@ import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { ImportModal } from '@/components/library/ImportModal';
 import { useAppStore } from '@/stores/appStore';
-import { getUser } from '@/lib/db';
+import { getUser, ensureDefaultUser } from '@/lib/db';
 
 interface LayoutWrapperProps {
     children: ReactNode;
@@ -20,12 +20,14 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
 
     // Session Validation: ensure persisted user matches DB (handles ID migrations)
     useEffect(() => {
-        if (!currentUser) return;
-
+        // Run this check always to ensure DB consistency (Fixed ID vs Random ID)
         async function validateSession() {
             try {
-                // If we are 'mcmassia', check if our ID matches the DB one
-                if (currentUser && currentUser.username) {
+                // Ensure default user state in DB is correct (migrates if needed)
+                await ensureDefaultUser();
+
+                // If we are logged in as 'mcmassia', check if our session ID matches the DB one
+                if (currentUser && currentUser.username === 'mcmassia') {
                     const dbUser = await getUser(currentUser.username);
                     if (dbUser && dbUser.id !== currentUser.id) {
                         console.log('Session mismatch detected (Migration). Updating session...');

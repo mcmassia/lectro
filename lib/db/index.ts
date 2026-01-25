@@ -67,6 +67,7 @@ export interface Book {
   updatedAt?: Date;
   metadata: BookMetadata;
   isOnServer?: boolean;
+  deletedAt?: Date;
 
   // Deprecated fields (moved to UserBookData), kept optional for type compatibility during migration/types
   lastReadAt?: Date;
@@ -293,6 +294,10 @@ export class LectroDB extends Dexie {
       userBookData: '++id, [userId+bookId], userId, bookId, lastReadAt, status, isFavorite',
       annotations: 'id, [userId+bookId], userId, bookId, createdAt, color, chapterIndex, *tags, isFavorite, isFlashcard',
       readingSessions: 'id, [userId+bookId], userId, bookId, startTime, endTime',
+    });
+
+    this.version(10).stores({
+      books: 'id, title, author, format, addedAt, lastReadAt, updatedAt, progress, status, fileName, filePath, isOnServer, isFavorite, deletedAt',
     }).upgrade(async (trans) => {
       // MIGRATION LOGIC
       // Create Default User 'mcmassia'
@@ -468,11 +473,16 @@ export async function getBook(id: string): Promise<Book | undefined> {
 }
 
 export async function getAllBooks(): Promise<Book[]> {
+  const all = await db.books.toArray();
+  return all.filter(b => !b.deletedAt);
+}
+
+export async function getAllBooksIncludingDeleted(): Promise<Book[]> {
   return db.books.toArray();
 }
 
 export async function getBooksForUser(userId: string): Promise<Book[]> {
-  const books = await db.books.toArray();
+  const books = await getAllBooks();
   const userData = await db.userBookData.where('userId').equals(userId).toArray();
   const userDataMap = new Map(userData.map(d => [d.bookId, d]));
 
@@ -531,7 +541,12 @@ export async function updateUserBookData(userId: string, bookId: string, updates
 
 
 export async function getRecentBooks(limit: number = 12): Promise<Book[]> {
-  const books = await db.books.orderBy('updatedAt').reverse().limit(limit).toArray();
+  const books = await db.books
+    .orderBy('updatedAt')
+    .reverse()
+    .filter(b => !b.deletedAt)
+    .limit(limit)
+    .toArray();
   return books;
 }
 
@@ -540,6 +555,11 @@ export async function updateBook(id: string, updates: Partial<Book>): Promise<nu
 }
 
 export async function deleteBook(id: string): Promise<void> {
+  // Soft Delete
+  await updateBook(id, { deletedAt: new Date() });
+}
+
+export async function hardDeleteBook(id: string): Promise<void> {
   await db.transaction('rw', [db.books, db.annotations, db.vectorChunks, db.xrayData, db.summaries, db.userBookData], async () => {
     await db.books.delete(id);
     await db.annotations.where('bookId').equals(id).delete();

@@ -7,6 +7,7 @@ import {
     User,
     UserBookData,
     getAllBooks,
+    getAllBooksIncludingDeleted,
     getAllTags,
     getAllAnnotationsIncludingDeleted,
     addBook,
@@ -202,7 +203,7 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
 }
 
 export async function pushLocalData() {
-    const books = await getAllBooks();
+    const books = await getAllBooksIncludingDeleted();
     const tags = await getAllTags();
     // Include deleted annotations so server knows about deletions
     const annotations = await getAllAnnotationsIncludingDeleted();
@@ -227,14 +228,10 @@ export async function pushLocalData() {
     };
 
     // Strip blobs to reduce payload. 
-    // Only strip cover if the book is on server (and thus cover can be served via API).
-    // If it's a local-only book, we must preserve the base64 cover or it will be lost on other devices.
+    // We MUST preserve 'cover' (base64) even if book is on server, because secondary devices 
+    // syncing metadata might not have the physical file to serve the cover via API.
     const booksPayload = books.map(b => {
         const { fileBlob, ...rest } = b;
-        if (b.isOnServer) {
-            const { cover, ...noCover } = rest;
-            return noCover;
-        }
         return rest;
     });
 
