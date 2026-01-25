@@ -47,13 +47,19 @@ export function NotesSidebar({
                                     >
                                         {/* Book Cover */}
                                         <div className="w-12 h-16 bg-[var(--color-bg-tertiary)] rounded-md overflow-hidden flex-shrink-0 relative shadow-md border border-[var(--color-border)] group-hover:shadow-lg transition-all">
-                                            {book.cover ? (
-                                                <img src={book.cover} className="w-full h-full object-cover" alt="" />
-                                            ) : (
-                                                <div className="absolute inset-0 flex items-center justify-center text-[10px] text-[var(--color-text-tertiary)] font-serif p-2 text-center leading-tight">
-                                                    {book.title.slice(0, 10)}
-                                                </div>
-                                            )}
+                                            <img
+                                                src={`/api/covers/${book.id}?width=100`}
+                                                alt={book.title}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    const target = e.target as HTMLImageElement;
+                                                    if (book.cover && target.src !== book.cover) {
+                                                        target.src = book.cover;
+                                                    } else {
+                                                        target.style.display = 'none';
+                                                    }
+                                                }}
+                                            />
                                         </div>
 
                                         <div className="flex-1 text-left min-w-0">

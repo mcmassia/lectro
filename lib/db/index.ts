@@ -809,3 +809,70 @@ export async function syncTagsFromBooks(books?: Book[]): Promise<void> {
 
   await db.tags.bulkAdd(newTags);
 }
+
+// Recovery function for legacy data (annotations/sessions without userId)
+export async function recoverLegacyData(targetUserId?: string): Promise<{ annotations: number; sessions: number; userBookData: number }> {
+  const DEFAULT_USER_ID = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d';
+  const userId = targetUserId || DEFAULT_USER_ID;
+
+  let migratedAnnotations = 0;
+  let migratedSessions = 0;
+  let migratedUserBookData = 0;
+
+  // 1. Find orphan annotations (no userId or empty userId)
+  const allAnnotations = await db.annotations.toArray();
+  const orphanAnnotations = allAnnotations.filter(a => !a.userId || a.userId === '');
+
+  if (orphanAnnotations.length > 0) {
+    console.log(`[Recovery] Found ${orphanAnnotations.length} orphan annotations`);
+    for (const annotation of orphanAnnotations) {
+      await db.annotations.update(annotation.id, { userId, updatedAt: new Date() });
+    }
+    migratedAnnotations = orphanAnnotations.length;
+  }
+
+  // 2. Find orphan reading sessions
+  const allSessions = await db.readingSessions.toArray();
+  const orphanSessions = allSessions.filter(s => !s.userId || s.userId === '');
+
+  if (orphanSessions.length > 0) {
+    console.log(`[Recovery] Found ${orphanSessions.length} orphan reading sessions`);
+    for (const session of orphanSessions) {
+      await db.readingSessions.update(session.id, { userId });
+    }
+    migratedSessions = orphanSessions.length;
+  }
+
+  // 3. Migrate book progress/status from books table to userBookData if missing
+  const books = await db.books.toArray();
+  const existingUserData = await db.userBookData.where('userId').equals(userId).toArray();
+  const existingBookIds = new Set(existingUserData.map(d => d.bookId));
+
+  const booksToMigrate = books.filter(b =>
+    !existingBookIds.has(b.id) &&
+    (b.progress || b.status || b.lastReadAt || b.currentPosition)
+  );
+
+  if (booksToMigrate.length > 0) {
+    console.log(`[Recovery] Found ${booksToMigrate.length} books with progress to migrate`);
+    const userBookDataItems = booksToMigrate.map(book => ({
+      userId,
+      bookId: book.id,
+      progress: book.progress || 0,
+      status: book.status || 'unread',
+      lastReadAt: book.lastReadAt,
+      currentPosition: book.currentPosition,
+      currentPage: book.currentPage,
+      userRating: book.metadata?.userRating,
+      isFavorite: book.isFavorite,
+      manualCategories: book.metadata?.manualCategories,
+      updatedAt: new Date()
+    }));
+    await db.userBookData.bulkAdd(userBookDataItems);
+    migratedUserBookData = userBookDataItems.length;
+  }
+
+  console.log(`[Recovery] Complete: ${migratedAnnotations} annotations, ${migratedSessions} sessions, ${migratedUserBookData} book data records`);
+
+  return { annotations: migratedAnnotations, sessions: migratedSessions, userBookData: migratedUserBookData };
+}

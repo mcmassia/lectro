@@ -6,7 +6,7 @@ import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { ImportModal } from '@/components/library/ImportModal';
 import { useAppStore } from '@/stores/appStore';
-import { getUser, ensureDefaultUser } from '@/lib/db';
+import { getUser, ensureDefaultUser, recoverLegacyData } from '@/lib/db';
 
 interface LayoutWrapperProps {
     children: ReactNode;
@@ -25,6 +25,9 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
             try {
                 // Ensure default user state in DB is correct (migrates if needed)
                 await ensureDefaultUser();
+
+                // Recover any legacy data (annotations/sessions without userId)
+                await recoverLegacyData();
 
                 // If we are logged in as 'mcmassia', check if our session ID matches the DB one
                 if (currentUser && currentUser.username === 'mcmassia') {

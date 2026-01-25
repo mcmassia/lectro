@@ -218,6 +218,7 @@ export default function NotesPage() {
                                     <NoteCard
                                         key={note.id}
                                         note={note}
+                                        bookId={book?.id || note.bookId}
                                         bookTitle={book?.title || 'Libro desconocido'}
                                         bookCover={book?.cover}
                                         bookAuthor={book?.author}

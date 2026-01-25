@@ -6,6 +6,7 @@ import { BookOpen, Edit2, Image as ImageIcon, HelpCircle, Share2, MoreVertical }
 interface NoteCardProps {
     note: Annotation;
     bookTitle: string;
+    bookId: string;
     bookCover?: string;
     bookAuthor?: string;
     chapterInfo?: string;
@@ -17,6 +18,7 @@ interface NoteCardProps {
 export function NoteCard({
     note,
     bookTitle,
+    bookId,
     bookCover,
     bookAuthor = "Autor desconocido",
     chapterInfo,
@@ -48,13 +50,19 @@ export function NoteCard({
             <div className="flex items-center gap-4 p-5 pb-4">
                 {/* Book Cover - Small square */}
                 <div className="w-11 h-14 bg-[var(--color-bg-tertiary)] rounded-lg overflow-hidden flex-shrink-0 border border-[var(--color-border)] shadow-sm">
-                    {bookCover ? (
-                        <img src={bookCover} alt={bookTitle} className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-[var(--color-bg-tertiary)] text-[var(--color-text-tertiary)]">
-                            <BookOpen size={18} />
-                        </div>
-                    )}
+                    <img
+                        src={`/api/covers/${bookId}?width=100`}
+                        alt={bookTitle}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            if (bookCover && target.src !== bookCover) {
+                                target.src = bookCover;
+                            } else {
+                                target.style.display = 'none';
+                            }
+                        }}
+                    />
                 </div>
 
                 {/* Book Meta */}
