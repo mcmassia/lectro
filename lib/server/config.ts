@@ -16,12 +16,7 @@ export function getLibraryPath(): string {
         try {
             const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
             if (config.libraryPath) {
-                // SAFETY: Ignore root '/library' path which was accidentally forcefully set by header bugs
-                if (config.libraryPath === '/library' || config.libraryPath === '/' || config.libraryPath === '/usr/lib') {
-                    console.warn(`Ignoring suspicious library path in config: ${config.libraryPath}. Using default instead.`);
-                } else {
-                    candidatePath = config.libraryPath;
-                }
+                candidatePath = config.libraryPath;
             }
         } catch (e) {
             console.error('Error reading server-config.json:', e);
