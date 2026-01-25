@@ -373,14 +373,9 @@ export async function ensureDefaultUser() {
       isAdmin: true
     });
   } else {
-    // Force update password to ensure it matches what we expect
-    // And ensure ID is consistent if we can (though changing ID effectively creates a new user, 
-    // ideally we would migrate data, but for now let's hope existing users align or this is fresh)
-    console.log('Updating default user password for: mcmassia');
-    await db.users.update(existing.id, {
-      passwordHash,
-      updatedAt: new Date()
-    });
+    // Check for ID mismatch only, do NOT force password update
+
+    // Warn if ID mismatch (debug info)
 
     // Warn if ID mismatch (debug info)
     if (existing.id !== DEFAULT_USER_ID) {
