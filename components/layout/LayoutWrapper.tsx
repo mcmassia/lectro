@@ -1,11 +1,12 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
 import { ImportModal } from '@/components/library/ImportModal';
 import { useAppStore } from '@/stores/appStore';
+import { getUser } from '@/lib/db';
 
 interface LayoutWrapperProps {
     children: ReactNode;
@@ -15,7 +16,28 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
     const pathname = usePathname();
     const isReaderMode = pathname?.startsWith('/reader');
     const isNotesMode = pathname?.startsWith('/notes');
-    const { showImportModal, setShowImportModal } = useAppStore();
+    const { showImportModal, setShowImportModal, currentUser, login } = useAppStore();
+
+    // Session Validation: ensure persisted user matches DB (handles ID migrations)
+    useEffect(() => {
+        if (!currentUser) return;
+
+        async function validateSession() {
+            try {
+                // If we are 'mcmassia', check if our ID matches the DB one
+                if (currentUser && currentUser.username) {
+                    const dbUser = await getUser(currentUser.username);
+                    if (dbUser && dbUser.id !== currentUser.id) {
+                        console.log('Session mismatch detected (Migration). Updating session...');
+                        login(dbUser);
+                    }
+                }
+            } catch (e) {
+                console.error('Session validation failed', e);
+            }
+        }
+        validateSession();
+    }, [currentUser, login]);
 
     const importModal = showImportModal && (
         <ImportModal onClose={() => setShowImportModal(false)} />
