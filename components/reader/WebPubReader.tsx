@@ -56,7 +56,7 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
                         // book.currentPosition might be an epub cfi from previous reader, which won't work directy.
                         // We'll default to 0 for migration safety unless we can map it.
                         const index = data.readingOrder.findIndex((link: ReadiumLink) =>
-                            book.currentPosition.includes(link.href)
+                            book.currentPosition?.includes(link.href)
                         );
                         if (index !== -1) setCurrentResourceIndex(index);
                     }
