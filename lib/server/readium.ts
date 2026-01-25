@@ -134,6 +134,15 @@ export class ReadiumHelper {
                 return fuzzyPath;
             }
 
+            // 4. Fallback: Lookup by fileName in library root
+            if (book.fileName) {
+                const namePath = path.join(this.libraryPath, book.fileName);
+                if (fs.existsSync(namePath)) {
+                    console.log(`[Readium] Resolved via fileName fallback: ${namePath}`);
+                    return namePath;
+                }
+            }
+
             console.error(`[Readium] File does not exist: ${rawPath}`);
             return null;
 

@@ -246,7 +246,7 @@ export default function ReaderPage() {
                     {book.format === 'epub' ? (
                         // Production: Use WebPubReader (Readium) for server books
                         // Development: Use EpubReader for local books with fileBlob
-                        book.isOnServer && book.filePath ? (
+                        book.isOnServer ? (
                             <WebPubReader
                                 ref={epubReaderRef}
                                 book={book}

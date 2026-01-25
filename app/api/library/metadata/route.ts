@@ -76,7 +76,13 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Helper to merge arrays by ID
+        // Helper to check timestamps
+        const getTime = (item: any) => {
+            if (!item) return 0;
+            return new Date(item.updatedAt || item.lastReadAt || item.createdAt || 0).getTime();
+        };
+
+        // Helper to merge arrays by ID with timestamp conflict resolution
         const mergeById = (existing: any[], incoming: any[], deletedIds: string[] = []) => {
             const map = new Map(existing.map(item => [item.id || item.name, item]));
 
@@ -86,28 +92,45 @@ export async function POST(req: NextRequest) {
             // Apply updates/additions
             if (incoming && incoming.length > 0) {
                 incoming.forEach(item => {
-                    if (item.id) map.set(item.id, item);
+                    const key = item.id || item.name;
+                    const existingItem = map.get(key);
+
+                    if (existingItem) {
+                        // Conflict resolution
+                        if (getTime(item) >= getTime(existingItem)) {
+                            map.set(key, item);
+                        }
+                    } else {
+                        if (key) map.set(key, item);
+                    }
                 });
             }
             return Array.from(map.values());
         };
 
-        // Helper to merge by composite ID (for userBookData which uses auto-inc ID locally but needs sync by userId+bookId)
+        // Helper to merge by composite ID (userId_bookId) with timestamp check
         const mergeByCompositeKey = (existing: any[], incoming: any[]) => {
-            // Key format: "userId_bookId"
             const getKey = (item: any) => `${item.userId}_${item.bookId}`;
             const map = new Map(existing.map(item => [getKey(item), item]));
 
             if (incoming && incoming.length > 0) {
                 incoming.forEach(item => {
                     if (item.userId && item.bookId) {
-                        // We strictly want to preserve the data, but strip the local ID if it exists 
-                        // to avoid contaminating server with conflicting local IDs.
-                        // However, keeping an ID on server helps if we ever need it, but here the key is composite.
-                        // Let's store it without 'id' property on server to be safe, 
-                        // or just overwrite. The sync.ts logic strips 'id' on receive.
+                        const key = getKey(item);
+                        const existingItem = map.get(key);
+
+                        // Drop local ID from incoming to avoid conflicts
                         const { id, ...rest } = item;
-                        map.set(getKey(item), rest);
+                        // Preserve ID if existing has one, or use none (server doesn't need it strictly)
+                        const mergedItem = existingItem ? { ...rest, id: existingItem.id } : rest;
+
+                        if (existingItem) {
+                            if (getTime(mergedItem) >= getTime(existingItem)) {
+                                map.set(key, mergedItem);
+                            }
+                        } else {
+                            map.set(key, mergedItem);
+                        }
                     }
                 });
             }

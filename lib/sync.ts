@@ -226,9 +226,15 @@ export async function pushLocalData() {
         return chunks;
     };
 
-    // Strip blobs and covers to reduce payload
+    // Strip blobs to reduce payload. 
+    // Only strip cover if the book is on server (and thus cover can be served via API).
+    // If it's a local-only book, we must preserve the base64 cover or it will be lost on other devices.
     const booksPayload = books.map(b => {
-        const { fileBlob, cover, ...rest } = b;
+        const { fileBlob, ...rest } = b;
+        if (b.isOnServer) {
+            const { cover, ...noCover } = rest;
+            return noCover;
+        }
         return rest;
     });
 

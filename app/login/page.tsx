@@ -6,6 +6,7 @@ import { useAppStore } from '@/stores/appStore';
 import { getUser, ensureDefaultUser } from '@/lib/db';
 import { verifyPassword } from '@/lib/auth';
 import { User, Lock, ArrowRight, BookOpen } from 'lucide-react';
+import { syncData } from '@/lib/sync';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -16,13 +17,17 @@ export default function LoginPage() {
     const router = useRouter();
     const login = useAppStore(state => state.login);
 
+
+
     // Initialize default user on mount
     useEffect(() => {
         async function init() {
             try {
+                // Sync users from server so we can login with them
+                await syncData();
                 await ensureDefaultUser();
             } catch (e) {
-                console.error('Failed to seed user', e);
+                console.error('Failed to seed user or sync', e);
             } finally {
                 setIsInitializing(false);
             }
