@@ -1,7 +1,7 @@
 'use client';
 
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
-import { getReadingStats } from '@/lib/db';
+import { getReadingStatsForUser } from '@/lib/db';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -18,15 +18,17 @@ export function RightSidebar() {
         activeTag, setActiveTag,
         tags, setTags, setView, currentView
     } = useLibraryStore();
-    const { dailyReadingGoal } = useAppStore();
+    const { dailyReadingGoal, currentUser } = useAppStore();
     const pathname = usePathname();
     const router = useRouter();
     const [stats, setStats] = useState<{ dailyStats: any } | null>(null);
 
     useEffect(() => {
-        getReadingStats().then(setStats);
+        if (currentUser) {
+            getReadingStatsForUser(currentUser.id).then(setStats);
+        }
         getAllTags().then(setTags);
-    }, [setTags]);
+    }, [setTags, currentUser]);
 
     const currentlyReading = books.filter(b => b.progress > 0 && b.progress < 100).slice(0, 3);
     const readingStates = {
