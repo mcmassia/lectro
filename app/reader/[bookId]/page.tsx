@@ -42,7 +42,7 @@ export default function ReaderPage() {
         chapterTitle,
     } = useReaderStore();
 
-    const { readerSidebarOpen, setReaderSidebarOpen, readerSettings } = useAppStore();
+    const { readerSidebarOpen, setReaderSidebarOpen, readerSettings, currentUser } = useAppStore();
     const [showAnnotationPopover, setShowAnnotationPopover] = useState(false);
     const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
     const [selectedColor, setSelectedColor] = useState<Annotation['color']>('yellow');
@@ -137,10 +137,11 @@ export default function ReaderPage() {
     }, [setSelection]);
 
     const handleCreateAnnotation = useCallback(async () => {
-        if (!selectedText || !selectionCfi || !book) return;
+        if (!selectedText || !selectionCfi || !book || !currentUser) return;
 
         const annotation: Annotation = {
             id: uuid(),
+            userId: currentUser.id,
             bookId: book.id,
             cfi: selectionCfi,
             text: selectedText,
@@ -157,7 +158,7 @@ export default function ReaderPage() {
         setShowAnnotationPopover(false);
         setNoteText('');
         clearSelection();
-    }, [selectedText, selectionCfi, book, annotations, setAnnotations, clearSelection, noteText, selectedColor, chapterTitle, currentPage]);
+    }, [selectedText, selectionCfi, book, currentUser, annotations, setAnnotations, clearSelection, noteText, selectedColor, chapterTitle, currentPage]);
 
     const handleClosePopover = useCallback(() => {
         setShowAnnotationPopover(false);
