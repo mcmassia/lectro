@@ -296,13 +296,28 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                         title="Paste image (Ctrl+V) anywhere in modal"
                     >
                         <div className="book-cover-wrapper">
-                            {book.cover ? (
-                                <img src={book.cover} alt={book.title} className="book-cover" />
-                            ) : (
-                                <div className="book-cover-placeholder">
-                                    <span>{book.title[0]}</span>
-                                </div>
-                            )}
+                            <img
+                                src={`/api/covers/${book.id}?width=400`}
+                                alt={book.title}
+                                className="book-cover"
+                                onError={(e) => {
+                                    // Fallback to stored base64 cover or placeholder
+                                    const target = e.target as HTMLImageElement;
+                                    if (book.cover && target.src !== book.cover) {
+                                        target.src = book.cover;
+                                    } else {
+                                        // Show placeholder
+                                        target.style.display = 'none';
+                                        const wrapper = target.parentElement;
+                                        if (wrapper && !wrapper.querySelector('.placeholder-fallback')) {
+                                            const placeholder = document.createElement('div');
+                                            placeholder.className = 'book-cover-placeholder placeholder-fallback';
+                                            placeholder.innerHTML = `<span>${book.title[0]}</span>`;
+                                            wrapper.appendChild(placeholder);
+                                        }
+                                    }
+                                }}
+                            />
                             <div className="cover-overlay">
                                 <span>Paste image (Ctrl+V)</span>
                                 <button
