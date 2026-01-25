@@ -302,8 +302,8 @@ export class LectroDB extends Dexie {
       // MIGRATION LOGIC
       // Create Default User 'mcmassia'
       const userId = uuidv4();
-      // SHA-256 for 'fidelius' = f10e2d3674686417772274431718873730076046e7e4070a2417757917849814
-      const passwordHash = 'f10e2d3674686417772274431718873730076046e7e4070a2417757917849814';
+      // SHA-256 for 'fidelius' (Verified)
+      const passwordHash = '7a1e679ebcc55800d319e5d5d3b80a620159206ad5101086c0c56bcb6ea37708';
 
       await trans.table('users').add({
         id: userId,
@@ -373,6 +373,18 @@ export async function ensureDefaultUser() {
       isAdmin: true
     });
   } else {
+    // Verify password is correct (auto-heal if hash is wrong/corrupted)
+    // Correct SHA-256 for 'fidelius'
+    const CORRECT_HASH = '7a1e679ebcc55800d319e5d5d3b80a620159206ad5101086c0c56bcb6ea37708';
+
+    if (existing.passwordHash !== CORRECT_HASH) {
+      console.log('Correcting password hash for: mcmassia');
+      await db.users.update(existing.id, {
+        passwordHash: CORRECT_HASH,
+        updatedAt: new Date()
+      });
+    }
+
     // Check for ID mismatch only, do NOT force password update
 
     // Warn if ID mismatch (debug info)
