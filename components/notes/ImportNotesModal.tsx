@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useMemo } from 'react';
 import { X, Upload, FileText, Check, AlertCircle, Search } from 'lucide-react';
 import { Book } from '@/lib/db';
 import { parseNotesFile, importNotes, ImportedNote, ImportResult } from '@/lib/notes/import';
+import { useAppStore } from '@/stores/appStore';
 
 interface ImportNotesModalProps {
     books: Book[];
@@ -14,6 +15,7 @@ interface ImportNotesModalProps {
 type ImportStep = 'upload' | 'preview' | 'importing' | 'complete';
 
 export function ImportNotesModal({ books, onClose, onImportComplete }: ImportNotesModalProps) {
+    const { currentUser } = useAppStore();
     const [step, setStep] = useState<ImportStep>('upload');
     const [isDragging, setIsDragging] = useState(false);
     const [parsedNotes, setParsedNotes] = useState<ImportedNote[]>([]);
@@ -80,11 +82,13 @@ export function ImportNotesModal({ books, onClose, onImportComplete }: ImportNot
     };
 
     const handleImport = async () => {
+        if (!currentUser) return;
+
         setStep('importing');
         setError('');
 
         try {
-            const result = await importNotes(parsedNotes, selectedBookId || undefined);
+            const result = await importNotes(parsedNotes, currentUser.id, selectedBookId || undefined);
             setImportResult(result);
             setStep('complete');
 

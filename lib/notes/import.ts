@@ -282,7 +282,8 @@ async function findBookByTitle(title: string, books: Book[]): Promise<Book | und
  */
 export async function importNotes(
     importedNotes: ImportedNote[],
-    targetBookId?: string
+    userId: string,
+    targetBookId?: string,
 ): Promise<ImportResult> {
     const result: ImportResult = {
         success: false,
@@ -318,6 +319,7 @@ export async function importNotes(
 
             const annotation: Annotation = {
                 id: uuidv4(),
+                userId,
                 bookId,
                 cfi: note.readerUrl || '', // Use URL as reference, won't navigate
                 text: note.quote,
