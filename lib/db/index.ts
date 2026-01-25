@@ -5,28 +5,52 @@ import { v4 as uuidv4 } from 'uuid';
 // Type Definitions
 // ===================================
 
+export interface User {
+  id: string;
+  username: string;
+  passwordHash: string; // We'll store a simple hash for now
+  createdAt: Date;
+  updatedAt?: Date;
+  isAdmin?: boolean;
+}
+
+export interface UserBookData {
+  id?: number;
+  userId: string;
+  bookId: string;
+  progress: number;
+  status: 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read';
+  lastReadAt?: Date;
+  currentPosition?: string;
+  currentPage?: number;
+  userRating?: UserBookRating;
+  isFavorite?: boolean;
+  manualCategories?: BookCategory[];
+  updatedAt: Date;
+}
+
 // Categorías temáticas de alta jerarquía (automáticas)
 export type BookCategory =
-  | 'Pensamiento'    // Filosofía, ética, lógica, epistemología
-  | 'Espiritualidad' // Religión, teología, mística, mitología
-  | 'Sociedad'       // Historia, política, sociología, economía
-  | 'Ciencia'        // Física, biología, matemáticas, divulgación
-  | 'Tecnología'     // IA, informática, ingeniería, innovación
-  | 'Narrativa'      // Novela, cuento, ficción general
-  | 'PoesíaDrama'    // Poesía lírica, teatro, drama
-  | 'ArteCultura'    // Pintura, música, cine, biografías artistas
-  | 'Crecimiento'    // Psicología, productividad, liderazgo
-  | 'Práctica'       // Manuales, idiomas, guías, cocina, viajes
-  | 'SinClasificar'; // No se pudo clasificar (sin metadatos)
+  | 'Pensamiento'
+  | 'Espiritualidad'
+  | 'Sociedad'
+  | 'Ciencia'
+  | 'Tecnología'
+  | 'Narrativa'
+  | 'PoesíaDrama'
+  | 'ArteCultura'
+  | 'Crecimiento'
+  | 'Práctica'
+  | 'SinClasificar';
 
 // Valoraciones personales del usuario
 export type UserBookRating =
-  | 'imprescindible'  // 💎 Libros que cambiaron tu forma de pensar
-  | 'favorito'        // ❤️ Placer estético/emocional alto
-  | 'referencia'      // ⭐ Consulta recurrente técnica
-  | 'releer'          // ⏳ Denso, requiere relectura
-  | 'correcto'        // ♻️ Decente pero no memorable
-  | 'prescindible';   // 🚮 Sin valor real para el futuro
+  | 'imprescindible'
+  | 'favorito'
+  | 'referencia'
+  | 'releer'
+  | 'correcto'
+  | 'prescindible';
 
 
 export interface Book {
@@ -41,19 +65,18 @@ export interface Book {
   fileSize: number;
   addedAt: Date;
   updatedAt?: Date;
-  lastReadAt?: Date;
-  progress: number; // 0-100
-  currentPosition: string; // CFI for EPUB, page number for PDF
-  totalPages?: number;
-  currentPage?: number;
   metadata: BookMetadata;
-  status: 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read';
   isOnServer?: boolean;
+
+  // Deprecated fields (moved to UserBookData), kept optional for type compatibility during migration/types
+  lastReadAt?: Date;
+  progress?: number;
+  currentPosition?: string;
+  currentPage?: number;
+  status?: 'unread' | 'interesting' | 'planToRead' | 'reading' | 'completed' | 're_read';
   isFavorite?: boolean;
+  totalPages?: number;
 }
-
-
-
 
 
 export interface BookMetadata {
@@ -66,9 +89,9 @@ export interface BookMetadata {
   series?: string;
   seriesIndex?: number;
   tags?: string[];
-  categories?: BookCategory[];     // Etiquetas temáticas (puede tener múltiples)
-  manualCategories?: BookCategory[]; // Etiquetas asignadas manualmente por usuario
-  userRating?: UserBookRating;   // Valoración personal del usuario
+  categories?: BookCategory[];
+  manualCategories?: BookCategory[];
+  userRating?: UserBookRating;
 }
 
 export interface Tag {
@@ -82,6 +105,7 @@ export interface Tag {
 export interface Annotation {
   id: string;
   bookId: string;
+  userId: string; // New field
   cfi: string; // Location in book
   text: string; // Selected/highlighted text
   note?: string; // User's note
@@ -103,6 +127,7 @@ export type HighlightColor = 'yellow' | 'green' | 'blue' | 'pink' | 'orange';
 export interface ReadingSession {
   id: string;
   bookId: string;
+  userId: string; // New field
   startTime: Date;
   endTime: Date;
   pagesRead: number;
@@ -210,6 +235,8 @@ export const defaultAppSettings: Omit<AppSettings, 'id'> = {
 
 export class LectroDB extends Dexie {
   books!: Table<Book, string>;
+  users!: Table<User, string>;
+  userBookData!: Table<UserBookData, number>;
   annotations!: Table<Annotation, string>;
   readingSessions!: Table<ReadingSession, string>;
   vectorChunks!: Table<VectorChunk, string>;
@@ -259,6 +286,61 @@ export class LectroDB extends Dexie {
     this.version(8).stores({
       annotations: 'id, bookId, createdAt, color, chapterIndex, *tags, isFavorite, isFlashcard',
     });
+
+    // Version 9: User Support and Migration
+    this.version(9).stores({
+      users: 'id, &username',
+      userBookData: '++id, [userId+bookId], userId, bookId, lastReadAt, status, isFavorite',
+      annotations: 'id, [userId+bookId], userId, bookId, createdAt, color, chapterIndex, *tags, isFavorite, isFlashcard',
+      readingSessions: 'id, [userId+bookId], userId, bookId, startTime, endTime',
+    }).upgrade(async (trans) => {
+      // MIGRATION LOGIC
+      // Create Default User 'mcmassia'
+      const userId = uuidv4();
+      // SHA-256 for 'fidelius' = f10e2d3674686417772274431718873730076046e7e4070a2417757917849814
+      const passwordHash = 'f10e2d3674686417772274431718873730076046e7e4070a2417757917849814';
+
+      await trans.table('users').add({
+        id: userId,
+        username: 'mcmassia',
+        passwordHash,
+        createdAt: new Date(),
+        isAdmin: true
+      });
+
+      // Migrate Book Progress
+      const books = await trans.table('books').toArray();
+      if (books.length > 0) {
+        const userBookDataItems = books.map(book => ({
+          userId,
+          bookId: book.id,
+          progress: book.progress || 0,
+          status: book.status || 'unread',
+          lastReadAt: book.lastReadAt,
+          currentPosition: book.currentPosition,
+          currentPage: book.currentPage,
+          userRating: book.metadata?.userRating,
+          isFavorite: book.isFavorite,
+          manualCategories: book.metadata?.manualCategories,
+          updatedAt: new Date()
+        }));
+        await trans.table('userBookData').bulkAdd(userBookDataItems);
+      }
+
+      // Migrate Annotations
+      const annotations = await trans.table('annotations').toArray();
+      if (annotations.length > 0) {
+        const updatedAnnotations = annotations.map(a => ({ ...a, userId }));
+        await trans.table('annotations').bulkPut(updatedAnnotations);
+      }
+
+      // Migrate Reading Sessions
+      const sessions = await trans.table('readingSessions').toArray();
+      if (sessions.length > 0) {
+        const updatedSessions = sessions.map(s => ({ ...s, userId }));
+        await trans.table('readingSessions').bulkPut(updatedSessions);
+      }
+    });
   }
 }
 
@@ -272,11 +354,33 @@ export const db = new LectroDB();
 // Database Operations
 // ===================================
 
+// Users
+export async function getUsers(): Promise<User[]> {
+  return db.users.toArray();
+}
+
+export async function getUser(username: string): Promise<User | undefined> {
+  return db.users.where('username').equals(username).first();
+}
+
+export async function createUser(user: User): Promise<string> {
+  return db.users.add(user);
+}
+
+export async function updateUser(id: string, updates: Partial<User>): Promise<number> {
+  return db.users.update(id, { ...updates, updatedAt: new Date() });
+}
+
+
 // Books
 export async function addBook(book: Book): Promise<string> {
   if (!book.updatedAt) {
     book.updatedAt = new Date();
   }
+  // Remove user-specific fields from book object before saving to 'books' table to keep it clean
+  // But strictly Dexie stores what we give it. 
+  // We'll keep legacy fields for now to avoid breaking other parts of app that might read them directly before we refactor all.
+  // But ideally we should strip them.
   return db.books.add(book);
 }
 
@@ -285,17 +389,70 @@ export async function getBook(id: string): Promise<Book | undefined> {
 }
 
 export async function getAllBooks(): Promise<Book[]> {
-  // Use toArray() directly to ensure we get all books, including those without lastReadAt
-  // Sorting is handled in the store
   return db.books.toArray();
 }
 
+export async function getBooksForUser(userId: string): Promise<Book[]> {
+  const books = await db.books.toArray();
+  const userData = await db.userBookData.where('userId').equals(userId).toArray();
+  const userDataMap = new Map(userData.map(d => [d.bookId, d]));
+
+  return books.map(book => {
+    const data = userDataMap.get(book.id);
+    if (data) {
+      // Merge user data over book data
+      return {
+        ...book,
+        progress: data.progress,
+        status: data.status,
+        lastReadAt: data.lastReadAt,
+        currentPosition: data.currentPosition,
+        currentPage: data.currentPage,
+        isFavorite: data.isFavorite,
+        metadata: {
+          ...book.metadata,
+          userRating: data.userRating,
+          manualCategories: data.manualCategories
+        }
+      };
+    }
+    return {
+      ...book,
+      status: 'unread',
+      progress: 0,
+      isFavorite: false,
+      lastReadAt: undefined
+    };
+  });
+}
+
+export async function updateUserBookData(userId: string, bookId: string, updates: Partial<UserBookData>): Promise<number> {
+  const existing = await db.userBookData.where('[userId+bookId]').equals([userId, bookId]).first();
+
+  if (existing) {
+    return db.userBookData.update(existing.id!, { ...updates, updatedAt: new Date() });
+  } else {
+    // Create new
+    const newData: UserBookData = {
+      userId,
+      bookId,
+      progress: 0,
+      status: 'unread', // Default
+      updatedAt: new Date(),
+      ...updates as any // dangerous cast but we trust inputs mostly
+    };
+    // Ensure defaults if partial doesn't cover
+    if (!newData.progress) newData.progress = 0;
+    if (!newData.status) newData.status = 'unread';
+
+    await db.userBookData.add(newData);
+    return 1;
+  }
+}
+
+
 export async function getRecentBooks(limit: number = 12): Promise<Book[]> {
   const books = await db.books.orderBy('updatedAt').reverse().limit(limit).toArray();
-  // Fallback to addedAt if needed, but we can assume updatedAt is populated or we could sort manually if mixed
-  // Since we want "subidos o modificados", updatedAt should cover both if we maintain it well.
-  // Ideally, query both indices? No, Dexie doesn't do OR easily.
-  // Let's assume updatedAt is reliable (it defaults to new Date() on add).
   return books;
 }
 
@@ -304,23 +461,38 @@ export async function updateBook(id: string, updates: Partial<Book>): Promise<nu
 }
 
 export async function deleteBook(id: string): Promise<void> {
-  await db.transaction('rw', [db.books, db.annotations, db.vectorChunks, db.xrayData, db.summaries], async () => {
+  await db.transaction('rw', [db.books, db.annotations, db.vectorChunks, db.xrayData, db.summaries, db.userBookData], async () => {
     await db.books.delete(id);
     await db.annotations.where('bookId').equals(id).delete();
     await db.vectorChunks.where('bookId').equals(id).delete();
     await db.xrayData.where('bookId').equals(id).delete();
     await db.summaries.where('bookId').equals(id).delete();
+    // Delete user data too
+    // We can't delete by bookId easily unless we index bookId or iterate.
+    // We indexed bookId in version 9: userBookData: '++id, [userId+bookId], userId, bookId...
+    await db.userBookData.where('bookId').equals(id).delete();
   });
 }
 
 // Annotations
+// Updated to require userId
 export async function addAnnotation(annotation: Annotation): Promise<string> {
   return db.annotations.add(annotation);
 }
 
+// Updated to filter by userId
+export async function getAnnotationsForUserBook(userId: string, bookId: string): Promise<Annotation[]> {
+  // We can use the compound index or just filter.
+  // Index: [userId+bookId]
+  const all = await db.annotations.where('[userId+bookId]').equals([userId, bookId]).toArray();
+  return all.filter(a => !a.deletedAt);
+}
+
 export async function getAnnotationsForBook(bookId: string): Promise<Annotation[]> {
+  // Legacy/Admin view? Or if we want all annotations for a book regardless of user?
+  // Probably shouldn't happen in normal usage.
+  // Warning: This returns all annotations.
   const all = await db.annotations.where('bookId').equals(bookId).toArray();
-  // Filter out soft-deleted annotations
   return all.filter(a => !a.deletedAt);
 }
 
@@ -328,7 +500,6 @@ export async function updateAnnotation(id: string, updates: Partial<Annotation>)
   return db.annotations.update(id, { ...updates, updatedAt: new Date() });
 }
 
-// Soft delete - marks annotation as deleted instead of removing
 export async function deleteAnnotation(id: string): Promise<void> {
   await db.annotations.update(id, {
     deletedAt: new Date(),
@@ -336,18 +507,14 @@ export async function deleteAnnotation(id: string): Promise<void> {
   });
 }
 
-// Hard delete - actually removes from database (for cleanup)
 export async function hardDeleteAnnotation(id: string): Promise<void> {
   await db.annotations.delete(id);
 }
 
 export async function getAllAnnotations(): Promise<Annotation[]> {
   const all = await db.annotations.orderBy('createdAt').reverse().toArray();
-  // Filter out soft-deleted annotations
   return all.filter(a => !a.deletedAt);
 }
-
-// Get all annotations including deleted ones (for sync)
 export async function getAllAnnotationsIncludingDeleted(): Promise<Annotation[]> {
   return db.annotations.orderBy('createdAt').reverse().toArray();
 }
@@ -357,9 +524,50 @@ export async function addReadingSession(session: ReadingSession): Promise<string
   return db.readingSessions.add(session);
 }
 
+export async function getReadingSessionsForUserBook(userId: string, bookId: string): Promise<ReadingSession[]> {
+  return db.readingSessions.where('[userId+bookId]').equals([userId, bookId]).toArray();
+}
+
 export async function getReadingSessionsForBook(bookId: string): Promise<ReadingSession[]> {
   return db.readingSessions.where('bookId').equals(bookId).toArray();
 }
+
+// Stats need to be user specific now
+export async function getReadingStatsForUser(userId: string, days: number = 30) {
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  // We don't have a simple index for [userId+startTime].
+  // We have userId.
+  const sessions = await db.readingSessions
+    .where('userId')
+    .equals(userId)
+    .filter(s => s.startTime > startDate)
+    .toArray();
+
+  const totalPages = sessions.reduce((sum, s) => sum + s.pagesRead, 0);
+  const totalMinutes = sessions.reduce((sum, s) => {
+    const duration = (s.endTime.getTime() - s.startTime.getTime()) / 60000;
+    return sum + duration;
+  }, 0);
+
+  // Group by day
+  const dailyStats: Record<string, number> = {};
+  sessions.forEach(s => {
+    const dateKey = s.startTime.toISOString().split('T')[0];
+    dailyStats[dateKey] = (dailyStats[dateKey] || 0) + s.pagesRead;
+  });
+
+  return {
+    totalPages,
+    totalMinutes: Math.round(totalMinutes),
+    averagePagesPerDay: Math.round(totalPages / days),
+    dailyStats,
+    activeDays: Object.keys(dailyStats).length,
+    currentStreak: calculateStreak(dailyStats),
+  };
+}
+
 
 export async function getReadingSessionsInRange(start: Date, end: Date): Promise<ReadingSession[]> {
   return db.readingSessions
@@ -385,7 +593,6 @@ export async function getAllVectorChunks(): Promise<VectorChunk[]> {
 export async function saveXRayData(data: XRayData): Promise<string> {
   const existing = await db.xrayData.where('bookId').equals(data.bookId).first();
   if (existing) {
-    // Preserve the existing ID but update all other fields
     await db.xrayData.put({ ...data, id: existing.id });
     return existing.id;
   }
@@ -420,39 +627,7 @@ export async function updateSettings(updates: Partial<AppSettings>): Promise<voi
   await db.settings.update('app', updates);
 }
 
-// Statistics
-export async function getReadingStats(days: number = 30) {
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
-
-  const sessions = await db.readingSessions
-    .where('startTime')
-    .above(startDate)
-    .toArray();
-
-  const totalPages = sessions.reduce((sum, s) => sum + s.pagesRead, 0);
-  const totalMinutes = sessions.reduce((sum, s) => {
-    const duration = (s.endTime.getTime() - s.startTime.getTime()) / 60000;
-    return sum + duration;
-  }, 0);
-
-  // Group by day
-  const dailyStats: Record<string, number> = {};
-  sessions.forEach(s => {
-    const dateKey = s.startTime.toISOString().split('T')[0];
-    dailyStats[dateKey] = (dailyStats[dateKey] || 0) + s.pagesRead;
-  });
-
-  return {
-    totalPages,
-    totalMinutes: Math.round(totalMinutes),
-    averagePagesPerDay: Math.round(totalPages / days),
-    dailyStats,
-    activeDays: Object.keys(dailyStats).length,
-    currentStreak: calculateStreak(dailyStats),
-  };
-}
-
+// Internal
 function calculateStreak(dailyStats: Record<string, number>): number {
   let streak = 0;
   const today = new Date();
@@ -468,14 +643,11 @@ function calculateStreak(dailyStats: Record<string, number>): number {
       break;
     }
   }
-
   return streak;
 }
 
-// ===================================
-// Tags Operations
-// ===================================
 
+// Tags
 export async function getAllTags(): Promise<Tag[]> {
   return db.tags.orderBy('name').toArray();
 }

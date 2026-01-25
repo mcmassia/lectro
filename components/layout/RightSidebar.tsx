@@ -1,22 +1,24 @@
-'use client';
-
 import { useState, useEffect } from 'react';
-import { useLibraryStore } from '@/stores/appStore';
+import { useLibraryStore, useAppStore } from '@/stores/appStore';
 import { ActivityRings } from '@/components/dashboard/ActivityRings';
-import { ChevronRight, ChevronLeft, Zap, Info, Sparkles } from 'lucide-react';
-import { getAllTags } from '@/lib/db';
-import { usePathname } from 'next/navigation';
+import { ChevronRight, ChevronLeft, Zap, Info, Sparkles, User as UserIcon, LogOut, Settings } from 'lucide-react';
+import { getAllTags, getUsers, User } from '@/lib/db';
+import { usePathname, useRouter } from 'next/navigation';
+import { UserManagementModal } from '@/components/settings/UserManagementModal'; // Need to create this
 
 export function RightSidebar() {
     const { books, tags, setTags, setView, setActiveCategory } = useLibraryStore();
+    const { currentUser, logout } = useAppStore();
     const [isCollapsed, setIsCollapsed] = useState(false);
+    const [showUserModal, setShowUserModal] = useState(false);
     const pathname = usePathname();
+    const router = useRouter();
 
     useEffect(() => {
         getAllTags().then(setTags);
     }, [setTags]);
 
-    if (pathname?.startsWith('/reader')) return null;
+    if (pathname?.startsWith('/reader') || pathname === '/login') return null;
 
     const uniqueCategories = new Set(books.flatMap(b => b.metadata?.categories || []));
 
@@ -26,15 +28,13 @@ export function RightSidebar() {
         tags: uniqueCategories.size
     };
 
+    const handleLogout = () => {
+        logout();
+        router.push('/login');
+    };
+
     // Mock data for X-Ray
     const xrayTags = ['Misterio', 'Historia', 'Thriller', 'Aprendizaje', 'Filosofía'];
-
-    // Mock recommendations
-    const recommendations = [
-        { id: 1, title: 'Sapiens', image: '/cover-placeholder.png' },
-        { id: 2, title: 'Dune', image: '/cover-placeholder.png' },
-        { id: 3, title: 'El Quijote', image: '/cover-placeholder.png' }
-    ];
 
     return (
         <aside className={`right-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
@@ -47,6 +47,33 @@ export function RightSidebar() {
             </button>
 
             <div className="sidebar-content">
+                {/* User Profile */}
+                <div className="sidebar-section">
+                    <div className="section-header">
+                        <h3 className="heading-4">Perfil</h3>
+                        <div className="flex gap-2">
+                            <button onClick={() => setShowUserModal(true)} title="Ajustes de Usuario" className="p-1 hover:text-primary transition-colors">
+                                <Settings size={14} className="info-icon" />
+                            </button>
+                            <button onClick={handleLogout} title="Cerrar Sesión" className="p-1 hover:text-red-500 transition-colors">
+                                <LogOut size={14} className="info-icon" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {!isCollapsed && currentUser && (
+                        <div className="user-profile-compact">
+                            <div className="avatar-circle">
+                                {currentUser.username.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="user-info">
+                                <span className="username">@{currentUser.username}</span>
+                                <span className="role">{currentUser.isAdmin ? 'Administrador' : 'Lector'}</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 {/* Insights Section */}
                 <div className="sidebar-section">
                     <div className="section-header">
@@ -111,30 +138,43 @@ export function RightSidebar() {
                         </div>
                     )}
                 </div>
-
-                {/* Smart Recs */}
-                <div className="sidebar-section">
-                    <div className="section-header">
-                        <h3 className="section-title">Smart Recs AI</h3>
-                    </div>
-
-                    {!isCollapsed && (
-                        <div className="recs-grid">
-                            {recommendations.map(rec => (
-                                <div key={rec.id} className="rec-card">
-                                    <div className="rec-cover-placeholder">
-                                        {/* Ideally use Next Image, but placeholder for now */}
-                                        <div className="placeholder-art" />
-                                    </div>
-                                    <span className="rec-title">{rec.title}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
             </div>
 
+            {showUserModal && <UserManagementModal onClose={() => setShowUserModal(false)} />}
+
             <style jsx>{`
+                .user-profile-compact {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 8px 0;
+                }
+                .avatar-circle {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: var(--color-accent);
+                    color: white;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: bold;
+                    font-size: 16px;
+                }
+                .user-info {
+                    display: flex;
+                    flex-direction: column;
+                }
+                .username {
+                    font-weight: 600;
+                    color: var(--color-text-primary);
+                    font-size: 14px;
+                }
+                .role {
+                    font-size: 11px;
+                    color: var(--color-text-secondary);
+                }
+                /* ... previous styles ... */
                 .right-sidebar {
                     width: 300px;
                     border-left: 1px solid var(--color-divider);
@@ -146,6 +186,7 @@ export function RightSidebar() {
                     height: calc(100vh - 64px);
                     flex-shrink: 0;
                 }
+
 
                 .right-sidebar.collapsed {
                     width: 0;

@@ -13,7 +13,11 @@ import {
     getAllBooks,
     getRecentBooks,
     getAllTags,
-    db
+    db,
+    User,
+    getBooksForUser,
+    getAnnotationsForUserBook,
+    updateUserBookData
 } from '@/lib/db';
 import { syncData } from '@/lib/sync';
 
@@ -22,6 +26,11 @@ import { syncData } from '@/lib/sync';
 // ===================================
 
 interface AppState {
+    // Auth
+    currentUser: User | null;
+    login: (user: User) => void;
+    logout: () => void;
+
     // Theme
     theme: 'light' | 'dark' | 'system';
     resolvedTheme: 'light' | 'dark';
@@ -73,6 +82,18 @@ interface AppState {
 export const useAppStore = create<AppState>()(
     persist(
         (set, get) => ({
+            // Auth
+            currentUser: null,
+            login: (user) => {
+                set({ currentUser: user });
+                // Reload library for new user
+                useLibraryStore.getState().loadBooks();
+            },
+            logout: () => {
+                set({ currentUser: null });
+                useLibraryStore.getState().setBooks([]);
+            },
+
             // Theme
             theme: 'system',
             resolvedTheme: 'light',
@@ -129,6 +150,7 @@ export const useAppStore = create<AppState>()(
         {
             name: 'lectro-storage',
             partialize: (state) => ({
+                currentUser: state.currentUser,
                 theme: state.theme,
                 libraryPath: state.libraryPath,
                 onboardingComplete: state.onboardingComplete,
@@ -210,7 +232,24 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     loadBooks: async () => {
         set({ isLoading: true });
         try {
-            const books = await getAllBooks();
+            const currentUser = useAppStore.getState().currentUser;
+            let books: Book[] = [];
+
+            if (currentUser) {
+                // Load books with user specific data
+                books = await getBooksForUser(currentUser.id);
+            } else {
+                // Fallback / No user? Should probably redirect or show empty.
+                // For now, loading 'all books' but without user data they will look unread.
+                // Or we can just return empty to force login.
+                // Let's load them to avoid flashing empty screen if brief race condition, but they will be 'clean'
+                // Actually, getBooksForUser with invalid ID behaves safely.
+                // Let's rely on protected routes to handle "no user"
+                // But if we are here, let's try to load clean books?
+                // No, just empty list is safer.
+                books = [];
+            }
+
             const tags = await getAllTags();
             await get().loadXRayKeywords();
             set({ books, tags, isLoading: false, isFullyLoaded: true });
@@ -220,16 +259,17 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         }
     },
     loadRecentBooks: async () => {
-        set({ isLoading: true });
-        try {
-            const books = await getRecentBooks(12);
-            const tags = await getAllTags();
-            await get().loadXRayKeywords();
-            set({ books, tags, isLoading: false, isFullyLoaded: false });
-        } catch (e) {
-            console.error(e);
-            set({ isLoading: false });
-        }
+        // Updated to use user data sort if possible, but for 'Recent' we used to verify updatedAt.
+        // Now 'Recent' should probably be based on User's LAST READ.
+        // So we need loadBooks() then sort? Or getBooksForUser sort?
+        // Let's re-use loadBooks logic but maybe set activeCategory to recent.
+        // Actually, getRecentBooks(12) was efficient db query. 
+        // With UserBookData, we need to join. 
+        // For simplicity, let's load all for now (client side sort is fast for <1000 books).
+        // If optimizing, we need getBooksForUserSortedByRead(userId).
+
+        // Just call loadBooks for now to ensure we have user data.
+        return get().loadBooks();
     },
     syncMetadata: async () => {
         try {
@@ -259,9 +299,18 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         }
     },
     addBook: (book) => set((state) => ({ books: [book, ...state.books] })),
-    updateBook: (id, updates) => set((state) => ({
-        books: state.books.map((b) => b.id === id ? { ...b, ...updates } : b)
-    })),
+    updateBook: (id, updates) => {
+        // We need to determine if updates are for Book (global) or UserBookData (local)
+        // This is tricky in store. 
+        // The store just updates local state. The actual DB call typically happens in component or action?
+        // Wait, 'updateBook' definition in LibraryStore only updates local state 'books' array.
+        // The DB update is usually separate call `import {updateBook} from db`.
+        // So this is fine for UI optimistic update.
+        // We just need to ensure we mix the data correctly.
+        set((state) => ({
+            books: state.books.map((b) => b.id === id ? { ...b, ...updates } : b)
+        }));
+    },
     removeBook: (id) => set((state) => ({
         books: state.books.filter((b) => b.id !== id)
     })),
@@ -290,22 +339,16 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         // Filter by category
         if (activeCategory !== 'all') {
             filtered = filtered.filter((b) => {
-                if (activeCategory === 'favorites') return b.metadata?.userRating === 'favorito';
+                if (activeCategory === 'favorites') return b.metadata?.userRating === 'favorito' || b.isFavorite; // Support both
                 if (activeCategory === 'unread') return !b.status || b.status === 'unread';
                 if (activeCategory === 'interesting') return b.status === 'interesting';
                 if (activeCategory === 'planToRead') return b.status === 'planToRead';
                 if (activeCategory === 'reading') return b.status === 'reading';
                 if (activeCategory === 'completed') return b.status === 'completed';
                 if (activeCategory === 're_read') return b.status === 're_read';
-                // 'recientes' is handled by loadRecentBooks and doesn't need client-side filtering if it's the view
-                // But if we have all books loaded and switch to Recientes, we might want to slice?
-                // The prompt says "Recientes ... donde únicamente cargar los últimos 12".
-                // If we are in 'recientes' category, we likely already only have 12 books if we just loaded.
-                // If we have ALL books, we should probably filter/slice them here too.
+
                 if (activeCategory === 'recientes') {
-                    // Logic: return top 12 by lastRead or addedAt
-                    // We need to sort by date before slicing to be accurate if we are filtering from 'books'
-                    // 'books' might be all books.
+                    // Handled in sort/slice usually
                     return true;
                 }
                 return true;
@@ -364,7 +407,8 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
                     comparison = a.addedAt.getTime() - b.addedAt.getTime();
                     break;
                 case 'progress':
-                    comparison = a.progress - b.progress;
+                    // Safe access if undefined
+                    comparison = (a.progress || 0) - (b.progress || 0);
                     break;
                 case 'fileSize':
                     comparison = a.fileSize - b.fileSize;
@@ -380,7 +424,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
             return sortOrder === 'asc' ? comparison : -comparison;
         });
 
-        // Limit to 12 for 'recientes' if we are filtering client side
+        // Limit to 12 for 'recientes'
         if (activeCategory === 'recientes') {
             return filtered.slice(0, 12);
         }
@@ -415,6 +459,7 @@ interface ReaderState {
     removeAnnotation: (id: string) => void;
     setSelection: (text: string | null, cfi: string | null) => void;
     clearSelection: () => void;
+    loadAnnotations: (bookId: string) => Promise<void>;
 }
 
 export const useReaderStore = create<ReaderState>((set) => ({
@@ -443,7 +488,15 @@ export const useReaderStore = create<ReaderState>((set) => ({
     })),
     setSelection: (text, cfi) => set({ selectedText: text, selectionCfi: cfi }),
     clearSelection: () => set({ selectedText: null, selectionCfi: null }),
+    loadAnnotations: async (bookId) => {
+        const currentUser = useAppStore.getState().currentUser;
+        if (currentUser) {
+            const annotations = await getAnnotationsForUserBook(currentUser.id, bookId);
+            set({ annotations });
+        }
+    }
 }));
+
 
 // ===================================
 // AI Store
