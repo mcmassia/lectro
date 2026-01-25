@@ -86,12 +86,13 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
 
             if (book.fileBlob) {
                 bookContent = await book.fileBlob.arrayBuffer();
-            } else if (book.isOnServer) {
-                // Download from server
+            } else if (book.isOnServer && book.filePath) {
+                // Download from server using the stream API
                 console.log('Downloading book from server for X-Ray...');
-                const response = await fetch(`/api/books/${book.id}/content`);
+                const encodedPath = book.filePath.split('/').map(encodeURIComponent).join('/');
+                const response = await fetch(`/api/library/stream/${encodedPath}`);
                 if (!response.ok) {
-                    throw new Error('Failed to download book from server');
+                    throw new Error(`Failed to download book from server: ${response.status}`);
                 }
                 bookContent = await response.arrayBuffer();
             } else {

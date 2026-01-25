@@ -812,8 +812,19 @@ export async function syncTagsFromBooks(books?: Book[]): Promise<void> {
 
 // Recovery function for legacy data (annotations/sessions without userId)
 export async function recoverLegacyData(targetUserId?: string): Promise<{ annotations: number; sessions: number; userBookData: number }> {
-  const DEFAULT_USER_ID = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d';
-  const userId = targetUserId || DEFAULT_USER_ID;
+  let userId = targetUserId;
+
+  // If no userId provided, find the default 'mcmassia' user in the database
+  if (!userId) {
+    const mcmassiaUser = await db.users.where('username').equals('mcmassia').first();
+    if (mcmassiaUser) {
+      userId = mcmassiaUser.id;
+      console.log(`[Recovery] Using mcmassia user ID: ${userId}`);
+    } else {
+      console.error('[Recovery] No mcmassia user found in database');
+      return { annotations: 0, sessions: 0, userBookData: 0 };
+    }
+  }
 
   let migratedAnnotations = 0;
   let migratedSessions = 0;
