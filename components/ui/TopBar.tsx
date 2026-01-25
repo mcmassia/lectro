@@ -1,21 +1,44 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState, useRef, useEffect } from 'react';
 import { useAppStore, useLibraryStore } from '@/stores/appStore';
-import { Search, Moon, Sun, Bell, Plus, User, Menu } from 'lucide-react';
+import { Search, Moon, Sun, Bell, Plus, User, Menu, LogOut, Settings } from 'lucide-react';
+import { UserManagementModal } from '@/components/settings/UserManagementModal';
 
 export function TopBar() {
-    const { theme, setTheme, setShowImportModal } = useAppStore();
+    const { theme, setTheme, setShowImportModal, currentUser, logout } = useAppStore();
     const { searchQuery, setSearchQuery } = useLibraryStore();
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [showUserModal, setShowUserModal] = useState(false);
+    const router = useRouter();
 
     const pathname = usePathname();
+    const userMenuRef = useRef<HTMLDivElement>(null);
 
     // Hide on login page
     if (pathname === '/login') return null;
 
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+                setIsUserMenuOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
+
     const toggleTheme = () => {
         setTheme(theme === 'dark' ? 'light' : 'dark');
+    };
+
+    const handleLogout = () => {
+        logout();
+        router.push('/login');
     };
 
     return (
@@ -48,13 +71,59 @@ export function TopBar() {
                     <Plus size={18} />
                     <span>Añadir</span>
                 </button>
-                <div className="user-profile">
-                    <div className="avatar-placeholder">
-                        <User size={20} />
-                    </div>
+
+                <div className="user-profile-wrapper" ref={userMenuRef}>
+                    <button
+                        className="avatar-placeholder"
+                        onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    >
+                        {currentUser?.username ? (
+                            <span className="font-bold">{currentUser.username.charAt(0).toUpperCase()}</span>
+                        ) : (
+                            <User size={20} />
+                        )}
+                    </button>
+
+                    {isUserMenuOpen && currentUser && (
+                        <div className="user-dropdown">
+                            <div className="user-info-section">
+                                <p className="username">@{currentUser.username}</p>
+                                <p className="role">{currentUser.isAdmin ? 'Administrador' : 'Lector'}</p>
+                            </div>
+
+                            <div className="menu-items">
+                                {/* Admin Only Section */}
+                                {currentUser.isAdmin && (
+                                    <button
+                                        className="menu-item"
+                                        onClick={() => {
+                                            setShowUserModal(true);
+                                            setIsUserMenuOpen(false);
+                                        }}
+                                    >
+                                        <User size={16} />
+                                        <span>Gestionar Usuarios</span>
+                                    </button>
+                                )}
+
+                                <button className="menu-item">
+                                    <Settings size={16} />
+                                    <span>Configuración</span>
+                                </button>
+
+                                <div className="divider"></div>
+
+                                <button className="menu-item logout" onClick={handleLogout}>
+                                    <LogOut size={16} />
+                                    <span>Cerrar Sesión</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
+            {showUserModal && <UserManagementModal onClose={() => setShowUserModal(false)} />}
 
             <style jsx>{`
                 .topbound {
@@ -65,6 +134,8 @@ export function TopBar() {
                     padding: 0 24px;
                     background: var(--color-bg-secondary);
                     border-bottom: 1px solid var(--color-divider);
+                    position: relative;
+                    z-index: 50;
                 }
 
                 .logo-section {
@@ -155,7 +226,8 @@ export function TopBar() {
                     font-size: 14px;
                 }
 
-                .user-profile {
+                .user-profile-wrapper {
+                    position: relative;
                     margin-left: 8px;
                 }
 
@@ -163,12 +235,94 @@ export function TopBar() {
                     width: 36px;
                     height: 36px;
                     border-radius: 50%;
-                    background: var(--color-bg-tertiary);
+                    background: var(--color-accent);
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    color: var(--color-text-secondary);
+                    color: white;
                     border: 1px solid var(--color-divider);
+                    cursor: pointer;
+                    transition: transform 0.2s;
+                    font-size: 14px;
+                }
+
+                .avatar-placeholder:hover {
+                    transform: scale(1.05);
+                }
+
+                .user-dropdown {
+                    position: absolute;
+                    top: calc(100% + 8px);
+                    right: 0;
+                    width: 240px;
+                    background: var(--color-bg-elevated);
+                    border: 1px solid var(--color-border);
+                    border-radius: 12px;
+                    box-shadow: var(--shadow-lg);
+                    overflow: hidden;
+                    animation: fadeIn 0.1s ease-out;
+                }
+
+                .user-info-section {
+                    padding: 16px;
+                    border-bottom: 1px solid var(--color-border);
+                    background: var(--color-bg-tertiary);
+                }
+
+                .username {
+                    font-weight: 600;
+                    color: var(--color-text-primary);
+                    font-size: 14px;
+                }
+
+                .role {
+                    font-size: 12px;
+                    color: var(--color-text-secondary);
+                    margin-top: 2px;
+                }
+
+                .menu-items {
+                    padding: 8px;
+                }
+
+                .menu-item {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 10px 12px;
+                    border: none;
+                    background: transparent;
+                    color: var(--color-text-secondary);
+                    cursor: pointer;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    transition: all 0.2s;
+                    text-align: left;
+                }
+
+                .menu-item:hover {
+                    background: var(--color-bg-tertiary);
+                    color: var(--color-text-primary);
+                }
+
+                .menu-item.logout {
+                    color: #ef4444;
+                }
+
+                .menu-item.logout:hover {
+                    background: rgba(239, 68, 68, 0.1);
+                }
+
+                .divider {
+                    height: 1px;
+                    background: var(--color-border);
+                    margin: 8px 0;
+                }
+
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(-10px); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
             `}</style>
         </header>

@@ -47,32 +47,7 @@ export function RightSidebar() {
             </button>
 
             <div className="sidebar-content">
-                {/* User Profile */}
-                <div className="sidebar-section">
-                    <div className="section-header">
-                        <h3 className="heading-4">Perfil</h3>
-                        <div className="flex gap-2">
-                            <button onClick={() => setShowUserModal(true)} title="Ajustes de Usuario" className="p-1 hover:text-primary transition-colors">
-                                <Settings size={14} className="info-icon" />
-                            </button>
-                            <button onClick={handleLogout} title="Cerrar Sesión" className="p-1 hover:text-red-500 transition-colors">
-                                <LogOut size={14} className="info-icon" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {!isCollapsed && currentUser && (
-                        <div className="user-profile-compact">
-                            <div className="avatar-circle">
-                                {currentUser.username.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="user-info">
-                                <span className="username">@{currentUser.username}</span>
-                                <span className="role">{currentUser.isAdmin ? 'Administrador' : 'Lector'}</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
+                {/* User Profile Removed - Moved to TopBar */}
 
                 {/* Insights Section */}
                 <div className="sidebar-section">
@@ -140,7 +115,7 @@ export function RightSidebar() {
                 </div>
             </div>
 
-            {showUserModal && <UserManagementModal onClose={() => setShowUserModal(false)} />}
+            {/* UserModal removed from here */}
 
             <style jsx>{`
                 .user-profile-compact {
