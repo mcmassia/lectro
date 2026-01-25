@@ -42,12 +42,32 @@ export async function GET(
         const data = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
         const book = data.books?.find((b: any) => b.id === bookId);
 
-        if (!book || !book.filePath) {
+        if (!book || (!book.filePath && !book.fileName)) {
             return NextResponse.json({ error: 'Book not found on server' }, { status: 404 });
         }
 
-        const filePath = path.join(libraryPath, book.filePath);
-        if (!fs.existsSync(filePath)) {
+        let filePath = '';
+        if (book.filePath) {
+            filePath = path.join(libraryPath, book.filePath);
+        }
+
+        // Fallback: If filePath is missing or file doesn't exist, try to find it by fileName in library root
+        if (!filePath || !fs.existsSync(filePath)) {
+            if (book.fileName) {
+                const fallbackPath = path.join(libraryPath, book.fileName);
+                if (fs.existsSync(fallbackPath)) {
+                    filePath = fallbackPath;
+                } else {
+                    // Try recursive search? (Expensive)
+                    // For now, let's assume if it's not at path and not at root, it's missing.
+                    // But we can try one level deep (Author/Book)?
+                    // Or rely on the 'scan' logic if we want to be smarter. 
+                    // Let's stick to root fallback for now as that's the common case for simple sync.
+                }
+            }
+        }
+
+        if (!filePath || !fs.existsSync(filePath)) {
             return NextResponse.json({ error: 'Book file not found' }, { status: 404 });
         }
 
