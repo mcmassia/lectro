@@ -144,6 +144,22 @@ export async function GET(
         }
 
         if (!coverBuffer) {
+            // Fallback: Check if book record has a stored cover (base64 data URL)
+            if (book.cover && typeof book.cover === 'string' && book.cover.startsWith('data:image')) {
+                try {
+                    // Extract base64 part from data URL
+                    const base64Match = book.cover.match(/^data:image\/[^;]+;base64,(.+)$/);
+                    if (base64Match) {
+                        coverBuffer = Buffer.from(base64Match[1], 'base64');
+                        console.log(`[Covers] Using stored base64 cover for book ${bookId}`);
+                    }
+                } catch (e) {
+                    console.error('Failed to decode stored cover:', e);
+                }
+            }
+        }
+
+        if (!coverBuffer) {
             // Return a placeholder or 404? 
             // A 404 is better so client handles fallback
             return NextResponse.json({ error: 'Cover not found' }, { status: 404 });
