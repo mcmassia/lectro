@@ -536,7 +536,13 @@ export async function hardDeleteAnnotation(id: string): Promise<void> {
   await db.annotations.delete(id);
 }
 
+export async function getAllAnnotationsForUser(userId: string): Promise<Annotation[]> {
+  const all = await db.annotations.orderBy('createdAt').reverse().toArray();
+  return all.filter(a => a.userId === userId && !a.deletedAt);
+}
+
 export async function getAllAnnotations(): Promise<Annotation[]> {
+  // Deprecated: use getAllAnnotationsForUser
   const all = await db.annotations.orderBy('createdAt').reverse().toArray();
   return all.filter(a => !a.deletedAt);
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import {
-    getAllAnnotations,
+    getAllAnnotationsForUser,
     getAllBooks,
     getAllTags,
     updateAnnotation,
@@ -11,7 +11,7 @@ import {
     Book,
     Tag
 } from '@/lib/db';
-import { useLibraryStore } from '@/stores/appStore';
+import { useLibraryStore, useAppStore } from '@/stores/appStore';
 import { NoteCard } from '@/components/notes/NoteCard';
 import { NotesSidebar } from '@/components/notes/NotesSidebar';
 import { InsightsPanel } from '@/components/notes/InsightsPanel';
@@ -22,6 +22,7 @@ import { ImportNotesModal } from '@/components/notes/ImportNotesModal';
 
 export default function NotesPage() {
     const router = useRouter();
+    const { currentUser } = useAppStore();
     const [notes, setNotes] = useState<Annotation[]>([]);
     const [books, setBooks] = useState<Book[]>([]);
     const [tags, setTags] = useState<Tag[]>([]);
@@ -65,13 +66,16 @@ export default function NotesPage() {
     }, [notes, books]);
 
     useEffect(() => {
-        loadData();
-    }, []);
+        if (currentUser) {
+            loadData();
+        }
+    }, [currentUser]);
 
     const loadData = async () => {
+        if (!currentUser) return;
         try {
             const [fetchedNotes, fetchedBooks, fetchedTags] = await Promise.all([
-                getAllAnnotations(),
+                getAllAnnotationsForUser(currentUser.id),
                 getAllBooks(),
                 getAllTags()
             ]);

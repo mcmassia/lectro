@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useReaderStore, useAppStore } from '@/stores/appStore';
-import { getBook, updateBook, getAnnotationsForBook, addAnnotation, updateAnnotation, deleteAnnotation, Annotation, Book, HighlightColor } from '@/lib/db';
+import { getBook, updateBook, getAnnotationsForUserBook, addAnnotation, updateAnnotation, deleteAnnotation, Annotation, Book, HighlightColor } from '@/lib/db';
 import { EpubReader, TocItem } from '@/components/reader/EpubReader';
 import { WebPubReader, WebPubReaderRef } from '@/components/reader/WebPubReader';
 import dynamic from 'next/dynamic';
@@ -60,8 +60,10 @@ export default function ReaderPage() {
                 }
                 setBook(bookData);
 
-                const bookAnnotations = await getAnnotationsForBook(bookId);
-                setAnnotations(bookAnnotations);
+                if (currentUser) {
+                    const bookAnnotations = await getAnnotationsForUserBook(currentUser.id, bookId);
+                    setAnnotations(bookAnnotations);
+                }
 
                 // Update last read time
                 await updateBook(bookId, { lastReadAt: new Date() });
@@ -79,7 +81,7 @@ export default function ReaderPage() {
             setBook(null);
             setAnnotations([]);
         };
-    }, [bookId, router, setBook, setAnnotations, setIsLoading]);
+    }, [bookId, router, setBook, setAnnotations, setIsLoading, currentUser]);
 
     const handleLocationChange = useCallback(async (cfi: string, page: number, total: number, chapter: string) => {
         setCurrentCfi(cfi);
