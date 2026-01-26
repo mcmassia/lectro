@@ -63,7 +63,8 @@ export async function POST(req: NextRequest) {
         console.log(`[POST] Writing metadata to: ${dbPath}`);
 
         const booksCount = body.books?.length || 0;
-        console.log(`[POST] Received ${booksCount} books to merge.`);
+        const xrayCount = body.xrayData?.length || 0;
+        console.log(`[POST] Received ${booksCount} books, ${xrayCount} X-Ray items to merge.`);
 
         // Read existing data to merge
         let existingData: any = { books: [], tags: [], annotations: [], readingSessions: [] };
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
         // Helper to check timestamps
         const getTime = (item: any) => {
             if (!item) return 0;
-            return new Date(item.updatedAt || item.lastReadAt || item.createdAt || 0).getTime();
+            return new Date(item.updatedAt || item.lastReadAt || item.createdAt || item.generatedAt || 0).getTime();
         };
 
         // Helper to merge arrays by ID with timestamp conflict resolution
