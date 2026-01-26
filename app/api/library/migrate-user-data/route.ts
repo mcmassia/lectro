@@ -52,11 +52,11 @@ export async function POST(req: NextRequest) {
             const correctUserData = data.userBookData.filter((d: any) => d.userId === correctUserId);
 
             // Create a map of correct user's book data by bookId for merging
-            const correctDataMap = new Map(correctUserData.map((d: any) => [d.bookId, d]));
+            const correctDataMap: Map<string, any> = new Map(correctUserData.map((d: any) => [d.bookId, d]));
 
             // Migrate wrong user data to correct user
             for (const wrongData of wrongUserData) {
-                const existingCorrect = correctDataMap.get(wrongData.bookId);
+                const existingCorrect: any = correctDataMap.get(wrongData.bookId);
 
                 if (existingCorrect) {
                     // Merge - keep the one with more progress or more recent activity
