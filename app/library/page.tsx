@@ -59,6 +59,7 @@ export default function LibraryPage() {
         setActiveUserRating,
         filteredBooks,
         setSelectedBookId,
+        selectedBookId,
         currentView,
         setView
     } = useLibraryStore();
