@@ -150,7 +150,8 @@ export function XRayModal({ data, onClose }: XRayModalProps) {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    z-index: 1000;
+                    justify-content: center;
+                    z-index: 9999;
                     animation: fadeIn 0.2s ease-out;
                 }
 

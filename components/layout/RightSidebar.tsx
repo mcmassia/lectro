@@ -262,6 +262,7 @@ export function RightSidebar() {
                     transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     height: calc(100vh - 64px);
                     flex-shrink: 0;
+                    overflow: hidden; /* Main vertical scroll handled by sidebar-content */
                 }
 
                 .right-sidebar.collapsed {
@@ -385,10 +386,11 @@ export function RightSidebar() {
                     font-size: 13px;
                     color: var(--color-text-secondary);
                     line-height: 1.6;
-                    display: -webkit-box;
-                    -webkit-line-clamp: 4;
-                    -webkit-box-orient: vertical;
-                    overflow: hidden;
+                    /* Removed clamping to show full text as requested */
+                    /* display: -webkit-box; */
+                    /* -webkit-line-clamp: 4; */
+                    /* -webkit-box-orient: vertical; */
+                    /* overflow: hidden; */
                     margin-bottom: 12px;
                 }
                 
