@@ -2,7 +2,8 @@
 
 import { XRayData } from '@/lib/db';
 import { X, Users, MapPin, BookOpen, FileText, BrainCircuit } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface XRayModalProps {
     data: XRayData;
@@ -11,9 +12,25 @@ interface XRayModalProps {
 
 export function XRayModal({ data, onClose }: XRayModalProps) {
     const [activeTab, setActiveTab] = useState<'overview' | 'characters' | 'places' | 'terms'>('overview');
+    const [mounted, setMounted] = useState(false);
 
-    return (
-        <div className="modal-overlay">
+    useEffect(() => {
+        setMounted(true);
+        // Prevent body scroll when modal is open
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = 'unset';
+            setMounted(false);
+        };
+    }, []);
+
+    if (!mounted) return null;
+
+    return createPortal(
+        <div className="modal-overlay" onClick={(e) => {
+            // Close on click outside if desired, strictly on overlay
+            if (e.target === e.currentTarget) onClose();
+        }}>
             <div className="modal-container xray-modal">
                 <button className="close-btn" onClick={onClose}>
                     <X size={24} />
@@ -150,8 +167,7 @@ export function XRayModal({ data, onClose }: XRayModalProps) {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    justify-content: center;
-                    z-index: 9999;
+                    z-index: 10000; /* Ensure it's top level */
                     animation: fadeIn 0.2s ease-out;
                 }
 
@@ -362,6 +378,7 @@ export function XRayModal({ data, onClose }: XRayModalProps) {
                     animation: fadeIn 0.3s ease-out;
                 }
             `}</style>
-        </div>
+        </div>,
+        document.body
     );
 }
