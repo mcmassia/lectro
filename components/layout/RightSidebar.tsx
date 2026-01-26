@@ -248,8 +248,6 @@ export function RightSidebar() {
                 </div>
             </div>
 
-            </div>
-
 
             <style jsx>{`
                 /* ... (User Profile Styles removed) ... */
