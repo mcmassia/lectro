@@ -218,6 +218,10 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
                 };
 
                 await saveXRayData(mappedData);
+                console.log(`[X-Ray] Saved data for book ${book.id}`);
+                const verify = await getXRayData(book.id);
+                console.log(`[X-Ray] Verification fetch:`, verify ? 'Found' : 'Not Found');
+
                 setXrayData(mappedData);
             } else {
                 console.error('X-Ray generation failed:', result.error);

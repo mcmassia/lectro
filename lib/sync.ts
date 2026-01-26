@@ -247,6 +247,7 @@ export async function pushLocalData() {
     const annotations = await getAllAnnotationsIncludingDeleted();
     const readingSessions = await db.readingSessions.toArray();
     const xrayData = await getAllXRayData();
+    console.log(`[Sync] Found ${xrayData.length} X-Ray items to push.`);
 
     // New: Sync Users and User Metadata
     const users = await db.users.toArray();
@@ -299,6 +300,9 @@ export async function pushLocalData() {
         };
 
         console.log(`Pushing batch ${i + 1}/${chunks.length} (${chunk.length} books)...`);
+        if (payload.xrayData && payload.xrayData.length > 0) {
+            console.log(`[Sync] Including ${payload.xrayData.length} X-Ray items in this batch.`);
+        }
 
         const res = await fetch('/api/library/metadata', {
             method: 'POST',
