@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Book, updateBook, getAllTags, Tag, BookCategory, UserBookRating } from '@/lib/db';
-import { useLibraryStore } from '@/stores/appStore';
+import { Book, updateBook, getAllTags, Tag, BookCategory, UserBookRating, updateUserBookData } from '@/lib/db';
+import { useLibraryStore, useAppStore } from '@/stores/appStore';
+import { syncData } from '@/lib/sync';
 import { useRouter } from 'next/navigation';
 import { searchGoogleBooks, searchMetadata, findCovers, MetadataResult } from '@/lib/metadata';
 import { MetadataSelector } from './MetadataSelector';
@@ -55,6 +56,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
     const [tagInput, setTagInput] = useState('');
 
     const { updateBook: updateBookInStore } = useLibraryStore();
+    const { currentUser } = useAppStore();
     const router = useRouter();
     const modalRef = useRef<HTMLDivElement>(null);
 
@@ -141,9 +143,17 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
 
     const handleStatusChange = async (status: Book['status']) => {
         try {
-            await updateBook(book.id, { status });
+            if (!currentUser) {
+                console.error('No current user for status change');
+                return;
+            }
+            // Save to per-user userBookData table
+            await updateUserBookData(currentUser.id, book.id, { status });
+            // Also update local store for immediate UI feedback
             updateBookInStore(book.id, { status });
             setBook({ ...book, status });
+            // Sync to server for cross-device persistence
+            syncData().catch(e => console.error('Sync after status change failed:', e));
         } catch (error) {
             console.error('Failed to update status:', error);
         }
@@ -151,10 +161,17 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
 
     const toggleFavorite = async () => {
         try {
+            if (!currentUser) {
+                console.error('No current user for favorite toggle');
+                return;
+            }
             const newIsFavorite = !book.isFavorite;
-            await updateBook(book.id, { isFavorite: newIsFavorite });
+            // Save to per-user userBookData table
+            await updateUserBookData(currentUser.id, book.id, { isFavorite: newIsFavorite });
             updateBookInStore(book.id, { isFavorite: newIsFavorite });
             setBook({ ...book, isFavorite: newIsFavorite });
+            // Sync to server for cross-device persistence
+            syncData().catch(e => console.error('Sync after favorite toggle failed:', e));
         } catch (error) {
             console.error('Failed to update favorite:', error);
         }
