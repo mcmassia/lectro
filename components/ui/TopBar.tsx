@@ -145,13 +145,17 @@ export function TopBar() {
 
                 .logo-section {
                     width: 260px; /* Aligns with left sidebar */
+                    display: flex;
+                    align-items: center;
                 }
 
                 .app-logo {
                     display: flex;
+                    flex-direction: row;
                     align-items: center;
                     gap: 12px;
                     text-decoration: none;
+                    white-space: nowrap;
                 }
 
                 .logo-icon-wrapper {
