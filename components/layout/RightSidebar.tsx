@@ -1,22 +1,45 @@
 import { useState, useEffect } from 'react';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
 import { ActivityRings } from '@/components/dashboard/ActivityRings';
-import { ChevronRight, ChevronLeft, Zap, Info, Sparkles, User as UserIcon, LogOut, Settings } from 'lucide-react';
-import { getAllTags, getUsers, User } from '@/lib/db';
+import { ChevronRight, ChevronLeft, Info, BrainCircuit, Eye, Sparkles } from 'lucide-react';
+import { getAllTags, db, XRayData, Book } from '@/lib/db';
 import { usePathname, useRouter } from 'next/navigation';
-import { UserManagementModal } from '@/components/settings/UserManagementModal'; // Need to create this
+import { XRayModal } from '@/components/library/XRayModal';
+import { generateXRayAction } from '@/app/actions/ai';
 
 export function RightSidebar() {
-    const { books, tags, setTags, setView, setActiveCategory } = useLibraryStore();
+    const { books, tags, setTags, setView, setActiveCategory, selectedBookId } = useLibraryStore();
     const { currentUser, logout } = useAppStore();
     const [isCollapsed, setIsCollapsed] = useState(false);
-    const [showUserModal, setShowUserModal] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
+
+    // X-Ray State
+    const [xrayData, setXrayData] = useState<XRayData | null>(null);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [showXRayModal, setShowXRayModal] = useState(false);
 
     useEffect(() => {
         getAllTags().then(setTags);
     }, [setTags]);
+
+    // Fetch X-Ray data when selected book changes
+    useEffect(() => {
+        if (!selectedBookId) {
+            setXrayData(null);
+            return;
+        }
+
+        const fetchXRay = async () => {
+            try {
+                const data = await db.xrayData.where('bookId').equals(selectedBookId).first();
+                setXrayData(data || null);
+            } catch (e) {
+                console.error("Failed to load X-Ray data", e);
+            }
+        };
+        fetchXRay();
+    }, [selectedBookId]);
 
     if (pathname?.startsWith('/reader') || pathname === '/login') return null;
 
@@ -28,13 +51,83 @@ export function RightSidebar() {
         tags: uniqueCategories.size
     };
 
-    const handleLogout = () => {
-        logout();
-        router.push('/login');
+    const handleGenerateXRay = async () => {
+        if (!selectedBookId) return;
+        const book = books.find(b => b.id === selectedBookId);
+        if (!book) return;
+
+        setIsGenerating(true);
+        try {
+            // 1. Extract content (Simplified for now - we might want to move this to a shared worker/helper)
+            // We need extraction logic similar to indexer.ts but focused on "first chunk" or "representative chunk"
+            // For X-Ray we typically want the first 60k chars or so.
+            // Re-using logic:
+            let content = "";
+            if (book.format === 'epub' && book.fileBlob) {
+                const arrayBuffer = await book.fileBlob.arrayBuffer();
+                const ePub = (await import('epubjs')).default;
+                const epub = ePub(arrayBuffer);
+                await epub.ready;
+
+                // Extract from first few spine items
+                // @ts-ignore
+                const spine = epub.spine as any;
+                let count = 0;
+                for (const item of spine.items) {
+                    if (count > 2) break; // First 3 chapters approx
+                    try {
+                        const doc = await item.load(epub.load.bind(epub));
+                        const text = (doc as any).body?.innerText || (doc as any).body?.textContent || "";
+                        content += text + "\n\n";
+                        if (content.length > 50000) break;
+                    } catch (e) { console.error(e); }
+                    count++;
+                }
+                epub.destroy();
+            } else {
+                // Fallback or PDF (not implemented fully for text yet)
+                alert("Formato no soportado para análisis automático aún (solo EPUB)");
+                setIsGenerating(false);
+                return;
+            }
+
+            if (!content || content.length < 500) {
+                alert("No se pudo extraer suficiente texto del libro.");
+                setIsGenerating(false);
+                return;
+            }
+
+            // 2. Generate
+            const result = await generateXRayAction(content, book.title);
+
+            if (result.success && result.data) {
+                const newXray: XRayData = {
+                    id: crypto.randomUUID(),
+                    bookId: book.id,
+                    generatedAt: new Date(),
+                    language: result.data.language,
+                    summary: result.data.summary,
+                    plot: result.data.plot,
+                    keyPoints: result.data.keyPoints,
+                    characters: result.data.characters.map((c: any) => ({ ...c, mentions: [] })),
+                    places: result.data.places.map((p: any) => ({ ...p, mentions: [] })),
+                    terms: result.data.terms.map((t: any) => ({ ...t, mentions: [] })),
+                };
+                await db.xrayData.add(newXray);
+                setXrayData(newXray);
+            } else {
+                alert("Error generando X-Ray: " + result.error);
+            }
+
+        } catch (e) {
+            console.error(e);
+            alert("Error general al generar ADN");
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
-    // Mock data for X-Ray
-    const xrayTags = ['Misterio', 'Historia', 'Thriller', 'Aprendizaje', 'Filosofía'];
+    const selectedBook = books.find(b => b.id === selectedBookId);
 
     return (
         <aside className={`right-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
@@ -47,7 +140,6 @@ export function RightSidebar() {
             </button>
 
             <div className="sidebar-content">
-                {/* User Profile Removed - Moved to TopBar */}
 
                 {/* Insights Section */}
                 <div className="sidebar-section">
@@ -64,7 +156,7 @@ export function RightSidebar() {
                     )}
                 </div>
 
-                {/* Stats / "Números" Section */}
+                {/* Stats Section */}
                 <div className="sidebar-section">
                     <div className="section-header">
                         <h3 className="section-title">Números</h3>
@@ -97,59 +189,69 @@ export function RightSidebar() {
                 </div>
 
                 {/* Book DNA / X-Ray */}
-                <div className="sidebar-section">
+                <div className="sidebar-section xray-section">
                     <div className="section-header">
                         <h3 className="section-title">ADN del Libro</h3>
                         <span className="badge-ai">AI</span>
                     </div>
 
                     {!isCollapsed && (
-                        <div className="xray-tags">
-                            {xrayTags.map((tag, i) => (
-                                <span key={i} className={`tag-pill ${i % 2 === 0 ? 'blue' : 'purple'}`}>
-                                    {tag}
-                                </span>
-                            ))}
+                        <div className="xray-container">
+                            {selectedBookId ? (
+                                xrayData ? (
+                                    <div className="xray-content-preview animate-fade-in">
+                                        <p className="xray-summary-clamp">
+                                            {xrayData.summary}
+                                        </p>
+                                        <button
+                                            className="btn-view-more"
+                                            onClick={() => setShowXRayModal(true)}
+                                        >
+                                            <Eye size={14} />
+                                            Ver todo
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="xray-empty-state animate-fade-in">
+                                        <p className="empty-text">
+                                            {selectedBook ? `Genera el ADN de "${selectedBook.title}"` : "Selecciona un libro"}
+                                        </p>
+                                        <button
+                                            className="btn-generate-ai"
+                                            onClick={handleGenerateXRay}
+                                            disabled={isGenerating || !selectedBook}
+                                        >
+                                            {isGenerating ? (
+                                                <>
+                                                    <Sparkles size={14} className="animate-spin-slow" />
+                                                    Generando...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <BrainCircuit size={14} />
+                                                    Generar ADN
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                )
+                            ) : (
+                                <div className="no-selection-state">
+                                    <p>Selecciona un libro de la biblioteca para ver su ADN.</p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* UserModal removed from here */}
+            {showXRayModal && xrayData && (
+                <XRayModal data={xrayData} onClose={() => setShowXRayModal(false)} />
+            )}
 
             <style jsx>{`
-                .user-profile-compact {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    padding: 8px 0;
-                }
-                .avatar-circle {
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 50%;
-                    background: var(--color-accent);
-                    color: white;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-weight: bold;
-                    font-size: 16px;
-                }
-                .user-info {
-                    display: flex;
-                    flex-direction: column;
-                }
-                .username {
-                    font-weight: 600;
-                    color: var(--color-text-primary);
-                    font-size: 14px;
-                }
-                .role {
-                    font-size: 11px;
-                    color: var(--color-text-secondary);
-                }
-                /* ... previous styles ... */
+                /* ... (User Profile Styles removed) ... */
+                
                 .right-sidebar {
                     width: 300px;
                     border-left: 1px solid var(--color-divider);
@@ -162,31 +264,14 @@ export function RightSidebar() {
                     flex-shrink: 0;
                 }
 
-
                 .right-sidebar.collapsed {
-                    width: 0;
-                    overflow: hidden;
-                    border-left: none; /* Hide border when fully collapsed to avoid double border look if adjacent */
-                    padding: 0;
-                }
-                
-                /* When collapsed, we might still want the button visible if we want to expand it back? 
-                   If width is 0, the button inside might be hidden if overflow hidden. 
-                   Better: width 20px or keep generic collapsed width. 
-                   The user asked for "Left Sidebar (collapsible)" and "Right Sidebar (collapsible)". 
-                   Usually right sidebar collapses to 0 or icon bar. 
-                   Let's assume collapsed width 0 but button protrudes or is separate.
-                   Actually, let's keep a small strip or make the button floating relative to the main content.
-                   For simplicity, I'll keep a small strip of 20px or modify the button position.
-                */
-               .right-sidebar.collapsed {
                     width: 24px;
                     border-left: 1px solid var(--color-divider);
-               }
+                }
                
-               .right-sidebar.collapsed .sidebar-content {
-                   display: none;
-               }
+                .right-sidebar.collapsed .sidebar-content {
+                    display: none;
+                }
 
                 .sidebar-content {
                     flex: 1;
@@ -289,57 +374,99 @@ export function RightSidebar() {
                     text-transform: lowercase;
                 }
 
-                .xray-tags {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 8px;
-                }
-
-                .tag-pill {
-                    font-size: 11px;
-                    padding: 4px 10px;
-                    border-radius: 12px;
-                    color: white;
-                    font-weight: 500;
-                }
-
-                .tag-pill.blue { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
-                .tag-pill.purple { background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
-
-                .recs-grid {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 12px;
-                }
-
-                .rec-card {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 6px;
-                    align-items: center;
-                }
-
-                .rec-cover-placeholder {
-                    width: 100%;
-                    aspect-ratio: 2/3;
+                .xray-container {
                     background: var(--color-bg-tertiary);
-                    border-radius: 6px;
-                    position: relative;
+                    border-radius: 12px;
+                    padding: 16px;
+                    min-height: 120px;
+                }
+
+                .xray-summary-clamp {
+                    font-size: 13px;
+                    color: var(--color-text-secondary);
+                    line-height: 1.6;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 4;
+                    -webkit-box-orient: vertical;
                     overflow: hidden;
+                    margin-bottom: 12px;
                 }
                 
-                .placeholder-art {
+                .btn-view-more {
                     width: 100%;
-                    height: 100%;
-                    background: linear-gradient(brand, transparent);
-                    opacity: 0.5;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 6px;
+                    padding: 8px;
+                    border-radius: 8px;
+                    background: var(--color-bg-elevated);
+                    color: var(--color-text-primary);
+                    border: 1px solid var(--color-border);
+                    font-size: 12px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+                
+                .btn-view-more:hover {
+                    background: var(--color-bg-secondary);
                 }
 
-                .rec-title {
-                    font-size: 11px;
-                    color: var(--color-text-secondary);
+                .xray-empty-state, .no-selection-state {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
                     text-align: center;
-                    line-height: 1.2;
+                    gap: 12px;
+                    height: 100%;
+                    padding: 8px;
+                }
+
+                .no-selection-state p {
+                     font-size: 12px;
+                     color: var(--color-text-tertiary);
+                }
+
+                .empty-text {
+                    font-size: 13px;
+                    color: var(--color-text-secondary);
+                    line-height: 1.4;
+                }
+
+                .btn-generate-ai {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    background: linear-gradient(135deg, #a855f7, #ec4899);
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: transform 0.2s, opacity 0.2s;
+                    box-shadow: 0 4px 6px -1px rgba(168, 85, 247, 0.4);
+                }
+
+                .btn-generate-ai:hover:not(:disabled) {
+                    transform: scale(1.05);
+                }
+                
+                .btn-generate-ai:disabled {
+                    opacity: 0.7;
+                    cursor: not-allowed;
+                }
+
+                .animate-spin-slow {
+                    animation: spin 3s linear infinite;
+                }
+
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
                 }
 
                 .collapse-btn {
@@ -362,30 +489,7 @@ export function RightSidebar() {
 
                 @media (max-width: 1024px) {
                     .right-sidebar {
-                        position: fixed;
-                        z-index: 50;
-                        right: 0;
-                        bottom: 0;
-                        height: calc(100vh - 64px);
-                        border-left: 1px solid var(--color-border);
-                        transform: translateX(100%); /* Hidden by default */
-                    }
-                    .right-sidebar.collapsed {
-                        transform: translateX(0); /* Used as 'open' state if we invert logic? */
-                        /* Actually let's just make it hidden on mobile unless toggled. 
-                           User asked to be responsive. 
-                           Standard responsive pattern: 3 columns on desktop, 1 on mobile. 
-                           Right sidebar usually goes to bottom or becomes hidden drawer.
-                        */
-                        width: 0;
-                    }
-                    /* For simplicity in this iteration: hide on mobile, user can't easily access. 
-                       Better: Stack it? 
-                       The request: "barra lateral derecha (colapsable)..."
-                       Let's make it collapse to 0 width on mobile by default.
-                    */
-                    .right-sidebar {
-                        display: none; /* Hide entirely on mobile for now as per standard 'collapsible' patterns on small screens */
+                        display: none;
                     }
                 }
                 
@@ -394,7 +498,18 @@ export function RightSidebar() {
                         display: flex;
                     }
                 }
+                
+                .animate-fade-in {
+                    animation: fadeIn 0.3s ease-out;
+                }
+                
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+
             `}</style>
         </aside>
     );
 }
+

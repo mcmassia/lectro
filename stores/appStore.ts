@@ -208,6 +208,9 @@ interface LibraryState {
     syncMetadata: () => Promise<void>;
     loadXRayKeywords: () => Promise<void>;
 
+    selectedBookId: string | null;
+    setSelectedBookId: (id: string | null) => void;
+
     // Computed
     filteredBooks: () => Book[];
 }
@@ -227,8 +230,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     tags: [],
     sortOrder: 'desc',
     currentView: 'library',
+    selectedBookId: null,
 
     setBooks: (books) => set({ books, isLoading: false }),
+    setSelectedBookId: (id) => set({ selectedBookId: id }),
     loadBooks: async () => {
         set({ isLoading: true });
         try {

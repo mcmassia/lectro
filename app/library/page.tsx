@@ -56,7 +56,8 @@ export default function LibraryPage() {
         setActiveThematicCategory,
         activeUserRating,
         setActiveUserRating,
-        filteredBooks
+        filteredBooks,
+        setSelectedBookId
     } = useLibraryStore();
     const [showImport, setShowImport] = useState(false);
     const [selectedBook, setSelectedBook] = useState<Book | null>(null);
@@ -264,7 +265,10 @@ export default function LibraryPage() {
                                 key={book.id}
                                 book={book}
                                 viewMode={viewMode}
-                                onClick={setSelectedBook}
+                                onClick={(bk) => {
+                                    setSelectedBook(bk);
+                                    setSelectedBookId(bk.id); // Update context for Sidebar
+                                }}
                             />
                         ))}
                     </div>
