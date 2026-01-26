@@ -314,7 +314,7 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     >
                         <div className="book-cover-wrapper">
                             <img
-                                src={`/api/covers/${book.id}?width=400`}
+                                src={`/api/covers/${book.id}?width=400&v=${new Date(book.updatedAt || 0).getTime()}`}
                                 alt={book.title}
                                 className="book-cover"
                                 onError={(e) => {
