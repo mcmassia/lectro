@@ -340,7 +340,10 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     removeTag: (id) => set((state) => ({ tags: state.tags.filter(t => t.id !== id) })),
     setSortOrder: (order) => set({ sortOrder: order }),
     setIsLoading: (loading) => set({ isLoading: loading }),
-    setView: (view) => set({ currentView: view }),
+    setView: (view) => {
+        console.log('Store: setView called with', view);
+        set({ currentView: view });
+    },
     setActiveThematicCategory: (cat) => set({ activeThematicCategory: cat }),
     setActiveUserRating: (rating) => set({ activeUserRating: rating }),
 
