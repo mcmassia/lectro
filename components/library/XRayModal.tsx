@@ -12,23 +12,16 @@ interface XRayModalProps {
 
 export function XRayModal({ data, onClose }: XRayModalProps) {
     const [activeTab, setActiveTab] = useState<'overview' | 'characters' | 'places' | 'terms'>('overview');
-    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        console.log('XRayModal mounted', { data });
-        setMounted(true);
         // Prevent body scroll when modal is open
         document.body.style.overflow = 'hidden';
         return () => {
-            console.log('XRayModal unmounting');
             document.body.style.overflow = 'unset';
-            setMounted(false);
         };
-    }, [data]);
+    }, []);
 
-    if (!mounted) return null;
-
-    return createPortal(
+    return (
         <div className="modal-overlay" onClick={(e) => {
             // Close on click outside if desired, strictly on overlay
             if (e.target === e.currentTarget) onClose();
@@ -169,7 +162,7 @@ export function XRayModal({ data, onClose }: XRayModalProps) {
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    z-index: 10000; /* Ensure it's top level */
+                    z-index: 10000;
                     animation: fadeIn 0.2s ease-out;
                 }
 
@@ -380,7 +373,6 @@ export function XRayModal({ data, onClose }: XRayModalProps) {
                     animation: fadeIn 0.3s ease-out;
                 }
             `}</style>
-        </div>,
-        document.body
+        </div>
     );
 }

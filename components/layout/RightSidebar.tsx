@@ -4,12 +4,12 @@ import { ActivityRings } from '@/components/dashboard/ActivityRings';
 import { ChevronRight, ChevronLeft, Info, BrainCircuit, Eye, Sparkles } from 'lucide-react';
 import { getAllTags, db, XRayData, Book } from '@/lib/db';
 import { usePathname, useRouter } from 'next/navigation';
-import { XRayModal } from '@/components/library/XRayModal';
 import { generateXRayAction } from '@/app/actions/ai';
+
 
 export function RightSidebar() {
     const { books, tags, setTags, setView, setActiveCategory, selectedBookId } = useLibraryStore();
-    const { currentUser, logout } = useAppStore();
+    const { currentUser, setXrayModalData } = useAppStore();
     const [isCollapsed, setIsCollapsed] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
@@ -17,7 +17,8 @@ export function RightSidebar() {
     // X-Ray State
     const [xrayData, setXrayData] = useState<XRayData | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [showXRayModal, setShowXRayModal] = useState(false);
+    // Removed local showXRayModal state
+
 
     useEffect(() => {
         getAllTags().then(setTags);
@@ -206,9 +207,7 @@ export function RightSidebar() {
                                         <button
                                             className="btn-view-more"
                                             onClick={(e) => {
-                                                console.log('View All clicked', { selectedBookId, xrayData });
-                                                e.stopPropagation();
-                                                setShowXRayModal(true);
+                                                if (xrayData) setXrayModalData(xrayData);
                                             }}
                                         >
                                             <Eye size={14} />
@@ -249,9 +248,8 @@ export function RightSidebar() {
                 </div>
             </div>
 
-            {showXRayModal && xrayData && (
-                <XRayModal data={xrayData} onClose={() => setShowXRayModal(false)} />
-            )}
+            </div>
+
 
             <style jsx>{`
                 /* ... (User Profile Styles removed) ... */
@@ -515,7 +513,7 @@ export function RightSidebar() {
                 }
 
             `}</style>
-        </aside>
+        </aside >
     );
 }
 

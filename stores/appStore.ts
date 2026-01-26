@@ -73,6 +73,10 @@ interface AppState {
     // Import Modal
     showImportModal: boolean;
     setShowImportModal: (show: boolean) => void;
+
+    // Global X-Ray Modal
+    xrayModalData: any | null; // using any to avoid circular dependency or import issues if straightforward import fails, but ideally XRayData
+    setXrayModalData: (data: any | null) => void;
 }
 
 // ===================================
@@ -146,6 +150,10 @@ export const useAppStore = create<AppState>()(
             // Import Modal
             showImportModal: false,
             setShowImportModal: (show) => set({ showImportModal: show }),
+
+            // Global X-Ray Modal
+            xrayModalData: null,
+            setXrayModalData: (data) => set({ xrayModalData: data }),
         }),
         {
             name: 'lectro-storage',

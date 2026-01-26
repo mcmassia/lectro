@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { TopBar } from "@/components/ui/TopBar";
 import { LayoutWrapper } from "@/components/layout/LayoutWrapper";
+import { GlobalModals } from "@/components/layout/GlobalModals";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -45,6 +46,7 @@ export default function RootLayout({
             <LayoutWrapper>
               {children}
             </LayoutWrapper>
+            <GlobalModals />
           </div>
         </ThemeProvider>
       </body>
