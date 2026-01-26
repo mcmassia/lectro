@@ -87,11 +87,15 @@ function ContinueReadingCard({ book, onOpenDetails }: { book: Book; onOpenDetail
       <Link href={`/reader/${book.id}`} className="continue-card-content">
         <div className="card-cover">
           <img
-            src={book.cover || '/default-cover.png'}
+            src={`/api/covers/${book.id}?width=200`}
             alt={book.title}
             onError={(e) => {
-              if ((e.target as HTMLImageElement).src !== '/default-cover.png') {
-                (e.target as HTMLImageElement).src = '/default-cover.png';
+              const target = e.target as HTMLImageElement;
+              // Try book.cover as fallback, then default
+              if (book.cover && !target.src.includes(book.cover)) {
+                target.src = book.cover;
+              } else if (!target.src.includes('/default-cover.png')) {
+                target.src = '/default-cover.png';
               }
             }}
           />
