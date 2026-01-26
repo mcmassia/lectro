@@ -7,7 +7,8 @@ import { getAllBooks, Book } from '@/lib/db';
 import { BookCard } from '@/components/library/BookCard';
 import { ImportModal } from '@/components/library/ImportModal';
 import { BookDetailsModal } from '@/components/library/BookDetailsModal';
-
+import { XRayView } from '@/components/library/XRayView';
+import { db } from '@/lib/db';
 const SortIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
         <path d="M11 5h10M11 9h10M11 13h10M5 5l-3 3 3 3" />
@@ -57,7 +58,9 @@ export default function LibraryPage() {
         activeUserRating,
         setActiveUserRating,
         filteredBooks,
-        setSelectedBookId
+        setSelectedBookId,
+        currentView,
+        setView
     } = useLibraryStore();
     const [showImport, setShowImport] = useState(false);
     const [selectedBook, setSelectedBook] = useState<Book | null>(null);
@@ -103,6 +106,34 @@ export default function LibraryPage() {
     };
 
     const displayBooks = filteredBooks();
+
+
+    // X-Ray View Data Loading
+    const [xrayDataForView, setXrayDataForView] = useState<any>(null);
+
+    useEffect(() => {
+        if (currentView === 'xray' && selectedBookId) {
+            // Load X-Ray data for selected book
+            db.xrayData.where('bookId').equals(selectedBookId).first().then(setXrayDataForView);
+            // Also ensure we have the selected book object
+            if (!selectedBook) {
+                const book = books.find(b => b.id === selectedBookId);
+                if (book) setSelectedBook(book);
+            }
+        }
+    }, [currentView, selectedBookId, books, selectedBook]);
+
+    if (currentView === 'xray' && xrayDataForView && selectedBook) {
+        return (
+            <div className="page-container" style={{ maxWidth: '100% !important', padding: 0 }}>
+                <XRayView
+                    data={xrayDataForView}
+                    book={selectedBook}
+                    onBack={() => setView('library')}
+                />
+            </div>
+        );
+    }
 
     return (
         <>

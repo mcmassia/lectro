@@ -209,14 +209,9 @@ export function RightSidebar() {
                                         <button
                                             className="btn-view-more"
                                             onClick={(e) => {
-                                                console.log('RightSidebar: View All clicked', xrayData);
-                                                e.stopPropagation(); // Safe to keep
-                                                if (xrayData) {
-                                                    console.log('RightSidebar: Setting global modal data');
-                                                    setXrayModalData(xrayData);
-                                                } else {
-                                                    console.warn('RightSidebar: No xrayData to set');
-                                                }
+                                                console.log('RightSidebar: Navigating to X-Ray View');
+                                                e.stopPropagation();
+                                                setView('xray');
                                             }}
                                         >
                                             <Eye size={14} />
