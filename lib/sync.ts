@@ -78,17 +78,12 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
                 }
             } else if (lUserByName) {
                 // Name match but ID different. Server wins to unify IDs.
-                // We should migrate data from old local ID to new server ID?
-                // For simplicity/robustness, we'll delete the local duplicate-by-name user and accept server one.
-                // BUT we must adhere to the rule: Server Authority for ID.
-                // Warning: This effectively orphans local data for 'lUserByName.id' if we don't migrate.
-                // Given the user issue, let's just accept the server user.
-                // The proper fix for data is checking if we need to migrate orphaned data (not implemented here for brevity, 
-                // assuming clean sync state or accepting reset for that user on this device).
+                // Delete the local user with old ID, then put the server user
                 await db.users.delete(lUserByName.id);
-                await db.users.add(hydrateUserDates(sUser));
+                await db.users.put(hydrateUserDates(sUser));
             } else {
-                await db.users.add(hydrateUserDates(sUser));
+                // New user - use put to handle any unexpected duplicates
+                await db.users.put(hydrateUserDates(sUser));
             }
         }
 
