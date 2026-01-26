@@ -52,7 +52,8 @@ export default function Home() {
     sortBy, setSortBy, activeCategory, setActiveCategory,
     activeFormat, sortOrder, setSortOrder, currentView, setView,
     syncMetadata, loadRecentBooks, loadBooks, searchQuery,
-    activeThematicCategory, activeUserRating, setActiveThematicCategory, setActiveUserRating, xrayKeywords
+    activeThematicCategory, activeUserRating, setActiveThematicCategory, setActiveUserRating, xrayKeywords,
+    setSelectedBookId
   } = useLibraryStore();
   const { onboardingComplete, currentUser } = useAppStore();
   const router = useRouter();
@@ -72,7 +73,19 @@ export default function Home() {
   const [isGrouped, setIsGrouped] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
+
+  // Sync specific selection to global store for Sidebar X-Ray
+  useEffect(() => {
+    if (selectedBookIds.size === 1) {
+      const id = Array.from(selectedBookIds)[0];
+      setSelectedBookId(id);
+    } else {
+      setSelectedBookId(null);
+    }
+  }, [selectedBookIds, setSelectedBookId]);
 
   // Handlers
   const handleSync = async () => {
@@ -452,7 +465,10 @@ export default function Home() {
                         key={book.id}
                         book={book}
                         viewMode={viewMode}
-                        onClick={(b) => setSelectedBook(b)}
+                        onClick={(b) => {
+                          setSelectedBook(b);
+                          setSelectedBookId(b.id);
+                        }}
                         selectionMode={isSelectionMode}
                         isSelected={selectedBookIds.has(book.id)}
                         onToggleSelection={handleToggleSelection}
@@ -469,7 +485,10 @@ export default function Home() {
                   key={book.id}
                   book={book}
                   viewMode={viewMode}
-                  onClick={(b) => setSelectedBook(b)}
+                  onClick={(b) => {
+                    setSelectedBook(b);
+                    setSelectedBookId(b.id);
+                  }}
                   selectionMode={isSelectionMode}
                   isSelected={selectedBookIds.has(book.id)}
                   onToggleSelection={handleToggleSelection}
