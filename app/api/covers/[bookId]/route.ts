@@ -71,24 +71,58 @@ export async function GET(
             return NextResponse.json({ error: 'Book file not found' }, { status: 404 });
         }
 
-        // 2. First, check for external cover file in the same directory (cover.jpg, cover.png, cover.webp)
-        const bookDir = path.dirname(filePath);
-        const coverExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        // PRIORITY 1: Check if book record has a user-saved cover (URL or base64) - this takes precedence
         let coverBuffer: Buffer | null = null;
 
-        for (const ext of coverExtensions) {
-            const externalCoverPath = path.join(bookDir, `cover.${ext}`);
-            if (fs.existsSync(externalCoverPath)) {
+        if (book.cover && typeof book.cover === 'string') {
+            // Check for external URL (http/https) - like Google Books covers
+            if (book.cover.startsWith('http://') || book.cover.startsWith('https://')) {
                 try {
-                    coverBuffer = fs.readFileSync(externalCoverPath);
-                    console.log(`[Covers] Using external cover file: ${externalCoverPath}`);
-                    break;
+                    console.log(`[Covers] Fetching saved cover URL for book ${bookId}: ${book.cover}`);
+                    const response = await fetch(book.cover);
+                    if (response.ok) {
+                        const arrayBuffer = await response.arrayBuffer();
+                        coverBuffer = Buffer.from(arrayBuffer);
+                        console.log(`[Covers] Successfully fetched saved cover URL for book ${bookId}`);
+                    } else {
+                        console.error(`[Covers] Failed to fetch saved cover URL: ${response.status}`);
+                    }
                 } catch (e) {
-                    console.error(`Failed to read external cover: ${externalCoverPath}`, e);
+                    console.error('Failed to fetch saved cover URL:', e);
+                }
+            }
+            // Check for base64 data URL
+            else if (book.cover.startsWith('data:image')) {
+                try {
+                    const base64Match = book.cover.match(/^data:image\/[^;]+;base64,(.+)$/);
+                    if (base64Match) {
+                        coverBuffer = Buffer.from(base64Match[1], 'base64');
+                        console.log(`[Covers] Using stored base64 cover for book ${bookId}`);
+                    }
+                } catch (e) {
+                    console.error('Failed to decode stored cover:', e);
                 }
             }
         }
 
+        // PRIORITY 2: Check for external cover file in the same directory (cover.jpg, cover.png, cover.webp)
+        if (!coverBuffer) {
+            const bookDir = path.dirname(filePath);
+            const coverExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+            for (const ext of coverExtensions) {
+                const externalCoverPath = path.join(bookDir, `cover.${ext}`);
+                if (fs.existsSync(externalCoverPath)) {
+                    try {
+                        coverBuffer = fs.readFileSync(externalCoverPath);
+                        console.log(`[Covers] Using external cover file: ${externalCoverPath}`);
+                        break;
+                    } catch (e) {
+                        console.error(`Failed to read external cover: ${externalCoverPath}`, e);
+                    }
+                }
+            }
+        }
         // 3. If no external cover, try extracting from EPUB
         const ext = path.extname(filePath).toLowerCase();
 
@@ -161,47 +195,11 @@ export async function GET(
         }
 
         if (!coverBuffer) {
-            // Fallback: Check if book record has a stored cover
-            if (book.cover && typeof book.cover === 'string') {
-                // Check for external URL (http/https)
-                if (book.cover.startsWith('http://') || book.cover.startsWith('https://')) {
-                    try {
-                        console.log(`[Covers] Fetching external cover URL for book ${bookId}: ${book.cover}`);
-                        const response = await fetch(book.cover);
-                        if (response.ok) {
-                            const arrayBuffer = await response.arrayBuffer();
-                            coverBuffer = Buffer.from(arrayBuffer);
-                            console.log(`[Covers] Successfully fetched external cover for book ${bookId}`);
-                        } else {
-                            console.error(`[Covers] Failed to fetch external cover: ${response.status}`);
-                        }
-                    } catch (e) {
-                        console.error('Failed to fetch external cover URL:', e);
-                    }
-                }
-                // Check for base64 data URL
-                else if (book.cover.startsWith('data:image')) {
-                    try {
-                        // Extract base64 part from data URL
-                        const base64Match = book.cover.match(/^data:image\/[^;]+;base64,(.+)$/);
-                        if (base64Match) {
-                            coverBuffer = Buffer.from(base64Match[1], 'base64');
-                            console.log(`[Covers] Using stored base64 cover for book ${bookId}`);
-                        }
-                    } catch (e) {
-                        console.error('Failed to decode stored cover:', e);
-                    }
-                }
-            }
-        }
-
-        if (!coverBuffer) {
-            // Return a placeholder or 404? 
-            // A 404 is better so client handles fallback
+            // Return 404 so client handles fallback
             return NextResponse.json({ error: 'Cover not found' }, { status: 404 });
         }
 
-        // 3. Resize with Sharp
+        // Resize with Sharp
         const processedImage = await sharp(coverBuffer)
             .resize({ width, fit: 'cover' })
             .webp({ quality })
