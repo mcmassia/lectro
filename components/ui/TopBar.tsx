@@ -44,11 +44,13 @@ export function TopBar() {
     return (
         <header className="topbound">
             <div className="logo-section">
-                <Link href="/" className="app-logo">
-                    <div className="logo-icon-wrapper">
-                        <BookOpen size={24} strokeWidth={2.5} />
+                <Link href="/" style={{ textDecoration: 'none' }}>
+                    <div className="app-logo">
+                        <div className="logo-icon-wrapper">
+                            <BookOpen size={24} strokeWidth={2.5} />
+                        </div>
+                        <span className="logo-text">LECTRO</span>
                     </div>
-                    <span className="logo-text">LECTRO</span>
                 </Link>
             </div>
 

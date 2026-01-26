@@ -149,6 +149,7 @@ export async function POST(req: NextRequest) {
         const mergedBooks = mergeById(existingData.books || [], body.books || [], deletedBookIds);
         const mergedTags = mergeById(existingData.tags || [], body.tags || []);
         const mergedAnnotations = mergeById(existingData.annotations || [], body.annotations || []);
+        const mergedXRayData = mergeById(existingData.xrayData || [], body.xrayData || []);
         const mergedSessions = (body.readingSessions && body.readingSessions.length > 0)
             ? body.readingSessions
             : (existingData.readingSessions || []);
@@ -161,6 +162,7 @@ export async function POST(req: NextRequest) {
             books: mergedBooks,
             tags: mergedTags,
             annotations: mergedAnnotations,
+            xrayData: mergedXRayData,
             readingSessions: mergedSessions,
             users: mergedUsers,
             userBookData: mergedUserBookData,

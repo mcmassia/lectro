@@ -715,6 +715,10 @@ export async function getXRayData(bookId: string): Promise<XRayData | undefined>
   return db.xrayData.where('bookId').equals(bookId).first();
 }
 
+export async function getAllXRayData(): Promise<XRayData[]> {
+  return db.xrayData.toArray();
+}
+
 // Summaries
 export async function saveSummary(summary: BookSummary): Promise<string> {
   return db.summaries.add(summary);

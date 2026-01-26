@@ -17,7 +17,10 @@ import {
     addAnnotation,
     updateAnnotation,
     addReadingSession,
-    getReadingSessionsForBook
+    getReadingSessionsForBook,
+    getAllXRayData,
+    saveXRayData,
+    XRayData
 } from './db';
 
 interface ServerData {
@@ -27,6 +30,7 @@ interface ServerData {
     tags: Tag[];
     annotations: Annotation[];
     readingSessions: ReadingSession[];
+    xrayData: XRayData[];
     lastSync: string;
 }
 
@@ -61,6 +65,7 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
         const localTags = await getAllTags();
         const localAnnotations = await getAllAnnotationsIncludingDeleted();
         const localSessions = await db.readingSessions.toArray();
+        const localXRayData = await getAllXRayData();
         const localUsers = await db.users.toArray();
         const localUserBookData = await db.userBookData.toArray();
 
@@ -202,6 +207,26 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
             }
         }
 
+        // 9. Merge X-Ray Data
+        try {
+            for (const sXRay of (serverData.xrayData || [])) {
+                const lXRay = localXRayData.find(x => x.bookId === sXRay.bookId);
+
+                if (!lXRay) {
+                    await saveXRayData(hydrateXRayDates(sXRay));
+                } else {
+                    const sTime = getTime(sXRay.generatedAt);
+                    const lTime = getTime(lXRay.generatedAt);
+                    if (sTime > lTime) {
+                        // Server is newer
+                        await saveXRayData(hydrateXRayDates(sXRay));
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('[SYNC] Error merging X-Ray Data:', e);
+        }
+
         // 9. Push merged state back to server
         // We always push the final state to ensure server is strictly consistent with the latest merge.
 
@@ -221,6 +246,7 @@ export async function pushLocalData() {
     // Include deleted annotations so server knows about deletions
     const annotations = await getAllAnnotationsIncludingDeleted();
     const readingSessions = await db.readingSessions.toArray();
+    const xrayData = await getAllXRayData();
 
     // New: Sync Users and User Metadata
     const users = await db.users.toArray();
@@ -266,6 +292,7 @@ export async function pushLocalData() {
             tags: isLastChunk ? tags : [],
             annotations: isLastChunk ? annotations : [],
             readingSessions: isLastChunk ? readingSessions : [],
+            xrayData: isLastChunk ? xrayData : [],
             users: isLastChunk ? users : [],
             userBookData: isLastChunk ? userBookData : [],
             lastSync: new Date().toISOString()
@@ -351,5 +378,12 @@ function hydrateUserBookDates(data: any): UserBookData {
         ...data,
         updatedAt: new Date(data.updatedAt),
         lastReadAt: data.lastReadAt ? new Date(data.lastReadAt) : undefined
+    };
+}
+
+function hydrateXRayDates(data: any): XRayData {
+    return {
+        ...data,
+        generatedAt: new Date(data.generatedAt)
     };
 }
