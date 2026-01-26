@@ -209,7 +209,11 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
 
         // 9. Merge X-Ray Data
         try {
-            for (const sXRay of (serverData.xrayData || [])) {
+            const incomingXRay = serverData.xrayData || [];
+            if (incomingXRay.length > 0) {
+                console.log(`[Sync] Merging ${incomingXRay.length} X-Ray items from server locally...`);
+            }
+            for (const sXRay of incomingXRay) {
                 const lXRay = localXRayData.find(x => x.bookId === sXRay.bookId);
 
                 if (!lXRay) {
