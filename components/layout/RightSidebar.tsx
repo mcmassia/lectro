@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
 import { ActivityRings } from '@/components/dashboard/ActivityRings';
@@ -416,6 +418,8 @@ export function RightSidebar() {
                     font-weight: 500;
                     cursor: pointer;
                     transition: all 0.2s;
+                    position: relative;
+                    z-index: 10;
                 }
                 
                 .btn-view-more:hover {
