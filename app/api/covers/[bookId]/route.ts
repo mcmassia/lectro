@@ -161,17 +161,36 @@ export async function GET(
         }
 
         if (!coverBuffer) {
-            // Fallback: Check if book record has a stored cover (base64 data URL)
-            if (book.cover && typeof book.cover === 'string' && book.cover.startsWith('data:image')) {
-                try {
-                    // Extract base64 part from data URL
-                    const base64Match = book.cover.match(/^data:image\/[^;]+;base64,(.+)$/);
-                    if (base64Match) {
-                        coverBuffer = Buffer.from(base64Match[1], 'base64');
-                        console.log(`[Covers] Using stored base64 cover for book ${bookId}`);
+            // Fallback: Check if book record has a stored cover
+            if (book.cover && typeof book.cover === 'string') {
+                // Check for external URL (http/https)
+                if (book.cover.startsWith('http://') || book.cover.startsWith('https://')) {
+                    try {
+                        console.log(`[Covers] Fetching external cover URL for book ${bookId}: ${book.cover}`);
+                        const response = await fetch(book.cover);
+                        if (response.ok) {
+                            const arrayBuffer = await response.arrayBuffer();
+                            coverBuffer = Buffer.from(arrayBuffer);
+                            console.log(`[Covers] Successfully fetched external cover for book ${bookId}`);
+                        } else {
+                            console.error(`[Covers] Failed to fetch external cover: ${response.status}`);
+                        }
+                    } catch (e) {
+                        console.error('Failed to fetch external cover URL:', e);
                     }
-                } catch (e) {
-                    console.error('Failed to decode stored cover:', e);
+                }
+                // Check for base64 data URL
+                else if (book.cover.startsWith('data:image')) {
+                    try {
+                        // Extract base64 part from data URL
+                        const base64Match = book.cover.match(/^data:image\/[^;]+;base64,(.+)$/);
+                        if (base64Match) {
+                            coverBuffer = Buffer.from(base64Match[1], 'base64');
+                            console.log(`[Covers] Using stored base64 cover for book ${bookId}`);
+                        }
+                    } catch (e) {
+                        console.error('Failed to decode stored cover:', e);
+                    }
                 }
             }
         }
