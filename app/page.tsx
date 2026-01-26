@@ -13,6 +13,8 @@ import { SyncReportModal } from '@/components/library/SyncReportModal';
 import TagManagerView from '@/components/library/TagManagerView';
 import { AuthorsView } from '@/components/library/AuthorsView';
 import { ArrowDownNarrowWide, ArrowUpNarrowWide } from 'lucide-react';
+import { XRayView } from '@/components/library/XRayView';
+import { db } from '@/lib/db';
 
 // ... icons
 const GridIcon = () => (
@@ -53,7 +55,7 @@ export default function Home() {
     activeFormat, sortOrder, setSortOrder, currentView, setView,
     syncMetadata, loadRecentBooks, loadBooks, searchQuery,
     activeThematicCategory, activeUserRating, setActiveThematicCategory, setActiveUserRating, xrayKeywords,
-    setSelectedBookId
+    setSelectedBookId, selectedBookId
   } = useLibraryStore();
   const { onboardingComplete, currentUser } = useAppStore();
   const router = useRouter();
@@ -262,8 +264,52 @@ export default function Home() {
   const displayBooks = filteredBooks;
 
 
+
+  // X-Ray View Data Loading
+  const [xrayDataForView, setXrayDataForView] = useState<any>(null);
+
+  useEffect(() => {
+    if (currentView === 'xray' && selectedBookId) {
+      console.log('Home: Fetching X-Ray data for', selectedBookId);
+      db.xrayData.where('bookId').equals(selectedBookId).first()
+        .then(data => setXrayDataForView(data))
+        .catch(e => console.error(e));
+
+      if (!selectedBook) {
+        const book = books.find(b => b.id === selectedBookId);
+        if (book) setSelectedBook(book);
+      }
+    }
+  }, [currentView, selectedBookId, books, selectedBook]);
+
   if (currentView === 'tags') return <TagManagerView />;
   if (activeCategory === 'authors') return <AuthorsView />;
+
+  if (currentView === 'xray') {
+    if (!selectedBookId) return (
+      <div className="flex flex-col items-center justify-center h-full p-10">
+        <p>No hay libro seleccionado</p>
+        <button className="btn btn-primary mt-4" onClick={() => setView('library')}>Volver</button>
+      </div>
+    );
+
+    if (!xrayDataForView || !selectedBook) return (
+      <div className="flex flex-col items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mb-4"></div>
+        <p className="text-gray-500">Cargando análisis...</p>
+      </div>
+    );
+
+    return (
+      <div className="h-full w-full">
+        <XRayView
+          data={xrayDataForView}
+          book={selectedBook}
+          onBack={() => setView('library')}
+        />
+      </div>
+    );
+  }
 
   return (
     <>
