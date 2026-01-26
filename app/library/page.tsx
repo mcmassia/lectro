@@ -113,9 +113,17 @@ export default function LibraryPage() {
     const [xrayDataForView, setXrayDataForView] = useState<any>(null);
 
     useEffect(() => {
+        console.log('LibraryPage: Effect triggered', { currentView, selectedBookId });
         if (currentView === 'xray' && selectedBookId) {
+            console.log('LibraryPage: Fetching X-Ray data for', selectedBookId);
             // Load X-Ray data for selected book
-            db.xrayData.where('bookId').equals(selectedBookId).first().then(setXrayDataForView);
+            db.xrayData.where('bookId').equals(selectedBookId).first()
+                .then(data => {
+                    console.log('LibraryPage: Data fetched', !!data);
+                    setXrayDataForView(data);
+                })
+                .catch(err => console.error('LibraryPage: Fetch Error', err));
+
             // Also ensure we have the selected book object
             if (!selectedBook) {
                 const book = books.find(b => b.id === selectedBookId);
@@ -124,7 +132,26 @@ export default function LibraryPage() {
         }
     }, [currentView, selectedBookId, books, selectedBook]);
 
-    if (currentView === 'xray' && xrayDataForView && selectedBook) {
+    if (currentView === 'xray') {
+        if (!selectedBookId) {
+            return (
+                <div className="page-container flex items-center justify-center h-full">
+                    <p>No book selected for X-Ray view</p>
+                    <button className="btn btn-primary mt-4" onClick={() => setView('library')}>Back to Library</button>
+                </div>
+            );
+        }
+
+        if (!xrayDataForView || !selectedBook) {
+            return (
+                <div className="page-container flex flex-col items-center justify-center h-screen">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mb-4"></div>
+                    <p className="text-gray-500">Cargando análisis...</p>
+                    <button className="btn btn-ghost mt-4 text-sm" onClick={() => setView('library')}>Cancelar</button>
+                </div>
+            );
+        }
+
         return (
             <div className="page-container" style={{ maxWidth: '100% !important', padding: 0 }}>
                 <XRayView
