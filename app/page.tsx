@@ -73,8 +73,6 @@ export default function Home() {
   const [isGrouped, setIsGrouped] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
 
   // Sync specific selection to global store for Sidebar X-Ray
