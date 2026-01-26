@@ -622,22 +622,25 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                             categories: book.metadata?.categories || [],
                                         };
 
-                                        // 1. Update DB
-                                        await updateBook(book.id, {
+                                        const now = new Date();
+                                        const updates = {
                                             title: book.title || 'Untitled',
                                             author: book.author || 'Unknown Author',
                                             cover: book.cover,
-                                            metadata: cleanMetadata
-                                        });
+                                            metadata: cleanMetadata,
+                                            updatedAt: now // Explicitly set update time
+                                        };
+
+                                        // 1. Update DB
+                                        await updateBook(book.id, updates);
                                         console.log('DB updated');
 
                                         // 2. Update Store
-                                        updateBookInStore(book.id, {
-                                            title: book.title,
-                                            author: book.author,
-                                            cover: book.cover,
-                                            metadata: cleanMetadata
-                                        });
+                                        updateBookInStore(book.id, updates);
+                                        console.log('Store updated');
+
+                                        // 3. Update Local State (Critical for immediate UI refresh of cover)
+                                        setBook({ ...book, ...updates });
                                         console.log('Store updated');
 
                                         // Sync to server for cross-device persistence
