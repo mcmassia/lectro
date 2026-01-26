@@ -91,7 +91,7 @@ export async function GET(
             return new NextResponse(processedImage as any, {
                 headers: {
                     'Content-Type': 'image/webp',
-                    'Cache-Control': 'public, max-age=31536000, immutable',
+                    'Cache-Control': 'public, max-age=3600, must-revalidate',
                     'Content-Length': processedImage.length.toString()
                 }
             });
@@ -219,7 +219,7 @@ export async function GET(
         return new NextResponse(processedImage as any, {
             headers: {
                 'Content-Type': 'image/webp',
-                'Cache-Control': 'public, max-age=31536000, immutable',
+                'Cache-Control': 'public, max-age=3600, must-revalidate',
                 'Content-Length': processedImage.length.toString()
             }
         });
