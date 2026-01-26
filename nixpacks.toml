@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["...", "bash"]
+
+[phases.build]
+cmds = ["npm install", "npm run build"]
+
+[start]
+cmd = "mkdir -p /srv && chmod 777 /srv && mkdir -p /library && chmod 777 /library && npm start"
