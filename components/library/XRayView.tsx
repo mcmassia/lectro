@@ -2,8 +2,9 @@
 
 import { XRayData, Book } from '@/lib/db';
 import { useLibraryStore } from '@/stores/appStore';
-import { ArrowLeft, BrainCircuit, Users, MapPin, BookOpen, FileText, Sparkles, Zap } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, Users, MapPin, BookOpen, FileText, Sparkles, Zap, Library } from 'lucide-react';
 import { useState } from 'react';
+import { BookCard } from './BookCard';
 
 interface XRayViewProps {
     data: XRayData;
@@ -12,20 +13,52 @@ interface XRayViewProps {
 }
 
 export function XRayView({ data, book, onBack }: XRayViewProps) {
-    const [activeSection, setActiveSection] = useState<'overview' | 'characters' | 'world'>('overview');
+    const [activeSection, setActiveSection] = useState<'overview' | 'characters' | 'world' | 'author_books' | 'recommendations'>('overview');
+    const { books, setSelectedBookId } = useLibraryStore();
+
+    // Data Filtering for Tabs
+    const authorBooks = books.filter(b => b.author === book.author && b.id !== book.id);
+
+    // Simple Recommendation Logic: same category or subjects
+    const recommendations = books.filter(b => {
+        if (b.id === book.id) return false;
+        if (b.author === book.author) return false; // Already in author tab
+
+        const hasCommonCategory = b.metadata?.categories?.some(c => book.metadata?.categories?.includes(c));
+        const hasCommonSubject = b.metadata?.subjects?.some(s => book.metadata?.subjects?.includes(s));
+
+        return hasCommonCategory || hasCommonSubject;
+    }).slice(0, 8); // Limit to 8
 
     return (
         <div className="xray-dashboard animate-fade-in">
             {/* Header / Navigation */}
-            <div className="dashboard-header">
+            <div className="dashboard-header h-32">
                 <button onClick={onBack} className="back-btn">
                     <ArrowLeft size={20} />
-                    <span>Volver a la biblioteca</span>
+                    <span>Volver</span>
                 </button>
-                <div className="book-context">
-                    <span className="label">ADN del Libro</span>
-                    <h1 className="title">{book.title}</h1>
+
+                <div className="header-content">
+                    {/* Book Cover in Header */}
+                    <div className="header-cover shadow-lg">
+                        <img
+                            src={book.isOnServer || book.filePath ? `/api/covers/${book.id}?width=200&v=${new Date(book.updatedAt || 0).getTime()}` : (book.cover || '/default-cover.png')}
+                            alt={book.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/default-cover.png';
+                            }}
+                        />
+                    </div>
+
+                    <div className="book-context text-left">
+                        <span className="label">ADN del Libro</span>
+                        <h1 className="title text-2xl">{book.title}</h1>
+                        <p className="author text-lg text-gray-400 font-medium">{book.author}</p>
+                    </div>
                 </div>
+
                 <div className="header-actions">
                     <button className="action-btn primary">
                         <Sparkles size={16} />
@@ -60,6 +93,25 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                         >
                             <MapPin size={18} />
                             <span>Mundo y Lugares</span>
+                        </button>
+
+                        <div className="nav-separator"></div>
+
+                        <button
+                            className={`nav-item ${activeSection === 'author_books' ? 'active' : ''}`}
+                            onClick={() => setActiveSection('author_books')}
+                        >
+                            <Library size={18} />
+                            <span>Más de {book.author?.split(' ')[0] || 'Autor'}</span>
+                            {authorBooks.length > 0 && <span className="nav-badge">{authorBooks.length}</span>}
+                        </button>
+                        <button
+                            className={`nav-item ${activeSection === 'recommendations' ? 'active' : ''}`}
+                            onClick={() => setActiveSection('recommendations')}
+                        >
+                            <Sparkles size={18} />
+                            <span>Similares</span>
+                            {recommendations.length > 0 && <span className="nav-badge">{recommendations.length}</span>}
                         </button>
                     </div>
 
@@ -164,6 +216,68 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                         </div>
                     )}
 
+                    {activeSection === 'author_books' && (
+                        <div className="content-slide animate-slide-up">
+                            <div className="section-header">
+                                <h2>Más de {book.author}</h2>
+                                <p>Otros títulos de este autor en tu biblioteca</p>
+                            </div>
+
+                            {authorBooks.length > 0 ? (
+                                <div className="book-grid-display">
+                                    {authorBooks.map(b => (
+                                        <div key={b.id} className="transform scale-90 origin-top-left hover:scale-100 transition-all duration-200">
+                                            {/* Reuse existing Book Card style but inert or navigating */}
+                                            <BookCard
+                                                book={b}
+                                                viewMode="grid"
+                                                onClick={() => {
+                                                    // This will trigger the global selection and reload the view
+                                                    useLibraryStore.getState().setSelectedBookId(b.id);
+                                                }}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="empty-state">
+                                    <Library size={48} className="text-gray-600 mb-4" />
+                                    <p>No tienes más libros de este autor.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeSection === 'recommendations' && (
+                        <div className="content-slide animate-slide-up">
+                            <div className="section-header">
+                                <h2>Recomendaciones</h2>
+                                <p>Libros similares basados en género y temática</p>
+                            </div>
+
+                            {recommendations.length > 0 ? (
+                                <div className="book-grid-display">
+                                    {recommendations.map(b => (
+                                        <div key={b.id} className="transform scale-90 origin-top-left hover:scale-100 transition-all duration-200">
+                                            <BookCard
+                                                book={b}
+                                                viewMode="grid"
+                                                onClick={() => {
+                                                    useLibraryStore.getState().setSelectedBookId(b.id);
+                                                }}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="empty-state">
+                                    <Sparkles size={48} className="text-gray-600 mb-4" />
+                                    <p>No encontramos recomendaciones directas. ¡Importa más libros!</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                 </div>
             </div>
 
@@ -181,13 +295,33 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    padding: 24px 40px;
+                    padding: 16px 40px;
                     border-bottom: 1px solid var(--color-border);
                     background: var(--color-bg-secondary);
                     position: sticky;
                     top: 0;
                     z-index: 10;
                     backdrop-filter: blur(10px);
+                    height: auto;
+                    min-height: 100px;
+                }
+
+                .header-content {
+                    display: flex;
+                    align-items: center;
+                    gap: 24px;
+                    flex: 1;
+                    justify-content: center; /* Center block */
+                    margin-left: 40px; /* Offset back button */
+                }
+
+                .header-cover {
+                    width: 60px;
+                    height: 90px;
+                    border-radius: 6px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+                    flex-shrink: 0;
                 }
 
                 .back-btn {
@@ -201,7 +335,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                 .back-btn:hover { color: var(--color-text-primary); }
 
                 .book-context {
-                    text-align: center;
+                    text-align: left;
                 }
                 .book-context .label {
                     font-size: 11px;
@@ -209,11 +343,19 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     letter-spacing: 1px;
                     color: var(--color-accent);
                     font-weight: 700;
+                    display: block;
+                    margin-bottom: 4px;
                 }
                 .book-context .title {
-                    font-size: 18px;
+                    font-size: 24px;
                     margin: 0;
-                    font-weight: 600;
+                    font-weight: 700;
+                    line-height: 1.2;
+                }
+                .book-context .author {
+                    font-size: 16px;
+                    margin: 0;
+                    color: var(--color-text-secondary);
                 }
 
                 .action-btn.primary {
@@ -236,7 +378,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     display: grid;
                     grid-template-columns: 260px 1fr;
                     flex: 1;
-                    max-width: 1400px;
+                    max-width: 1600px;
                     width: 100%;
                     margin: 0 auto;
                 }
@@ -255,6 +397,12 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     gap: 8px;
                 }
 
+                .nav-separator {
+                    height: 1px;
+                    background: var(--color-border);
+                    margin: 8px 0;
+                }
+
                 .nav-item {
                     display: flex;
                     align-items: center;
@@ -266,6 +414,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     transition: all 0.2s;
                     border: 1px solid transparent;
                     text-align: left;
+                    position: relative;
                 }
                 .nav-item:hover { background: var(--color-bg-tertiary); color: var(--color-text-primary); }
                 .nav-item.active {
@@ -273,6 +422,20 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     color: var(--color-accent);
                     border-color: var(--color-border);
                     box-shadow: var(--shadow-sm);
+                }
+                
+                .nav-badge {
+                    margin-left: auto;
+                    background: var(--color-bg-tertiary);
+                    color: var(--color-text-secondary);
+                    font-size: 10px;
+                    padding: 2px 6px;
+                    border-radius: 10px;
+                    font-weight: 700;
+                }
+                .nav-item.active .nav-badge {
+                    background: rgba(168, 85, 247, 0.1);
+                    color: var(--color-accent);
                 }
 
                 .stat-card {
@@ -307,7 +470,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     display: flex;
                     flex-direction: column;
                     gap: 32px;
-                    max-width: 900px;
+                    max-width: 1000px;
                 }
                 
                 .section-header { margin-bottom: 16px; }
@@ -425,6 +588,24 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                 .place-icon { color: var(--color-text-tertiary); }
                 .place-content h4 { margin: 0 0 8px 0; font-size: 16px; font-weight: 600; }
                 .place-content p { margin: 0; font-size: 14px; color: var(--color-text-secondary); line-height: 1.5; }
+                
+                /* Book List Grid */
+                .book-grid-display {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                    gap: 20px;
+                }
+                
+                .empty-state {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 60px;
+                    background: var(--color-bg-secondary);
+                    border-radius: 16px;
+                    color: var(--color-text-secondary);
+                }
 
                 @keyframes slideUp {
                     from { opacity: 0; transform: translateY(20px); }
