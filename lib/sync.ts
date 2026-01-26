@@ -250,6 +250,15 @@ export async function pushLocalData() {
 
     console.log(`Pushing ${books.length} books in ${chunks.length} batches...`);
 
+    // DEBUG: Trace specific book sync
+    const debugBook = books.find(b => b.title === 'Roma');
+    if (debugBook) {
+        console.log(`[SYNC-CLIENT] Debug 'Roma':`);
+        console.log(`  Cover present: ${!!debugBook.cover}`);
+        console.log(`  Cover length: ${debugBook.cover?.length}`);
+        console.log(`  UpdatedAt: ${debugBook.updatedAt}`);
+    }
+
     for (let i = 0; i < chunks.length; i++) {
         const isLastChunk = i === chunks.length - 1;
         const chunk = chunks[i];
