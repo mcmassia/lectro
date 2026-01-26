@@ -15,14 +15,16 @@ export function XRayModal({ data, onClose }: XRayModalProps) {
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        console.log('XRayModal mounted', { data });
         setMounted(true);
         // Prevent body scroll when modal is open
         document.body.style.overflow = 'hidden';
         return () => {
+            console.log('XRayModal unmounting');
             document.body.style.overflow = 'unset';
             setMounted(false);
         };
-    }, []);
+    }, [data]);
 
     if (!mounted) return null;
 

@@ -205,7 +205,11 @@ export function RightSidebar() {
                                         </p>
                                         <button
                                             className="btn-view-more"
-                                            onClick={() => setShowXRayModal(true)}
+                                            onClick={(e) => {
+                                                console.log('View All clicked', { selectedBookId, xrayData });
+                                                e.stopPropagation();
+                                                setShowXRayModal(true);
+                                            }}
                                         >
                                             <Eye size={14} />
                                             Ver todo
