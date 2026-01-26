@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore, useLibraryStore } from '@/stores/appStore';
-import { Search, Moon, Sun, Bell, Plus, User, Menu, LogOut, Settings } from 'lucide-react';
+import { Search, Moon, Sun, Bell, Plus, User, Menu, LogOut, Settings, BookOpen } from 'lucide-react';
 import { UserManagementModal } from '@/components/settings/UserManagementModal';
 
 export function TopBar() {
@@ -44,7 +44,12 @@ export function TopBar() {
     return (
         <header className="topbound">
             <div className="logo-section">
-                <Link href="/" className="app-logo">Lectro</Link>
+                <Link href="/" className="app-logo">
+                    <div className="logo-icon-wrapper">
+                        <BookOpen size={24} strokeWidth={2.5} />
+                    </div>
+                    <span className="logo-text">LECTRO</span>
+                </Link>
             </div>
 
             <div className="search-section">
@@ -143,11 +148,32 @@ export function TopBar() {
                 }
 
                 .app-logo {
-                    font-size: 20px;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    text-decoration: none;
+                }
+
+                .logo-icon-wrapper {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 40px;
+                    height: 40px;
+                    background: var(--color-bg-primary);
+                    border-radius: 10px;
+                    color: var(--color-accent);
+                    box-shadow: var(--shadow-sm);
+                    border: 1px solid var(--color-border);
+                }
+
+                .logo-text {
+                    font-size: 18px;
                     font-weight: 700;
-                    background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
+                    letter-spacing: 1.5px;
+                    color: var(--color-text-primary);
+                    text-transform: uppercase;
+                    font-family: var(--font-display, sans-serif); /* Fallback */
                 }
 
                 .search-section {
