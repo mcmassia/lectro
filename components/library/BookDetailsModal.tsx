@@ -640,7 +640,8 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                         });
                                         console.log('Store updated');
 
-                                        // NO server sync call here to avoid errors
+                                        // Sync to server for cross-device persistence
+                                        syncData().catch(e => console.error('Sync after metadata save failed:', e));
 
                                         setIsEditing(false);
                                     } catch (err: any) {
