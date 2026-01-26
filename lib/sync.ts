@@ -163,19 +163,31 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
         }
 
         // 7. Merge Annotations (respecting soft deletes)
+        // Get default user ID for legacy annotations without userId
+        const defaultUser = await db.users.where('username').equals('mcmassia').first();
+        const defaultUserId = defaultUser?.id;
+
         for (const sAnn of (serverData.annotations || [])) {
             const lAnn = localAnnotations.find(a => a.id === sAnn.id);
+
+            // Assign default userId to legacy annotations without one
+            let processedAnn = hydrateAnnotationDates(sAnn);
+            if (!processedAnn.userId && defaultUserId) {
+                processedAnn = { ...processedAnn, userId: defaultUserId };
+                console.log(`[Sync] Assigned userId to legacy annotation ${sAnn.id}`);
+            }
+
             if (!lAnn) {
                 // Only add if not deleted
                 if (!sAnn.deletedAt) {
-                    await db.annotations.put(hydrateAnnotationDates(sAnn));
+                    await db.annotations.put(processedAnn);
                 }
             } else {
                 const sTime = getTime(sAnn.updatedAt);
                 const lTime = getTime(lAnn.updatedAt);
                 // Server is newer
                 if (sTime > lTime) {
-                    await db.annotations.update(lAnn.id, hydrateAnnotationDates(sAnn) as any);
+                    await db.annotations.update(lAnn.id, processedAnn as any);
                 }
                 // If local is deleted but server is not, keep local deletion (local wins if same time or newer)
             }
