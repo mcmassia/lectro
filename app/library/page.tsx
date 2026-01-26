@@ -63,6 +63,10 @@ export default function LibraryPage() {
     const [selectedBook, setSelectedBook] = useState<Book | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
+    // Selection Mode State
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(new Set());
+
     useEffect(() => {
         async function loadBooks() {
             try {
@@ -78,6 +82,26 @@ export default function LibraryPage() {
         loadBooks();
     }, [setBooks, setIsLoading]);
 
+    // Sync specific selection to global store for Sidebar X-Ray
+    useEffect(() => {
+        if (selectedBookIds.size === 1) {
+            const id = Array.from(selectedBookIds)[0];
+            setSelectedBookId(id);
+        } else {
+            setSelectedBookId(null);
+        }
+    }, [selectedBookIds, setSelectedBookId]);
+
+    const handleToggleSelection = (book: Book) => {
+        const newSelected = new Set(selectedBookIds);
+        if (newSelected.has(book.id)) {
+            newSelected.delete(book.id);
+        } else {
+            newSelected.add(book.id);
+        }
+        setSelectedBookIds(newSelected);
+    };
+
     const displayBooks = filteredBooks();
 
     return (
@@ -92,6 +116,17 @@ export default function LibraryPage() {
                             </svg>
                         </Link>
                         <h1 className="header-title">Biblioteca</h1>
+
+                        {/* Selection Mode Toggle in Header if desired, or keep in toolbar */}
+                        {selectedBookIds.size > 0 && (
+                            <div className="selection-actions">
+                                <span className="selection-count">{selectedBookIds.size} seleccionados</span>
+                                <button className="btn btn-sm btn-ghost" onClick={() => setSelectedBookIds(new Set())}>
+                                    Cancelar
+                                </button>
+                            </div>
+                        )}
+
                         <button className="btn btn-icon btn-ghost">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
                                 <circle cx="12" cy="12" r="1" />
@@ -243,6 +278,19 @@ export default function LibraryPage() {
                             >
                                 <ListIcon />
                             </button>
+                            <button
+                                className={`btn btn-icon ${isSelectionMode ? 'active' : ''}`}
+                                onClick={() => {
+                                    setIsSelectionMode(!isSelectionMode);
+                                    if (isSelectionMode) setSelectedBookIds(new Set()); // Clear on exit
+                                }}
+                                title={isSelectionMode ? "Salir de selección" : "Seleccionar"}
+                            >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                                    <path d="M9 11l3 3L22 4" />
+                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                                </svg>
+                            </button>
                         </div>
 
                         <button className="btn btn-primary btn-import" onClick={() => setShowImport(true)} title="Importar libros">
@@ -265,9 +313,16 @@ export default function LibraryPage() {
                                 key={book.id}
                                 book={book}
                                 viewMode={viewMode}
+                                selectionMode={isSelectionMode}
+                                isSelected={selectedBookIds.has(book.id)}
+                                onToggleSelection={handleToggleSelection}
                                 onClick={(bk) => {
+                                    // If we are in selection mode, Card handles it via onToggleSelection
+                                    // But if NOT in selection mode, we select standard way AND set ID for Sidebar
+                                    // BUT, maybe user wants sidebar even without modal?
+                                    // For now, keep modal behavior + sidebar update
                                     setSelectedBook(bk);
-                                    setSelectedBookId(bk.id); // Update context for Sidebar
+                                    setSelectedBookId(bk.id);
                                 }}
                             />
                         ))}
