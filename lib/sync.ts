@@ -88,73 +88,79 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
         }
 
         // 4. Merge UserBookData (Progress, Status)
-        for (const sData of (serverData.userBookData || [])) {
-            // Find by composite key: userId + bookId
-            const lData = localUserBookData.find(d => d.userId === sData.userId && d.bookId === sData.bookId);
+        try {
+            for (const sData of (serverData.userBookData || [])) {
+                // Find by composite key: userId + bookId
+                const lData = localUserBookData.find(d => d.userId === sData.userId && d.bookId === sData.bookId);
 
-            if (lData) {
-                const sTime = getTime(sData.updatedAt);
-                const lTime = getTime(lData.updatedAt);
-                if (sTime > lTime) {
-                    await db.userBookData.put(hydrateUserBookDates(sData));
-                }
-            } else {
-                // Remove 'id' so it auto-increments locally or keep it? 
-                // Dexie 'userBookData' has '++id'. We should probably let it auto-increment 
-                // OR if we sync 'id', we might have clashes. 
-                // Safest to drop 'id' from server and let local auto-increment, 
-                // BUT then we can't update exact rows easily back and forth.
-                // Actually, since we match on [userId+bookId], we can just PUT.
-                const { id, ...rest } = sData; // Drop ID to allow clean insert/update
-                // Hydrate and find existing ID to update or add new
-                const existing = await db.userBookData.where('[userId+bookId]').equals([sData.userId, sData.bookId]).first();
-                if (existing) {
-                    await db.userBookData.put({ ...hydrateUserBookDates(rest), id: existing.id! });
+                if (lData) {
+                    const sTime = getTime(sData.updatedAt);
+                    const lTime = getTime(lData.updatedAt);
+                    if (sTime > lTime) {
+                        await db.userBookData.put({ ...hydrateUserBookDates(sData), id: lData.id });
+                    }
                 } else {
-                    await db.userBookData.add(hydrateUserBookDates(rest) as any);
+                    const { id, ...rest } = sData; // Drop ID to allow clean insert/update
+                    // Hydrate and find existing ID to update or add new
+                    const existing = await db.userBookData.where('[userId+bookId]').equals([sData.userId, sData.bookId]).first();
+                    if (existing) {
+                        await db.userBookData.put({ ...hydrateUserBookDates(rest), id: existing.id! });
+                    } else {
+                        // Use put instead of add to be safe, though without ID it generally adds
+                        await db.userBookData.put(hydrateUserBookDates(rest) as any);
+                    }
                 }
             }
+        } catch (e) {
+            console.error('[SYNC] Error merging UserBookData:', e);
         }
 
         // 5. Merge Books
-        // Process Server Books -> Local
-        for (const sBook of (serverData.books || [])) {
-            const lBook = localBooks.find(b => b.id === sBook.id);
+        try {
+            for (const sBook of (serverData.books || [])) {
+                const lBook = localBooks.find(b => b.id === sBook.id);
 
-            if (!lBook) {
-                // New book from server (ensure date objects are instantiated)
-                await addBook(hydrateBookDates(sBook));
-            } else {
-                // Conflict resolution
-                const sTime = getTime(sBook.updatedAt) || getTime(sBook.lastReadAt) || 0;
-                const lTime = getTime(lBook.updatedAt) || getTime(lBook.lastReadAt) || 0;
+                if (!lBook) {
+                    // New book from server
+                    await db.books.put(hydrateBookDates(sBook));
+                } else {
+                    // Conflict resolution
+                    const sTime = getTime(sBook.updatedAt) || getTime(sBook.lastReadAt) || 0;
+                    const lTime = getTime(lBook.updatedAt) || getTime(lBook.lastReadAt) || 0;
 
-                if (sTime > lTime) {
-                    // Server is newer
-                    await updateBook(lBook.id, hydrateBookDates(sBook));
+                    if (sTime > lTime) {
+                        // Server is newer
+                        await updateBook(lBook.id, hydrateBookDates(sBook));
+                    }
                 }
             }
+        } catch (e) {
+            console.error('[SYNC] Error merging Books:', e);
         }
 
         // 6. Merge Tags
-        for (const sTag of (serverData.tags || [])) {
-            const lTag = localTags.find(t => t.id === sTag.id);
-            const lTagName = localTags.find(t => t.name === sTag.name);
+        try {
+            for (const sTag of (serverData.tags || [])) {
+                const lTag = localTags.find(t => t.id === sTag.id);
+                const lTagName = localTags.find(t => t.name === sTag.name);
 
-            if (lTag) {
-                const sTime = getTime(sTag.updatedAt) || getTime(sTag.createdAt);
-                const lTime = getTime(lTag.updatedAt) || getTime(lTag.createdAt);
+                if (lTag) {
+                    const sTime = getTime(sTag.updatedAt) || getTime(sTag.createdAt);
+                    const lTime = getTime(lTag.updatedAt) || getTime(lTag.createdAt);
 
-                if (sTime > lTime) {
-                    await db.tags.update(lTag.id, hydrateTagDates(sTag));
+                    if (sTime > lTime) {
+                        await db.tags.put(hydrateTagDates(sTag));
+                    }
+                } else if (lTagName) {
+                    // Same name but different ID. Server authority wins.
+                    await db.tags.delete(lTagName.id);
+                    await db.tags.put(hydrateTagDates(sTag));
+                } else {
+                    await db.tags.put(hydrateTagDates(sTag));
                 }
-            } else if (lTagName) {
-                // Same name but different ID. Server authority wins to converge IDs.
-                await db.tags.delete(lTagName.id);
-                await db.tags.add(hydrateTagDates(sTag));
-            } else {
-                await db.tags.add(hydrateTagDates(sTag));
             }
+        } catch (e) {
+            console.error('[SYNC] Error merging Tags:', e);
         }
 
         // 7. Merge Annotations (respecting soft deletes)
