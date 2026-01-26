@@ -42,36 +42,12 @@ export async function GET(
         const data = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
         const book = data.books?.find((b: any) => b.id === bookId);
 
-        if (!book || (!book.filePath && !book.fileName)) {
+        if (!book || (!book.filePath && !book.fileName && !book.cover)) {
             return NextResponse.json({ error: 'Book not found on server' }, { status: 404 });
         }
 
-        let filePath = '';
-        if (book.filePath) {
-            filePath = path.join(libraryPath, book.filePath);
-        }
-
-        // Fallback: If filePath is missing or file doesn't exist, try to find it by fileName in library root
-        if (!filePath || !fs.existsSync(filePath)) {
-            if (book.fileName) {
-                const fallbackPath = path.join(libraryPath, book.fileName);
-                if (fs.existsSync(fallbackPath)) {
-                    filePath = fallbackPath;
-                } else {
-                    // Try recursive search? (Expensive)
-                    // For now, let's assume if it's not at path and not at root, it's missing.
-                    // But we can try one level deep (Author/Book)?
-                    // Or rely on the 'scan' logic if we want to be smarter. 
-                    // Let's stick to root fallback for now as that's the common case for simple sync.
-                }
-            }
-        }
-
-        if (!filePath || !fs.existsSync(filePath)) {
-            return NextResponse.json({ error: 'Book file not found' }, { status: 404 });
-        }
-
         // PRIORITY 1: Check if book record has a user-saved cover (URL or base64) - this takes precedence
+        // We check this FIRST before even looking for the file, since we don't need the file if we have a cover URL
         let coverBuffer: Buffer | null = null;
 
         if (book.cover && typeof book.cover === 'string') {
@@ -105,21 +81,56 @@ export async function GET(
             }
         }
 
-        // PRIORITY 2: Check for external cover file in the same directory (cover.jpg, cover.png, cover.webp)
-        if (!coverBuffer) {
-            const bookDir = path.dirname(filePath);
-            const coverExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        // If we have a cover from URL/base64, process and return it now
+        if (coverBuffer) {
+            const processedImage = await sharp(coverBuffer)
+                .resize({ width, fit: 'cover' })
+                .webp({ quality })
+                .toBuffer();
 
-            for (const ext of coverExtensions) {
-                const externalCoverPath = path.join(bookDir, `cover.${ext}`);
-                if (fs.existsSync(externalCoverPath)) {
-                    try {
-                        coverBuffer = fs.readFileSync(externalCoverPath);
-                        console.log(`[Covers] Using external cover file: ${externalCoverPath}`);
-                        break;
-                    } catch (e) {
-                        console.error(`Failed to read external cover: ${externalCoverPath}`, e);
-                    }
+            return new NextResponse(processedImage as any, {
+                headers: {
+                    'Content-Type': 'image/webp',
+                    'Cache-Control': 'public, max-age=31536000, immutable',
+                    'Content-Length': processedImage.length.toString()
+                }
+            });
+        }
+
+        // If no saved cover, we need the file to extract cover from EPUB or find external cover file
+        let filePath = '';
+        if (book.filePath) {
+            filePath = path.join(libraryPath, book.filePath);
+        }
+
+        // Fallback: If filePath is missing or file doesn't exist, try to find it by fileName
+        if (!filePath || !fs.existsSync(filePath)) {
+            if (book.fileName) {
+                const fallbackPath = path.join(libraryPath, book.fileName);
+                if (fs.existsSync(fallbackPath)) {
+                    filePath = fallbackPath;
+                }
+            }
+        }
+
+        // If still no file found, return 404
+        if (!filePath || !fs.existsSync(filePath)) {
+            return NextResponse.json({ error: 'Book file not found and no cover URL saved' }, { status: 404 });
+        }
+
+        // PRIORITY 2: Check for external cover file in the same directory (cover.jpg, cover.png, cover.webp)
+        const bookDir = path.dirname(filePath);
+        const coverExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+        for (const ext of coverExtensions) {
+            const externalCoverPath = path.join(bookDir, `cover.${ext}`);
+            if (fs.existsSync(externalCoverPath)) {
+                try {
+                    coverBuffer = fs.readFileSync(externalCoverPath);
+                    console.log(`[Covers] Using external cover file: ${externalCoverPath}`);
+                    break;
+                } catch (e) {
+                    console.error(`Failed to read external cover: ${externalCoverPath}`, e);
                 }
             }
         }
