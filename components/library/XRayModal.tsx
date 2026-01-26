@@ -14,12 +14,14 @@ export function XRayModal({ data, onClose }: XRayModalProps) {
     const [activeTab, setActiveTab] = useState<'overview' | 'characters' | 'places' | 'terms'>('overview');
 
     useEffect(() => {
+        console.log('XRayModal: MOUNTED', { data });
         // Prevent body scroll when modal is open
         document.body.style.overflow = 'hidden';
         return () => {
+            console.log('XRayModal: UNMOUNTING');
             document.body.style.overflow = 'unset';
         };
-    }, []);
+    }, [data]);
 
     return (
         <div className="modal-overlay" onClick={(e) => {
