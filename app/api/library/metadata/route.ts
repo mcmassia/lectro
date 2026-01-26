@@ -97,7 +97,18 @@ export async function POST(req: NextRequest) {
 
                     if (existingItem) {
                         // Conflict resolution
-                        if (getTime(item) >= getTime(existingItem)) {
+                        const incomingTime = getTime(item);
+                        const existingTime = getTime(existingItem);
+
+                        // Debug log for conflicts (only for books to avoid spam)
+                        if (item.cover !== existingItem.cover) {
+                            console.log(`[MERGE] Conflict for book ${item.title || key}:`);
+                            console.log(`  Incoming Time: ${new Date(incomingTime).toISOString()} (${incomingTime})`);
+                            console.log(`  Existing Time: ${new Date(existingTime).toISOString()} (${existingTime})`);
+                            console.log(`  Winner: ${incomingTime >= existingTime ? 'Incoming' : 'Existing'}`);
+                        }
+
+                        if (incomingTime >= existingTime) {
                             map.set(key, item);
                         }
                     } else {
