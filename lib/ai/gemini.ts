@@ -14,8 +14,9 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 
 // Models
 // Models
-export const geminiPro = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-export const geminiProVision = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+// Models
+export const geminiPro = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+export const geminiProVision = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 // ===================================
 // X-Ray Generation
@@ -37,7 +38,7 @@ export interface XRayEntity {
     importance: 'main' | 'secondary' | 'minor';
 }
 
-export async function generateXRay(bookContent: string, bookTitle: string, modelName: string = 'gemini-1.5-pro'): Promise<XRayResult> {
+export async function generateXRay(bookContent: string, bookTitle: string, modelName: string = 'gemini-1.5-flash'): Promise<XRayResult> {
     const prompt = `Analyze the provided book content for "${bookTitle}".
     
 First, detect the language of the book content (e.g., Spanish, English, French).

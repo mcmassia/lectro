@@ -7,7 +7,7 @@ export async function getRagResponseAction(
     query: string,
     contexts: RagContext[],
     conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [],
-    modelName: string = 'gemini-2.5-flash'
+    modelName: string = 'gemini-1.5-flash'
 ) {
     // Check if API key is configured
     if (!process.env.GEMINI_API_KEY) {
@@ -40,7 +40,7 @@ export async function generateEmbeddingAction(text: string): Promise<{ success: 
     }
 }
 
-export async function generateXRayAction(content: string, title: string, modelName: string = 'gemini-1.5-pro'): Promise<{ success: boolean; data?: XRayResult; error?: string }> {
+export async function generateXRayAction(content: string, title: string, modelName: string = 'gemini-1.5-flash'): Promise<{ success: boolean; data?: XRayResult; error?: string }> {
     if (!process.env.GEMINI_API_KEY) {
         return { success: false, error: 'Configuration Error: Gemini API Key is missing.' };
     }
