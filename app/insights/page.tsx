@@ -28,7 +28,8 @@ export default function InsightsPage() {
     const [chunkCount, setChunkCount] = useState<number>(0);
     const [indexingStatus, setIndexingStatus] = useState<any>(null); // Use proper type
     const [isIndexing, setIsIndexing] = useState(false);
-    const [indexingFilter, setIndexingFilter] = useState<string>('all'); // 'all' or 'a', 'b', etc.
+    const [indexingFilter, setIndexingFilter] = useState<string>('all');
+    const [deepIndexSearch, setDeepIndexSearch] = useState('');
     const indexerRef = useRef<any>(null); // To store indexer instance
     const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -52,38 +53,30 @@ export default function InsightsPage() {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [ragMessages]);
 
-    const handleToggleIndexing = async () => {
-        if (isIndexing) {
-            if (indexerRef.current) {
-                indexerRef.current.cancel();
-            }
-            setIsIndexing(false);
-            return;
-        }
-
+    const startIndexing = async (mode: 'full' | 'metadata', filter: any) => {
         setIsIndexing(true);
-        // import dynamically to avoid processing payload on initial load? optional
+        // import dynamically
         const { LibraryIndexer } = await import('@/lib/ai/indexer');
 
         indexerRef.current = new LibraryIndexer((status: any) => {
             setIndexingStatus(status);
-            if (!status.isIndexing && status.currentBook === 'Completed') {
+            if (!status.isIndexing && status.currentBook.startsWith('Completed')) {
                 setIsIndexing(false);
             }
         });
 
-        // Start indexing in background
-        const options = {
-            filter: {
-                type: 'startsWith' as const,
-                value: indexingFilter
-            }
-        };
-
-        indexerRef.current.indexLibrary(options).catch((err: any) => {
+        // Start indexing
+        indexerRef.current.indexLibrary({ mode, filter }).catch((err: any) => {
             console.error("Indexing failed:", err);
             setIsIndexing(false);
         });
+    };
+
+    const stopIndexing = () => {
+        if (indexerRef.current) {
+            indexerRef.current.cancel();
+        }
+        setIsIndexing(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -370,32 +363,75 @@ export default function InsightsPage() {
                                 </p>
                             )}
 
-                            {!isIndexing && (
-                                <div style={{ marginTop: 'var(--space-3)' }}>
-                                    <label className="body-xs" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--color-text-secondary)' }}>
-                                        Indexar por lote (título empieza por):
-                                    </label>
-                                    <select
-                                        className="input"
-                                        style={{ width: '100%', fontSize: 'var(--text-sm)', padding: 'var(--space-1) var(--space-2)' }}
-                                        value={indexingFilter}
-                                        onChange={(e) => setIndexingFilter(e.target.value)}
-                                    >
-                                        <option value="all">Todo el catálogo</option>
-                                        {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(char => (
-                                            <option key={char} value={char}>{char}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
+                            {!isIndexing ? (
+                                <>
+                                    {/* Section 1: Quick Metadata Indexing */}
+                                    <div style={{ marginTop: 'var(--space-3)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--color-border)' }}>
+                                        <div style={{ marginBottom: 'var(--space-2)' }}>
+                                            <h4 className="label">Indexación Rápida (Metadatos)</h4>
+                                            <p className="body-xs" style={{ color: 'var(--color-text-tertiary)' }}>Recomendado. Procesa toda la biblioteca en segundos.</p>
+                                        </div>
+                                        <label className="body-xs" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--color-text-secondary)' }}>
+                                            Lote (letra inicial):
+                                        </label>
+                                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                            <select
+                                                className="input"
+                                                style={{ flex: 1, fontSize: 'var(--text-sm)', padding: 'var(--space-1) var(--space-2)' }}
+                                                value={indexingFilter}
+                                                onChange={(e) => setIndexingFilter(e.target.value)}
+                                            >
+                                                <option value="all">Todo el catálogo</option>
+                                                {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(char => (
+                                                    <option key={char} value={char}>{char}</option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                className="btn btn-primary btn-sm"
+                                                onClick={() => startIndexing('metadata', { type: 'startsWith', value: indexingFilter })}
+                                            >
+                                                Indexar M.
+                                            </button>
+                                        </div>
+                                    </div>
 
-                            <button
-                                className={`btn btn-sm ${isIndexing ? 'btn-danger' : 'btn-primary'}`}
-                                style={{ width: '100%', marginTop: 'var(--space-3)' }}
-                                onClick={handleToggleIndexing}
-                            >
-                                {isIndexing ? 'Detener Indexación' : 'Indexar Biblioteca'}
-                            </button>
+                                    {/* Section 2: Deep Full Indexing */}
+                                    <div style={{ marginTop: 'var(--space-3)' }}>
+                                        <div style={{ marginBottom: 'var(--space-2)' }}>
+                                            <h4 className="label">Indexación Profunda (Texto)</h4>
+                                            <p className="body-xs" style={{ color: 'var(--color-text-tertiary)' }}>Lento. Úsalo solo para libros específicos que quieras consultar a fondo.</p>
+                                        </div>
+                                        <label className="body-xs" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--color-text-secondary)' }}>
+                                            Buscar libro:
+                                        </label>
+                                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                style={{ flex: 1, fontSize: 'var(--text-sm)', padding: 'var(--space-1) var(--space-2)' }}
+                                                placeholder="Título del libro..."
+                                                value={deepIndexSearch}
+                                                onChange={(e) => setDeepIndexSearch(e.target.value)}
+                                            />
+                                            <button
+                                                className="btn btn-secondary btn-sm"
+                                                disabled={!deepIndexSearch.trim()}
+                                                onClick={() => startIndexing('full', { type: 'titleMatch', value: deepIndexSearch })}
+                                            >
+                                                Indexar T.
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <button
+                                    className="btn btn-danger btn-sm"
+                                    style={{ width: '100%', marginTop: 'var(--space-3)' }}
+                                    onClick={stopIndexing}
+                                >
+                                    Detener Indexación
+                                </button>
+                            )}
                         </div>
 
                         <div className="library-preview">

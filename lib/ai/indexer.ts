@@ -19,9 +19,10 @@ export interface IndexingStatus {
 
 export interface IndexingOptions {
     filter?: {
-        type: 'startsWith';
+        type: 'startsWith' | 'titleMatch';
         value: string;
     };
+    mode?: 'full' | 'metadata';
 }
 
 export class LibraryIndexer {
@@ -37,15 +38,25 @@ export class LibraryIndexer {
     }
 
     async indexLibrary(options?: IndexingOptions) {
+        if (options?.mode === 'metadata') {
+            return this.indexMetadataOnly(options);
+        }
+
         this.isCancelled = false;
         let allBooks = await db.books.toArray();
 
         // Apply user filter if present
-        if (options?.filter?.type === 'startsWith' && options.filter.value) {
-            const prefix = options.filter.value.toLowerCase();
-            if (prefix !== 'all') {
+        if (options?.filter?.value) {
+            const filterVal = options.filter.value.toLowerCase();
+            if (options.filter.type === 'startsWith') {
+                if (filterVal !== 'all') {
+                    allBooks = allBooks.filter(book =>
+                        book.title.toLowerCase().startsWith(filterVal)
+                    );
+                }
+            } else if (options.filter.type === 'titleMatch') {
                 allBooks = allBooks.filter(book =>
-                    book.title.toLowerCase().startsWith(prefix)
+                    book.title.toLowerCase().includes(filterVal)
                 );
             }
         }
@@ -76,7 +87,6 @@ export class LibraryIndexer {
                     try {
                         const pathParam = book.filePath || book.fileName;
                         console.log(`Fetching file for ${book.title} from ${pathParam}`);
-                        // Use a dummy filename 'download' as the route requires [filename], but we rely on the query param
                         const url = `/api/library/file/download?path=${encodeURIComponent(pathParam)}`;
                         const res = await fetch(url);
                         if (res.ok) {
@@ -126,6 +136,93 @@ export class LibraryIndexer {
         this.onProgress({ ...status });
     }
 
+    async indexMetadataOnly(options?: IndexingOptions) {
+        this.isCancelled = false;
+        let allBooks = await db.books.toArray();
+
+        // Apply filters
+        if (options?.filter?.value) {
+            const filterVal = options.filter.value.toLowerCase();
+            if (options.filter.type === 'startsWith') {
+                if (filterVal !== 'all') {
+                    allBooks = allBooks.filter(book =>
+                        book.title.toLowerCase().startsWith(filterVal)
+                    );
+                }
+            } else if (options.filter.type === 'titleMatch') {
+                allBooks = allBooks.filter(book =>
+                    book.title.toLowerCase().includes(filterVal)
+                );
+            }
+        }
+
+        const status: IndexingStatus = {
+            totalBooks: allBooks.length,
+            processedBooks: 0,
+            currentBook: '',
+            isIndexing: true,
+            errors: []
+        };
+        this.onProgress(status);
+
+        for (const book of allBooks) {
+            if (this.isCancelled) break;
+            status.currentBook = book.title;
+            this.onProgress({ ...status });
+
+            try {
+                // Gather data
+                const userBookData = await db.userBookData.where('bookId').equals(book.id).first();
+                const xray = await db.xrayData.where('bookId').equals(book.id).first();
+
+                // Build Summary
+                let summary = `Título: ${book.title}\nAutor: ${book.author}\n`;
+                if (book.metadata?.description) summary += `Descripción: ${book.metadata.description}\n`;
+                if (book.metadata?.tags?.length) summary += `Categorías: ${book.metadata.tags.join(', ')}\n`;
+                if (userBookData?.userRating) summary += `Valoración Personal: ${userBookData.userRating}\n`;
+
+                if (xray) {
+                    summary += `\n-- ADN del Libro --\n`;
+                    if (xray.summary) summary += `Resumen: ${xray.summary}\n`;
+                    if (xray.characters?.length) summary += `Personajes Clave: ${xray.characters.map(c => c.name).join(', ')}\n`;
+                    if (xray.terms?.length) summary += `Temas Clave: ${xray.terms.map(t => t.name).join(', ')}\n`;
+                }
+
+                // Generate Embedding
+                const result = await generateEmbeddingAction(summary);
+
+                if (result.success && result.embedding) {
+                    // Delete old metadata chunk if exists
+                    await db.vectorChunks.where('bookId').equals(book.id).filter(c => c.chapterIndex === -999).delete();
+
+                    const chunk: VectorChunk = {
+                        id: uuid(),
+                        bookId: book.id,
+                        chapterIndex: -999, // Metadata marker
+                        chapterTitle: 'METADATA_SUMMARY',
+                        text: summary,
+                        embedding: result.embedding,
+                        startCfi: ''
+                    };
+                    await addVectorChunks([chunk]);
+                } else {
+                    status.errors.push(`Failed to generate metadata embedding for ${book.title}`);
+                }
+
+            } catch (e: any) {
+                console.error(`Error indexing metadata for ${book.title}`, e);
+                status.errors.push(`Error: ${e.message}`);
+            }
+
+            status.processedBooks++;
+            this.onProgress({ ...status });
+        }
+
+        status.isIndexing = false;
+        status.currentBook = 'Completed (Metadata)';
+        this.onProgress({ ...status });
+    }
+
     private async filterUnindexedBooks(books: Book[]): Promise<Book[]> {
         const unindexed: Book[] = [];
         for (const book of books) {
@@ -158,18 +255,8 @@ export class LibraryIndexer {
     private async processPdf(blob: Blob): Promise<{ text: string, chapterTitle: string, cfi: string }[]> {
         try {
             const arrayBuffer = await blob.arrayBuffer();
-            // Dynamic import to avoid SSR issues if this runs on server, though it's client code
             const pdfjsCount = await import('pdfjs-dist');
-            // Check how to import based on version. valid for v3/v4 usually. 
-            // For v5, might differ. relying on installed types.
 
-            // Set worker. In Next.js client side, this can be tricky. 
-            // Often best to use the CDN for the worker if not configured in bundler.
-            // Or assume specific path.
-            // For now, try asking it to disable worker or use what's available?
-            // pdfjsCount.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsCount.version}/pdf.worker.min.js`;
-
-            // Simple configuration for worker
             if (!pdfjsCount.GlobalWorkerOptions.workerSrc) {
                 pdfjsCount.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsCount.version}/build/pdf.worker.min.mjs`;
             }
@@ -177,7 +264,6 @@ export class LibraryIndexer {
             const pdf = await pdfjsCount.getDocument({ data: arrayBuffer }).promise;
 
             const chunks: { text: string, chapterTitle: string, cfi: string }[] = [];
-            let fullText = '';
 
             for (let i = 1; i <= pdf.numPages; i++) {
                 if (this.isCancelled) break;
@@ -186,10 +272,7 @@ export class LibraryIndexer {
                 const textContent = await page.getTextContent();
                 const pageText = textContent.items.map((item: any) => item.str).join(' ');
 
-                // Add to chunks if large enough
                 if (pageText.length > 50) {
-                    // We can chunk per page or accumulate. 
-                    // Let's chunk per page for now to keep it simple and have "page" references
                     const pageChunks = this.splitText(pageText);
                     pageChunks.forEach(chunk => {
                         chunks.push({
@@ -216,13 +299,10 @@ export class LibraryIndexer {
 
         const chunks: { text: string, chapterTitle: string, cfi: string }[] = [];
 
-        // Iterate over spine items (chapters)
-        // Iterate over spine items (chapters)
         // @ts-ignore
         const spine = book.spine as any;
         const sections: any[] = [];
 
-        // Use the public API to iterate sections ensures we get initialized Section objects
         spine.each((section: any) => {
             sections.push(section);
         });
@@ -233,18 +313,10 @@ export class LibraryIndexer {
             if (this.isCancelled) break;
 
             try {
-                // console.log(`Processing section: ${item.href}`);
                 const doc = await item.load(book.load.bind(book));
-                // Extract text content
-                // This is a simplification. Ideally we traverse the DOM to get CFIs for paragraphs.
-                // For this implementation, we'll get full text of chapter and chunk it, 
-                // assigning chapter CFI as start.
-
-                // We need to parse the HTML properly
                 const tempDiv = document.createElement('div');
 
                 if (doc instanceof Document) {
-                    // Start with body if available (HTML), else documentElement (XHTML/XML)
                     const root = doc.body || doc.documentElement;
                     if (root) {
                         tempDiv.innerHTML = root.innerHTML;
@@ -253,49 +325,41 @@ export class LibraryIndexer {
                     tempDiv.innerHTML = doc;
                 }
 
-                // Append to body to ensure innerText works (Safari/some browsers issue with detached nodes)
                 tempDiv.style.position = 'absolute';
                 tempDiv.style.left = '-9999px';
                 tempDiv.style.visibility = 'hidden';
                 document.body.appendChild(tempDiv);
 
-                // Get text - prefer innerText for layout awareness, fallback to textContent
                 let text = (tempDiv.innerText || tempDiv.textContent || '')
                     .replace(/\s+/g, ' ')
                     .trim();
 
-                // Cleanup
                 document.body.removeChild(tempDiv);
 
                 if (!text) {
-                    // Try fallback to simple textContent on root if detached extraction failed
                     if (doc instanceof Document) {
                         const root = doc.body || doc.documentElement;
                         if (root && root.textContent) {
-                            // Use raw text content if innerText failed
                             text = root.textContent.replace(/\s+/g, ' ').trim();
                         }
                     }
                 }
 
-                if (text.length > 50) { // arbitrary min length to skip empty/nav pages
-                    // Split into chunks
+                if (text.length > 50) {
                     const textParts = this.splitText(text);
 
                     textParts.forEach((part, index) => {
                         chunks.push({
                             text: part,
-                            chapterTitle: item.href, // Or try to find TOC title
-                            cfi: item.cfiBase // Approximate CFI
+                            chapterTitle: item.href,
+                            cfi: item.cfiBase
                         });
                     });
                 }
 
-                // Unload to free memory
                 item.unload();
             } catch (e: any) {
                 console.error('Error processing chapter:', e);
-                // We might want to see this in UI if all fail
             }
         }
 
@@ -318,7 +382,6 @@ export class LibraryIndexer {
         for (const chunk of chunks) {
             if (this.isCancelled) break;
 
-            // Rate limiting delay
             await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CHUNKS));
 
             const result = await generateEmbeddingAction(chunk.text);
@@ -327,7 +390,7 @@ export class LibraryIndexer {
                 vectorChunks.push({
                     id: uuid(),
                     bookId: bookId,
-                    chapterIndex: 0, // We could track this
+                    chapterIndex: 0,
                     chapterTitle: chunk.chapterTitle,
                     text: chunk.text,
                     embedding: result.embedding,
@@ -335,14 +398,12 @@ export class LibraryIndexer {
                 });
             } else {
                 console.warn('Failed to generate embedding for chunk', result.error);
-                // Don't spam errors but maybe add one generic one
                 if (!status.errors.includes(`Embedding error: ${result.error}`)) {
                     status.errors.push(`Embedding error: ${result.error}`);
                     this.onProgress({ ...status });
                 }
             }
 
-            // Save in batches of 5 to avoid memory issues but not too frequent DB writes
             if (vectorChunks.length >= 5) {
                 await addVectorChunks(vectorChunks);
                 totalAdded += vectorChunks.length;
@@ -350,7 +411,6 @@ export class LibraryIndexer {
             }
         }
 
-        // Save remaining
         if (vectorChunks.length > 0) {
             await addVectorChunks(vectorChunks);
             totalAdded += vectorChunks.length;
