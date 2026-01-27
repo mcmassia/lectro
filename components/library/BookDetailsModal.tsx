@@ -7,6 +7,9 @@ import { syncData } from '@/lib/sync';
 import { useRouter } from 'next/navigation';
 import { searchGoogleBooks, searchMetadata, findCovers, MetadataResult } from '@/lib/metadata';
 import { MetadataSelector } from './MetadataSelector';
+import { generateXRayAction } from '@/app/actions/ai';
+import { BrainCircuit, Sparkles } from 'lucide-react';
+import { db, XRayData } from '@/lib/db';
 
 interface BookDetailsModalProps {
     book: Book;
@@ -66,6 +69,14 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
             modalRef.current.focus();
         }
     }, []);
+
+    // X-Ray State
+    const [hasXRay, setHasXRay] = useState(false);
+    const [isGeneratingXRay, setIsGeneratingXRay] = useState(false);
+
+    useEffect(() => {
+        db.xrayData.where('bookId').equals(book.id).count().then(count => setHasXRay(count > 0));
+    }, [book.id]);
 
     // Global Paste Handler
     useEffect(() => {
@@ -250,6 +261,79 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
         setShowCoverSelector(false);
     };
 
+    const handleViewXRay = () => {
+        useLibraryStore.getState().setView('xray');
+        useLibraryStore.getState().setSelectedBookId(book.id);
+        onClose();
+    };
+
+    const handleGenerateXRay = async () => {
+        setIsGeneratingXRay(true);
+        try {
+            // Extraction Logic (Similar to RightSidebar)
+            let content = "";
+            if (book.format === 'epub' && book.fileBlob) {
+                const arrayBuffer = await book.fileBlob.arrayBuffer();
+                const ePub = (await import('epubjs')).default;
+                const epub = ePub(arrayBuffer);
+                await epub.ready;
+
+                // @ts-ignore
+                const spine = epub.spine as any;
+                let count = 0;
+                for (const item of spine.items) {
+                    if (count > 2) break;
+                    try {
+                        const doc = await item.load(epub.load.bind(epub));
+                        const text = (doc as any).body?.innerText || (doc as any).body?.textContent || "";
+                        content += text + "\n\n";
+                        if (content.length > 50000) break;
+                    } catch (e) { console.error(e); }
+                    count++;
+                }
+                epub.destroy();
+            } else {
+                alert("Formato no soportado para análisis automático aún (solo EPUB)");
+                setIsGeneratingXRay(false);
+                return;
+            }
+
+            if (!content || content.length < 500) {
+                alert("No se pudo extraer suficiente texto del libro.");
+                setIsGeneratingXRay(false);
+                return;
+            }
+
+            // Generate
+            const result = await generateXRayAction(content, book.title);
+
+            if (result.success && result.data) {
+                const newXray: XRayData = {
+                    id: crypto.randomUUID(),
+                    bookId: book.id,
+                    generatedAt: new Date(),
+                    language: result.data.language,
+                    summary: result.data.summary,
+                    plot: result.data.plot,
+                    keyPoints: result.data.keyPoints,
+                    characters: result.data.characters.map((c: any) => ({ ...c, mentions: [] })),
+                    places: result.data.places.map((p: any) => ({ ...p, mentions: [] })),
+                    terms: result.data.terms.map((t: any) => ({ ...t, mentions: [] })),
+                };
+                await db.xrayData.add(newXray);
+                setHasXRay(true);
+            } else {
+                alert("Error generando X-Ray: " + result.error);
+            }
+
+        } catch (e) {
+            console.error(e);
+            alert("Error general al generar ADN");
+        } finally {
+            setIsGeneratingXRay(false);
+        }
+    };
+
     // Old handlePaste removed in favor of global listener
 
     const handleRead = () => {
@@ -400,6 +484,23 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                             )}
                             <button className="btn btn-secondary btn-download" onClick={handleDownload}>
                                 Download ({formatFileSize(book.fileSize)})
+                            </button>
+
+                            {/* X-Ray / Vision Button */}
+                            <button
+                                className={`btn ${hasXRay ? 'btn-accent' : 'btn-secondary'} btn-xray`}
+                                onClick={hasXRay ? handleViewXRay : handleGenerateXRay}
+                                disabled={isGeneratingXRay}
+                                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                            >
+                                {isGeneratingXRay ? (
+                                    <Sparkles size={18} className="animate-spin" />
+                                ) : hasXRay ? (
+                                    <BrainCircuit size={18} />
+                                ) : (
+                                    <Sparkles size={18} />
+                                )}
+                                <span>{isGeneratingXRay ? 'Generando...' : hasXRay ? 'Ver ADN' : 'Generar ADN'}</span>
                             </button>
                         </div>
 
