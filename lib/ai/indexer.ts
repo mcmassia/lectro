@@ -57,11 +57,13 @@ export class LibraryIndexer {
                 if (!fileBlob && (book.filePath || book.fileName)) {
                     try {
                         const pathParam = book.filePath || book.fileName;
+                        console.log(`Fetching file for ${book.title} from ${pathParam}`);
                         // Use a dummy filename 'download' as the route requires [filename], but we rely on the query param
                         const url = `/api/library/file/download?path=${encodeURIComponent(pathParam)}`;
                         const res = await fetch(url);
                         if (res.ok) {
                             fileBlob = await res.blob();
+                            console.log(`Fetched ${fileBlob.size} bytes for ${book.title}`);
                         } else {
                             console.warn(`Failed to fetch file for ${book.title}: ${res.status}`);
                         }
@@ -78,6 +80,7 @@ export class LibraryIndexer {
                 const bookWithBlob = { ...book, fileBlob } as Book;
 
                 const textChunks = await this.extractAndChunkBook(bookWithBlob);
+                console.log(`Extracted ${textChunks.length} chunks for ${book.title}`);
 
                 if (textChunks.length === 0) {
                     console.warn(`No text chunks found for book: ${book.title}`);
@@ -206,10 +209,13 @@ export class LibraryIndexer {
             sections.push(section);
         });
 
+        console.log(`EPUB has ${sections.length} sections for processing`);
+
         for (const item of sections) {
             if (this.isCancelled) break;
 
             try {
+                // console.log(`Processing section: ${item.href}`);
                 const doc = await item.load(book.load.bind(book));
                 // Extract text content
                 // This is a simplification. Ideally we traverse the DOM to get CFIs for paragraphs.
