@@ -17,6 +17,13 @@ export interface IndexingStatus {
     errors: string[];
 }
 
+export interface IndexingOptions {
+    filter?: {
+        type: 'startsWith';
+        value: string;
+    };
+}
+
 export class LibraryIndexer {
     private isCancelled = false;
     private onProgress: (status: IndexingStatus) => void;
@@ -29,9 +36,20 @@ export class LibraryIndexer {
         this.isCancelled = true;
     }
 
-    async indexLibrary() {
+    async indexLibrary(options?: IndexingOptions) {
         this.isCancelled = false;
-        const allBooks = await db.books.toArray();
+        let allBooks = await db.books.toArray();
+
+        // Apply user filter if present
+        if (options?.filter?.type === 'startsWith' && options.filter.value) {
+            const prefix = options.filter.value.toLowerCase();
+            if (prefix !== 'all') {
+                allBooks = allBooks.filter(book =>
+                    book.title.toLowerCase().startsWith(prefix)
+                );
+            }
+        }
+
         const unindexedBooks = await this.filterUnindexedBooks(allBooks);
 
         const status: IndexingStatus = {

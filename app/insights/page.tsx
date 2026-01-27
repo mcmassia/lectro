@@ -28,6 +28,7 @@ export default function InsightsPage() {
     const [chunkCount, setChunkCount] = useState<number>(0);
     const [indexingStatus, setIndexingStatus] = useState<any>(null); // Use proper type
     const [isIndexing, setIsIndexing] = useState(false);
+    const [indexingFilter, setIndexingFilter] = useState<string>('all'); // 'all' or 'a', 'b', etc.
     const indexerRef = useRef<any>(null); // To store indexer instance
     const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -64,7 +65,7 @@ export default function InsightsPage() {
         // import dynamically to avoid processing payload on initial load? optional
         const { LibraryIndexer } = await import('@/lib/ai/indexer');
 
-        indexerRef.current = new LibraryIndexer((status) => {
+        indexerRef.current = new LibraryIndexer((status: any) => {
             setIndexingStatus(status);
             if (!status.isIndexing && status.currentBook === 'Completed') {
                 setIsIndexing(false);
@@ -72,7 +73,14 @@ export default function InsightsPage() {
         });
 
         // Start indexing in background
-        indexerRef.current.indexLibrary().catch((err: any) => {
+        const options = {
+            filter: {
+                type: 'startsWith' as const,
+                value: indexingFilter
+            }
+        };
+
+        indexerRef.current.indexLibrary(options).catch((err: any) => {
             console.error("Indexing failed:", err);
             setIsIndexing(false);
         });
@@ -360,6 +368,25 @@ export default function InsightsPage() {
                                 <p className="body-xs" style={{ color: 'var(--color-text-tertiary)' }}>
                                     Biblioteca no indexada o parcialmente indexada.
                                 </p>
+                            )}
+
+                            {!isIndexing && (
+                                <div style={{ marginTop: 'var(--space-3)' }}>
+                                    <label className="body-xs" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--color-text-secondary)' }}>
+                                        Indexar por lote (título empieza por):
+                                    </label>
+                                    <select
+                                        className="input"
+                                        style={{ width: '100%', fontSize: 'var(--text-sm)', padding: 'var(--space-1) var(--space-2)' }}
+                                        value={indexingFilter}
+                                        onChange={(e) => setIndexingFilter(e.target.value)}
+                                    >
+                                        <option value="all">Todo el catálogo</option>
+                                        {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(char => (
+                                            <option key={char} value={char}>{char}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             )}
 
                             <button
