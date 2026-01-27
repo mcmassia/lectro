@@ -65,40 +65,77 @@ export function RightSidebar() {
             // We need extraction logic similar to indexer.ts but focused on "first chunk" or "representative chunk"
             // For X-Ray we typically want the first 60k chars or so.
             // Re-using logic:
-            let content = "";
-            if (book.format === 'epub' && book.fileBlob) {
-                const arrayBuffer = await book.fileBlob.arrayBuffer();
-                const ePub = (await import('epubjs')).default;
-                const epub = ePub(arrayBuffer);
-                await epub.ready;
+            // 1. Extract content with robust fallback
+            let bookContent: ArrayBuffer;
 
-                // Extract from first few spine items
-                // @ts-ignore
-                const spine = epub.spine as any;
-                let count = 0;
-                for (const item of spine.items) {
-                    if (count > 2) break; // First 3 chapters approx
-                    try {
-                        const doc = await item.load(epub.load.bind(epub));
-                        const text = (doc as any).body?.innerText || (doc as any).body?.textContent || "";
-                        content += text + "\n\n";
-                        if (content.length > 50000) break;
-                    } catch (e) { console.error(e); }
-                    count++;
+            if (book.fileBlob) {
+                bookContent = await book.fileBlob.arrayBuffer();
+            } else if (book.isOnServer && book.filePath) {
+                // Download from server using the stream API
+                console.log('Downloading book from server for X-Ray...');
+                const encodedPath = book.filePath.split('/').map(encodeURIComponent).join('/');
+                const response = await fetch(`/api/library/stream/${encodedPath}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to download book from server: ${response.status}`);
                 }
-                epub.destroy();
+                bookContent = await response.arrayBuffer();
             } else {
-                // Fallback or PDF (not implemented fully for text yet)
-                alert("Formato no soportado para análisis automático aún (solo EPUB)");
+                alert("No se pudo obtener el contenido del libro (falta blob local y ruta remota).");
                 setIsGenerating(false);
                 return;
             }
 
-            if (!content || content.length < 500) {
-                alert("No se pudo extraer suficiente texto del libro.");
-                setIsGenerating(false);
-                return;
+            // Robust Extraction using JSZip (matches ReaderSidebar logic)
+            // Import epubjs dynamically just to get the spine/structure info easily
+            const ePub = (await import('epubjs')).default;
+            const bookInstance = ePub(bookContent);
+            await bookInstance.ready;
+
+            let fullText = '';
+            // @ts-ignore
+            const spine = bookInstance.spine;
+            const sections: any[] = [];
+            spine.each((section: any) => sections.push(section));
+
+            const limit = 60000;
+            const JSZip = (await import('jszip')).default;
+            const zip = await JSZip.loadAsync(bookContent);
+
+            for (const item of sections) {
+                if (fullText.length >= limit) break;
+
+                let text = '';
+                const href = item.href;
+
+                try {
+                    let zipFile = zip.file(href);
+                    if (!zipFile) {
+                        const cleanHref = href.replace(/^\//, '');
+                        zipFile = zip.file(cleanHref);
+                    }
+                    if (!zipFile) {
+                        const files = Object.keys(zip.files);
+                        const match = files.find(f => f.endsWith(href) || href.endsWith(f));
+                        if (match) zipFile = zip.file(match);
+                    }
+
+                    if (zipFile) {
+                        const rawContent = await zipFile.async('string');
+                        // Simple robust cleanup without DOM if possible, but DOMParser is fine in browser
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(rawContent, 'text/html');
+                        text = (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
+                    }
+                } catch (e) {
+                    console.warn(`X-Ray: Extraction failed for ${href}`, e);
+                }
+
+                if (text) {
+                    fullText += text + '\n\n';
+                }
             }
+            bookInstance.destroy();
+            const content = fullText;
 
             // 2. Generate
             const result = await generateXRayAction(content, book.title);
