@@ -161,63 +161,68 @@ export function parseGoogleBooksMarkdown(content: string): ImportedNote[] {
 function parseGoogleBooksNoteLine(line: string, bookTitle: string, chapter?: string): ImportedNote | null {
     // Regex to capture:
     // 1. Image ID (color)
-    // 2. Quote (between *)
     // 3. Date (text between quote and page link)
     // 4. Page number
     // 5. URL
     // Pattern: | ![][imageX] *Quote* Date [Page](Url) |
 
-    // Simplistic extraction strategy to be more robust:
+    // Strategy: Outside-In
+    // 1. Extract Link from the end.
+    // 2. Extract Image from the start.
+    // 3. The middle is [Quote + Date]
+    // 4. Try to strip Date from the end of the middle.
 
-    // 1. Color
-    const imageMatch = line.match(/!\[\]\[(image\d+)\]/);
-    const imageId = imageMatch ? imageMatch[1] : undefined;
-
-    // 2. Quote: strict match between first pair of * * after image
-    // Note: Use lazy match .*? 
-    const quoteMatch = line.match(/\*([^*]+)\*/);
-    const quote = quoteMatch ? quoteMatch[1].trim() : undefined;
-
-    if (!quote) return null;
-
-    // 3. Link/Page
-    // Use stricter regex to avoid matching [image] tags: look for [...] followed by (http...)
-    // and ensure content inside [] doesn't contain brackets
-    const linkMatch = line.match(/\[([^\]]*)\]\((http.*?)\)/);
+    // 1. Link (End)
+    // Finding [Page](Url) at the end, ignoring trailing pipes/spaces.
+    const linkMatch = line.match(/\[([^\]]*)\]\((http[^\)]+)\)\s*\|?\s*$/);
     const pageStr = linkMatch ? linkMatch[1] : undefined;
     const readerUrl = linkMatch ? linkMatch[2] : undefined;
 
-    // 4. Date: Text between Quote end (*) and Link start ([)
-    let date: Date | undefined;
-    if (quoteMatch && linkMatch) {
-        // Find the substring between quote match index and link match index
-        const quoteEndIndex = (quoteMatch.index || 0) + quoteMatch[0].length;
-        const linkStartIndex = (linkMatch.index || 0);
+    const linkIndex = (linkMatch && linkMatch.index !== undefined) ? linkMatch.index : -1;
 
-        if (linkStartIndex > quoteEndIndex) {
-            const dateStr = line.substring(quoteEndIndex, linkStartIndex).trim();
-            // Clean pipes or extra spaces
-            const cleanDateStr = dateStr.replace(/^\|\s*/, '').replace(/\s*\|$/, '').trim();
-            if (cleanDateStr) {
-                date = parseSpanishDate(cleanDateStr);
-            }
+    // 2. Image (Start)
+    // Finding ![][imageX] at the start, ignoring leading pipes/spaces.
+    const imageMatch = line.match(/^\s*\|?\s*!\[\]\[(image\d+)\]/);
+    const imageId = imageMatch ? imageMatch[1] : undefined;
+
+    const imageEndIndex = imageMatch ? (imageMatch.index || 0) + imageMatch[0].length : 0;
+
+    // 3. Middle Content
+    // Slice between matches
+    let content = '';
+    if (linkIndex > -1) {
+        content = line.substring(imageEndIndex, linkIndex).trim();
+    } else {
+        // Fallback: if no link found, take everything after image
+        content = line.substring(imageEndIndex).replace(/\|\s*$/, '').trim();
+    }
+
+    // 4. Date Extraction
+    // Expect date at the end of content. Format: "15 de noviembre de 2021"
+    let date: Date | undefined;
+
+    // Regex looking for date at the end of the string
+    const dateMatch = content.match(/(\d{1,2}\s+de\s+[a-zA-Z]+\s+de\s+\d{4})$/);
+
+    let quote = content;
+    if (dateMatch) {
+        date = parseSpanishDate(dateMatch[1]);
+        if (dateMatch.index !== undefined) {
+            quote = content.substring(0, dateMatch.index).trim();
         }
     }
 
-    // Clean quote if it contains image markdown (e.g. *![][image2] Berig*)
-    let cleanQuote = quote;
-    if (cleanQuote.startsWith('![][image')) {
-        cleanQuote = cleanQuote.replace(/!\[\]\[image\d+\]\s*/, '');
+    // 5. Cleanup Quote
+    // Remove wrapping * if present
+    if (quote.startsWith('*') && quote.endsWith('*')) {
+        quote = quote.substring(1, quote.length - 1).trim();
     }
+
+    if (!quote) return null;
 
     // Map color
     let color: string | undefined;
     if (imageId) {
-        // Mapping based on observation
-        // image2: Orange
-        // image3: Yellow
-        // image4: Blue/Teal
-        // imageX: ?
         switch (imageId) {
             case 'image2': color = '#ff5722'; break; // Orange (approx)
             case 'image3': color = '#ffd700'; break; // Yellow
@@ -231,7 +236,7 @@ function parseGoogleBooksNoteLine(line: string, bookTitle: string, chapter?: str
         chapter,
         position: pageStr ? parseFloat(pageStr) : undefined,
         readerUrl,
-        quote: cleanQuote,
+        quote,
         color,
         date,
     };
