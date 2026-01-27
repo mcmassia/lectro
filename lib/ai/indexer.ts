@@ -117,11 +117,72 @@ export class LibraryIndexer {
     }
 
     private async extractAndChunkBook(book: Book): Promise<{ text: string, chapterTitle: string, cfi: string }[]> {
-        if (book.format === 'epub') {
-            return this.processEpub(book.fileBlob);
-        } else {
-            // PDF support to be added
-            // For now return empty or simple text
+        console.log(`Extracting text for ${book.title} (${book.format})`);
+
+        try {
+            if (book.format === 'epub') {
+                return this.processEpub(book.fileBlob);
+            } else if (book.format === 'pdf') {
+                return this.processPdf(book.fileBlob);
+            } else {
+                console.warn(`Unsupported format: ${book.format} for ${book.title}`);
+                return [];
+            }
+        } catch (e) {
+            console.error(`Extraction failed for ${book.title}:`, e);
+            return [];
+        }
+    }
+
+    private async processPdf(blob: Blob): Promise<{ text: string, chapterTitle: string, cfi: string }[]> {
+        try {
+            const arrayBuffer = await blob.arrayBuffer();
+            // Dynamic import to avoid SSR issues if this runs on server, though it's client code
+            const pdfjsCount = await import('pdfjs-dist');
+            // Check how to import based on version. valid for v3/v4 usually. 
+            // For v5, might differ. relying on installed types.
+
+            // Set worker. In Next.js client side, this can be tricky. 
+            // Often best to use the CDN for the worker if not configured in bundler.
+            // Or assume specific path.
+            // For now, try asking it to disable worker or use what's available?
+            // pdfjsCount.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsCount.version}/pdf.worker.min.js`;
+
+            // Simple configuration for worker
+            if (!pdfjsCount.GlobalWorkerOptions.workerSrc) {
+                pdfjsCount.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsCount.version}/build/pdf.worker.min.mjs`;
+            }
+
+            const pdf = await pdfjsCount.getDocument({ data: arrayBuffer }).promise;
+
+            const chunks: { text: string, chapterTitle: string, cfi: string }[] = [];
+            let fullText = '';
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                if (this.isCancelled) break;
+
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map((item: any) => item.str).join(' ');
+
+                // Add to chunks if large enough
+                if (pageText.length > 50) {
+                    // We can chunk per page or accumulate. 
+                    // Let's chunk per page for now to keep it simple and have "page" references
+                    const pageChunks = this.splitText(pageText);
+                    pageChunks.forEach(chunk => {
+                        chunks.push({
+                            text: chunk,
+                            chapterTitle: `Page ${i}`,
+                            cfi: `page_${i}` // Pseudo-CFI for PDF
+                        });
+                    });
+                }
+            }
+            return chunks;
+
+        } catch (e) {
+            console.error("PDF Processing Error", e);
             return [];
         }
     }
