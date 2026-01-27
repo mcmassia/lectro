@@ -181,7 +181,9 @@ function parseGoogleBooksNoteLine(line: string, bookTitle: string, chapter?: str
     if (!quote) return null;
 
     // 3. Link/Page
-    const linkMatch = line.match(/\[(.*?)\]\((http.*?)\)/);
+    // Use stricter regex to avoid matching [image] tags: look for [...] followed by (http...)
+    // and ensure content inside [] doesn't contain brackets
+    const linkMatch = line.match(/\[([^\]]*)\]\((http.*?)\)/);
     const pageStr = linkMatch ? linkMatch[1] : undefined;
     const readerUrl = linkMatch ? linkMatch[2] : undefined;
 
@@ -200,6 +202,12 @@ function parseGoogleBooksNoteLine(line: string, bookTitle: string, chapter?: str
                 date = parseSpanishDate(cleanDateStr);
             }
         }
+    }
+
+    // Clean quote if it contains image markdown (e.g. *![][image2] Berig*)
+    let cleanQuote = quote;
+    if (cleanQuote.startsWith('![][image')) {
+        cleanQuote = cleanQuote.replace(/!\[\]\[image\d+\]\s*/, '');
     }
 
     // Map color
@@ -223,7 +231,7 @@ function parseGoogleBooksNoteLine(line: string, bookTitle: string, chapter?: str
         chapter,
         position: pageStr ? parseFloat(pageStr) : undefined,
         readerUrl,
-        quote,
+        quote: cleanQuote,
         color,
         date,
     };
