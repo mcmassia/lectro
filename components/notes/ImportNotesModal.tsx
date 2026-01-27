@@ -147,7 +147,7 @@ export function ImportNotesModal({ books, onClose, onImportComplete }: ImportNot
                     {step === 'upload' && (
                         <div className="space-y-6">
                             <p className="text-sm text-[var(--color-text-secondary)]">
-                                Importa notas desde archivos CSV o Markdown exportados de BookFusion u otras aplicaciones.
+                                Importa notas desde archivos CSV o Markdown exportados de BookFusion, Google Play Books u otras aplicaciones.
                             </p>
 
                             {/* Drop Zone */}

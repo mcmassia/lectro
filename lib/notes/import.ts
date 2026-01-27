@@ -105,6 +105,155 @@ function parseCSVLine(line: string): string[] {
 // ===================================
 
 /**
+ * Parse Google Play Books Drive/Docs Markdown export
+ * Format:
+ * | ![Cover Image][image1] | *Title* Author | (Header)
+ * ## *Chapter*
+ * | ![][image2] *Quote* Date [Page](Url) |
+ */
+export function parseGoogleBooksMarkdown(content: string): ImportedNote[] {
+    const lines = content.split('\n');
+    const notes: ImportedNote[] = [];
+
+    let bookTitle = 'Libro importado';
+    let currentChapter: string | undefined;
+
+    // 1. Try to find title in the first few lines (usually line 0 or 2 depending on empty lines)
+    // Header format: | ![Cover Image][image1] | *Visigodos (Historia) (Spanish Edition)* José Javier Esparza ... |
+    const headerLine = lines.find(line => line.includes('![Cover Image]'));
+    if (headerLine) {
+        // Extract content between * *
+        const titleMatch = headerLine.match(/\*([^*]+)\*/);
+        if (titleMatch) {
+            bookTitle = cleanBookTitle(titleMatch[1]);
+        }
+    }
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        // Chapter header: ## *INTRODUCCIÓN*
+        if (trimmed.startsWith('##')) {
+            const cleanChapter = trimmed.replace(/^##\s*/, '').replace(/\*/g, '').trim();
+            if (cleanChapter) {
+                currentChapter = cleanChapter;
+            }
+            continue;
+        }
+
+        // Note line: | ![][image2] *Quote* 15 de noviembre de 2021 [4](http...) |
+        if (trimmed.startsWith('|') && trimmed.includes('![][image')) {
+            try {
+                const note = parseGoogleBooksNoteLine(trimmed, bookTitle, currentChapter);
+                if (note) {
+                    notes.push(note);
+                }
+            } catch (e) {
+                console.warn('Failed to parse Google Books note line:', trimmed, e);
+            }
+        }
+    }
+
+    return notes;
+}
+
+function parseGoogleBooksNoteLine(line: string, bookTitle: string, chapter?: string): ImportedNote | null {
+    // Regex to capture:
+    // 1. Image ID (color)
+    // 2. Quote (between *)
+    // 3. Date (text between quote and page link)
+    // 4. Page number
+    // 5. URL
+    // Pattern: | ![][imageX] *Quote* Date [Page](Url) |
+
+    // Simplistic extraction strategy to be more robust:
+
+    // 1. Color
+    const imageMatch = line.match(/!\[\]\[(image\d+)\]/);
+    const imageId = imageMatch ? imageMatch[1] : undefined;
+
+    // 2. Quote: strict match between first pair of * * after image
+    // Note: Use lazy match .*? 
+    const quoteMatch = line.match(/\*([^*]+)\*/);
+    const quote = quoteMatch ? quoteMatch[1].trim() : undefined;
+
+    if (!quote) return null;
+
+    // 3. Link/Page
+    const linkMatch = line.match(/\[(.*?)\]\((http.*?)\)/);
+    const pageStr = linkMatch ? linkMatch[1] : undefined;
+    const readerUrl = linkMatch ? linkMatch[2] : undefined;
+
+    // 4. Date: Text between Quote end (*) and Link start ([)
+    let date: Date | undefined;
+    if (quoteMatch && linkMatch) {
+        // Find the substring between quote match index and link match index
+        const quoteEndIndex = (quoteMatch.index || 0) + quoteMatch[0].length;
+        const linkStartIndex = (linkMatch.index || 0);
+
+        if (linkStartIndex > quoteEndIndex) {
+            const dateStr = line.substring(quoteEndIndex, linkStartIndex).trim();
+            // Clean pipes or extra spaces
+            const cleanDateStr = dateStr.replace(/^\|\s*/, '').replace(/\s*\|$/, '').trim();
+            if (cleanDateStr) {
+                date = parseSpanishDate(cleanDateStr);
+            }
+        }
+    }
+
+    // Map color
+    let color: string | undefined;
+    if (imageId) {
+        // Mapping based on observation
+        // image2: Orange
+        // image3: Yellow
+        // image4: Blue/Teal
+        // imageX: ?
+        switch (imageId) {
+            case 'image2': color = '#ff5722'; break; // Orange (approx)
+            case 'image3': color = '#ffd700'; break; // Yellow
+            case 'image4': color = '#2196f3'; break; // Blue
+            default: color = '#ffd700'; // Default yellow
+        }
+    }
+
+    return {
+        bookTitle,
+        chapter,
+        position: pageStr ? parseFloat(pageStr) : undefined,
+        readerUrl,
+        quote,
+        color,
+        date,
+    };
+}
+
+function parseSpanishDate(dateStr: string): Date | undefined {
+    // Format: "15 de noviembre de 2021"
+    const months: Record<string, string> = {
+        'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+        'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+        'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
+    };
+
+    try {
+        const parts = dateStr.toLowerCase().split(' de ');
+        if (parts.length === 3) {
+            const day = parts[0].padStart(2, '0');
+            const month = months[parts[1]] || '01';
+            const year = parts[2];
+            return new Date(`${year}-${month}-${day}T12:00:00Z`);
+        }
+    } catch (e) {
+        return undefined;
+    }
+    return undefined;
+}
+
+
+
+/**
  * Parse BookFusion Markdown export
  * Format:
  * ## [CHAPTER](URL)
@@ -375,6 +524,9 @@ export function parseNotesFile(content: string, filename: string): ImportedNote[
         return parseBookFusionCSV(content);
     } else if (content.includes('##') && content.includes('>')) {
         return parseBookFusionMarkdown(content);
+    } else if (content.includes('play.google.com/books') || content.includes('![Cover Image]')) {
+        // Google Books detection
+        return parseGoogleBooksMarkdown(content);
     }
 
     return [];
