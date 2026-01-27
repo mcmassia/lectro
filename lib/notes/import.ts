@@ -143,7 +143,8 @@ export function parseGoogleBooksMarkdown(content: string): ImportedNote[] {
         }
 
         // Note line: | ![][image2] *Quote* 15 de noviembre de 2021 [4](http...) |
-        if (trimmed.startsWith('|') && trimmed.includes('![][image')) {
+        // Relax check: allow lines starting with | or just containing ![][image
+        if (trimmed.includes('![][image')) {
             try {
                 const note = parseGoogleBooksNoteLine(trimmed, bookTitle, currentChapter);
                 if (note) {
@@ -526,20 +527,22 @@ export async function importNotes(
 export function parseNotesFile(content: string, filename: string): ImportedNote[] {
     const extension = filename.toLowerCase().split('.').pop();
 
-    if (extension === 'csv') {
-        return parseBookFusionCSV(content);
-    } else if (extension === 'md' || extension === 'markdown') {
-        return parseBookFusionMarkdown(content);
+    // 1. Check for Google Books signatures (play.google.com or image table structure)
+    // This looks for "![Cover Image]" or "![][image" or the google books URL
+    if (content.includes('play.google.com/books') ||
+        content.includes('![Cover Image]') ||
+        content.includes('![][image')) {
+        return parseGoogleBooksMarkdown(content);
     }
 
-    // Try to auto-detect
-    if (content.includes('Title,Chapter,Position') || content.startsWith('"')) {
+    // 2. Check for BookFusion CSV
+    if (extension === 'csv' || content.includes('Title,Chapter,Position') || content.startsWith('"Title","Chapter"')) {
         return parseBookFusionCSV(content);
-    } else if (content.includes('##') && content.includes('>')) {
+    }
+
+    // 3. Fallback to BookFusion Markdown (or generic MD)
+    if (extension === 'md' || extension === 'markdown' || (content.includes('##') && content.includes('>'))) {
         return parseBookFusionMarkdown(content);
-    } else if (content.includes('play.google.com/books') || content.includes('![Cover Image]')) {
-        // Google Books detection
-        return parseGoogleBooksMarkdown(content);
     }
 
     return [];
