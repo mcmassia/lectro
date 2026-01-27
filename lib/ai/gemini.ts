@@ -221,7 +221,7 @@ export async function generateRagResponse(
     query: string,
     contexts: RagContext[],
     conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [],
-    modelName: string = 'gemini-1.5-flash'
+    modelName: string = 'gemini-2.5-flash'
 ): Promise<{ response: string; usedSources: RagContext[] }> {
     const gemini = genAI.getGenerativeModel({ model: modelName });
     const contextText = contexts.map((ctx, i) =>

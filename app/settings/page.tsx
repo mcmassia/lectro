@@ -147,7 +147,6 @@ ${ann.note ? `**Nota:** ${ann.note}` : ''}
                             <option value="gemini-3-flash">Gemini 3 Flash</option>
                             <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
                             <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                         </select>
                     </div>
                 </section>
