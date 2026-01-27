@@ -51,11 +51,33 @@ export class LibraryIndexer {
             this.onProgress({ ...status });
 
             try {
-                if (!book.fileBlob) {
+                let fileBlob = book.fileBlob;
+
+                // If no local blob, try to fetch from server
+                if (!fileBlob && (book.filePath || book.fileName)) {
+                    try {
+                        const pathParam = book.filePath || book.fileName;
+                        // Use a dummy filename 'download' as the route requires [filename], but we rely on the query param
+                        const url = `/api/library/file/download?path=${encodeURIComponent(pathParam)}`;
+                        const res = await fetch(url);
+                        if (res.ok) {
+                            fileBlob = await res.blob();
+                        } else {
+                            console.warn(`Failed to fetch file for ${book.title}: ${res.status}`);
+                        }
+                    } catch (e) {
+                        console.error(`Failed to fetch file for ${book.title}`, e);
+                    }
+                }
+
+                if (!fileBlob) {
                     throw new Error('No file data available');
                 }
 
-                const textChunks = await this.extractAndChunkBook(book);
+                // Create a temporary book object with the blob for processing
+                const bookWithBlob = { ...book, fileBlob } as Book;
+
+                const textChunks = await this.extractAndChunkBook(bookWithBlob);
 
                 if (textChunks.length === 0) {
                     console.warn(`No text chunks found for book: ${book.title}`);
