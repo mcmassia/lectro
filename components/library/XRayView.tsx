@@ -5,6 +5,7 @@ import { useLibraryStore } from '@/stores/appStore';
 import { ArrowLeft, BrainCircuit, Users, MapPin, BookOpen, FileText, Sparkles, Zap, Library } from 'lucide-react';
 import { useState } from 'react';
 import { BookCard } from './BookCard';
+import { BookDetailsModal } from './BookDetailsModal';
 
 interface XRayViewProps {
     data: XRayData;
@@ -14,6 +15,7 @@ interface XRayViewProps {
 
 export function XRayView({ data, book, onBack }: XRayViewProps) {
     const [activeSection, setActiveSection] = useState<'overview' | 'characters' | 'world' | 'author_books' | 'recommendations'>('overview');
+    const [viewingBook, setViewingBook] = useState<Book | null>(null);
     const { books, setSelectedBookId } = useLibraryStore();
 
     // Data Filtering for Tabs
@@ -32,6 +34,14 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
 
     return (
         <div className="xray-dashboard animate-fade-in">
+            {/* Modal Layer */}
+            {viewingBook && (
+                <BookDetailsModal
+                    book={viewingBook}
+                    onClose={() => setViewingBook(null)}
+                />
+            )}
+
             {/* Header / Navigation */}
             <div className="dashboard-header h-32">
                 <button onClick={onBack} className="back-btn">
@@ -227,14 +237,10 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                                 <div className="book-grid-display">
                                     {authorBooks.map(b => (
                                         <div key={b.id} className="transform scale-90 origin-top-left hover:scale-100 transition-all duration-200">
-                                            {/* Reuse existing Book Card style but inert or navigating */}
                                             <BookCard
                                                 book={b}
                                                 viewMode="grid"
-                                                onClick={() => {
-                                                    // This will trigger the global selection and reload the view
-                                                    useLibraryStore.getState().setSelectedBookId(b.id);
-                                                }}
+                                                onClick={() => setViewingBook(b)}
                                             />
                                         </div>
                                     ))}
@@ -262,9 +268,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                                             <BookCard
                                                 book={b}
                                                 viewMode="grid"
-                                                onClick={() => {
-                                                    useLibraryStore.getState().setSelectedBookId(b.id);
-                                                }}
+                                                onClick={() => setViewingBook(b)}
                                             />
                                         </div>
                                     ))}
