@@ -6,6 +6,8 @@ import type { RagContext } from '@/lib/ai/gemini';
 import { getRagResponseAction } from '@/app/actions/ai';
 import { getAllVectorChunks, getAllBooks, Book, db } from '@/lib/db';
 import { v4 as uuid } from 'uuid';
+import ReactMarkdown from 'react-markdown';
+import { BookDetailsModal } from '@/components/library/BookDetailsModal';
 
 const SendIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
@@ -30,6 +32,7 @@ export default function InsightsPage() {
     const [isIndexing, setIsIndexing] = useState(false);
     const [indexingFilter, setIndexingFilter] = useState<string>('all');
     const [deepIndexSearch, setDeepIndexSearch] = useState('');
+    const [selectedBook, setSelectedBook] = useState<Book | null>(null);
     const indexerRef = useRef<any>(null); // To store indexer instance
     const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -79,9 +82,31 @@ export default function InsightsPage() {
         setIsIndexing(false);
     };
 
+    // Helper to enrich text with book links
+    const enrichMessageContent = (content: string) => {
+        if (!content) return '';
+        let enriched = content;
+
+        // Sort books by title length descending to avoid partial matches first (e.g. "The Hobbit" vs "The")
+        const sortedBooks = [...books].sort((a, b) => b.title.length - a.title.length);
+
+        sortedBooks.forEach(book => {
+            // Only link titles > 4 chars to avoid noise
+            if (book.title && book.title.length > 4 && enriched.includes(book.title)) {
+                const escapedTitle = book.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                // Using negative lookbehind/ahead to detect if already linked `[...]`
+                const regex = new RegExp(`(?<!\\[)${escapedTitle}(?!\\])`, 'g');
+                enriched = enriched.replace(regex, `[${book.title}](book:${book.id})`);
+            }
+        });
+        return enriched;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || isGenerating) return;
+
+        const startTime = Date.now();
 
         const userMessage: RagMessage = {
             id: uuid(),
@@ -174,12 +199,16 @@ export default function InsightsPage() {
                 cfi: src.cfi,
             }));
 
+            const endTime = Date.now();
+            const latency = endTime - startTime;
+
             const assistantMessage: RagMessage = {
                 id: uuid(),
                 role: 'assistant',
                 content: response,
                 sources: sources.length > 0 ? sources : undefined,
                 timestamp: new Date(),
+                latency
             };
 
             addRagMessage(assistantMessage);
@@ -246,16 +275,70 @@ export default function InsightsPage() {
                                         className={`message ${message.role}`}
                                     >
                                         <div className="message-content">
-                                            <p>{message.content}</p>
+                                            {message.latency && message.role === 'assistant' && (
+                                                <div className="text-xs text-secondary mb-2 opacity-70">
+                                                    ⏱️ {(message.latency / 1000).toFixed(1)}s
+                                                </div>
+                                            )}
+
+                                            {message.role === 'assistant' ? (
+                                                <div className="markdown-body">
+                                                    <ReactMarkdown
+                                                        components={{
+                                                            a: ({ node, ...props }) => {
+                                                                if (props.href?.startsWith('book:')) {
+                                                                    const bookId = props.href.replace('book:', '');
+                                                                    return (
+                                                                        <button
+                                                                            className="text-accent hover:underline font-medium inline-block mx-1"
+                                                                            onClick={() => {
+                                                                                const book = books.find(b => b.id === bookId);
+                                                                                if (book) setSelectedBook(book);
+                                                                            }}
+                                                                        >
+                                                                            {props.children}
+                                                                        </button>
+                                                                    );
+                                                                }
+                                                                return <a {...props} target="_blank" rel="noopener noreferrer" className="text-accent underline" />;
+                                                            },
+                                                            strong: ({ node, ...props }) => <strong className="font-bold text-primary" {...props} />,
+                                                            ul: ({ node, ...props }) => <ul className="list-disc pl-4 my-2 space-y-1" {...props} />,
+                                                            ol: ({ node, ...props }) => <ol className="list-decimal pl-4 my-2 space-y-1" {...props} />,
+                                                            li: ({ node, ...props }) => <li className="mb-0.5" {...props} />,
+                                                            p: ({ node, ...props }) => <p className="mb-2 leading-relaxed" {...props} />
+                                                        }}
+                                                    >
+                                                        {enrichMessageContent(message.content)}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            ) : (
+                                                <p className="whitespace-pre-wrap">{message.content}</p>
+                                            )}
+
                                             {message.sources && message.sources.length > 0 && (
                                                 <div className="message-sources">
                                                     <span className="sources-label">Fuentes:</span>
-                                                    {message.sources.map((source, i) => (
-                                                        <span key={i} className="source-tag">
-                                                            <BookIcon />
-                                                            {source.bookTitle}
-                                                        </span>
-                                                    ))}
+                                                    {Array.from(new Set(message.sources.map(s => s.bookId))).map(bookId => {
+                                                        const source = message.sources?.find(s => s.bookId === bookId);
+                                                        const count = message.sources?.filter(s => s.bookId === bookId).length;
+                                                        if (!source) return null;
+
+                                                        return (
+                                                            <button
+                                                                key={bookId}
+                                                                className="source-tag hover:bg-opacity-80 transition-colors cursor-pointer"
+                                                                onClick={() => {
+                                                                    const book = books.find(b => b.id === bookId);
+                                                                    if (book) setSelectedBook(book);
+                                                                }}
+                                                            >
+                                                                <BookIcon />
+                                                                <span className="truncate max-w-[150px]">{source.bookTitle}</span>
+                                                                {count && count > 1 && <span className="opacity-60 text-[10px] ml-1">x{count}</span>}
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                         </div>
@@ -443,6 +526,13 @@ export default function InsightsPage() {
                 </div>
             </div>
 
+            {selectedBook && (
+                <BookDetailsModal
+                    book={selectedBook}
+                    onClose={() => setSelectedBook(null)}
+                />
+            )}
+
             <style jsx>{`
          .status-dot {
             width: 8px;
@@ -542,7 +632,7 @@ export default function InsightsPage() {
         }
 
         .message-content {
-          max-width: 80%;
+          max-width: 90%;
           padding: var(--space-3) var(--space-4);
           border-radius: var(--radius-lg);
         }
@@ -559,9 +649,18 @@ export default function InsightsPage() {
           border-bottom-left-radius: var(--radius-sm);
         }
 
-        .message-content p {
-          line-height: 1.6;
-          white-space: pre-wrap;
+        /* Markdown Styles */
+        .markdown-body p {
+            margin-bottom: var(--space-2);
+            line-height: 1.6;
+        }
+        .markdown-body ul, .markdown-body ol {
+            margin-left: var(--space-4);
+            margin-bottom: var(--space-2);
+        }
+        .markdown-body strong {
+            font-weight: 600;
+            color: var(--color-text-primary);
         }
 
         .message-sources {
@@ -588,6 +687,11 @@ export default function InsightsPage() {
           background: var(--color-accent-subtle);
           color: var(--color-accent);
           border-radius: var(--radius-sm);
+          border: 1px solid transparent;
+        }
+        
+        .source-tag:hover {
+            border-color: var(--color-accent);
         }
 
         .message-content.typing {

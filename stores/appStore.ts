@@ -536,6 +536,7 @@ export interface RagMessage {
     content: string;
     sources?: RagSource[];
     timestamp: Date;
+    latency?: number; // Time in milliseconds
 }
 
 export interface RagSource {
