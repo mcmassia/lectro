@@ -153,7 +153,11 @@ export default function InsightsPage() {
                 userMessage.content,
                 contexts,
                 history,
-                aiModel || 'gemini-2.5-flash'
+                aiModel || 'gemini-2.5-flash',
+                {
+                    totalBooks: books.length,
+                    indexedBooks: chunkCount
+                }
             );
 
             if (!result.success || !result.data) {

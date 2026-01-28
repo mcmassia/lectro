@@ -221,7 +221,8 @@ export async function generateRagResponse(
     query: string,
     contexts: RagContext[],
     conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [],
-    modelName: string = 'gemini-2.5-flash'
+    modelName: string = 'gemini-2.5-flash',
+    libraryContext?: { totalBooks: number; indexedBooks: number }
 ): Promise<{ response: string; usedSources: RagContext[] }> {
     const gemini = genAI.getGenerativeModel({ model: modelName });
     const contextText = contexts.map((ctx, i) =>
@@ -232,7 +233,13 @@ export async function generateRagResponse(
         `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
     ).join('\n');
 
+    const libStats = libraryContext
+        ? `Library Context: You are analyzing a library with ${libraryContext.totalBooks} total books, of which ${libraryContext.indexedBooks} are currently indexed and searchable.`
+        : '';
+
     const prompt = `You are a knowledgeable assistant helping a user explore their personal book library. Answer questions by synthesizing information from the provided book excerpts.
+
+${libStats}
 
 ${historyText ? `Previous conversation:\n${historyText}\n\n` : ''}
 
@@ -245,8 +252,9 @@ Instructions:
 1. Synthesize information from multiple sources when relevant
 2. Reference specific books when citing information
 3. If the excerpts don't contain relevant information, say so honestly
-4. Be conversational and insightful
-5. Draw connections between different books when appropriate
+4. IF asked about the number of books or statistics, use the "Library Context" provided above, NOT just the excerpts count.
+5. Be conversational and insightful
+6. Draw connections between different books when appropriate
 
 Provide a helpful, well-structured response.`;
 
