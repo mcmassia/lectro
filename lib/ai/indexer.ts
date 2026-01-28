@@ -192,8 +192,26 @@ export class LibraryIndexer {
                     if (xray.terms?.length) summary += `Temas Clave: ${xray.terms.map(t => t.name).join(', ')}\n`;
                 }
 
-                // Generate Embedding
-                const result = await generateEmbeddingAction(summary);
+                // Generate Embedding with Retry
+                let result: { success: boolean; embedding?: number[]; error?: string } = { success: false };
+                let attempts = 0;
+                while (attempts < 3 && !result.success) {
+                    try {
+                        if (attempts > 0) await new Promise(r => setTimeout(r, 5000 * attempts)); // Exponential backoff
+
+                        // Check payload size
+                        if (summary.length > 20000) {
+                            console.warn(`Summary for ${book.title} is very large (${summary.length} chars). Truncating.`);
+                            summary = summary.slice(0, 20000);
+                        }
+
+                        result = await generateEmbeddingAction(summary);
+                    } catch (netErr: any) {
+                        console.error(`Network error on attempt ${attempts + 1} for ${book.title}:`, netErr);
+                        result = { success: false, error: netErr.message || 'Network error' };
+                    }
+                    attempts++;
+                }
 
                 if (result.success && result.embedding) {
                     // Delete old metadata chunk if exists
@@ -210,7 +228,7 @@ export class LibraryIndexer {
                     };
                     await addVectorChunks([chunk]);
                 } else {
-                    status.errors.push(`Failed to generate metadata embedding for ${book.title}`);
+                    status.errors.push(`Failed to generate metadata embedding for ${book.title}: ${result.error}`);
                 }
 
             } catch (e: any) {
