@@ -37,8 +37,8 @@ export default function InsightsPage() {
         async function loadData() {
             const allBooks = await getAllBooks();
             setBooks(allBooks);
-            const count = await db.vectorChunks.count();
-            setChunkCount(count);
+            const count = allBooks.filter(b => b.indexedAt).length;
+            setChunkCount(count); // repurpose chunkCount to mean "Indexed Books Count" for now
         }
         loadData();
 
@@ -47,7 +47,7 @@ export default function InsightsPage() {
                 indexerRef.current.cancel();
             }
         }
-    }, []);
+    }, [isIndexing, indexingStatus]);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -95,68 +95,51 @@ export default function InsightsPage() {
         setIsGenerating(true);
 
         try {
-            // Get vector chunks for context
-            // Get vector chunks for context
-            const chunks = await getAllVectorChunks();
+            // Server-Side Vector Search (Hybrid Mode)
             let contexts: RagContext[] = [];
 
-            if (chunks.length > 0) {
-                // Generate embedding for user query
-                const { generateEmbeddingAction } = await import('@/app/actions/ai');
-                const { cosineSimilarity } = await import('@/lib/ai/gemini');
+            try {
+                const res = await fetch('/api/ai/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: userMessage.content, limit: 15 })
+                });
 
-                const embeddingResult = await generateEmbeddingAction(input.trim());
-
-                if (embeddingResult.success && embeddingResult.embedding) {
-                    const queryEmbedding = embeddingResult.embedding;
-
-                    // Calculate similarity for all chunks
-                    const rankedChunks = chunks.map(chunk => ({
-                        ...chunk,
-                        similarity: cosineSimilarity(queryEmbedding, chunk.embedding)
-                    }))
-                        .sort((a, b) => b.similarity - a.similarity)
-                        .slice(0, 10); // Take top 10 most relevant chunks
-
-                    contexts = rankedChunks.map(chunk => {
-                        const book = books.find(b => b.id === chunk.bookId);
-                        return {
-                            bookId: chunk.bookId,
-                            bookTitle: book?.title || 'Libro',
-                            chapterTitle: chunk.chapterTitle || 'Capítulo',
-                            content: chunk.text,
-                            cfi: chunk.startCfi,
-                        };
-                    });
-                } else {
-                    console.error('Failed to generate query embedding:', embeddingResult.error);
-                    // Fallback to random/first chunks if embedding fails
-                    contexts = chunks.slice(0, 5).map(chunk => {
-                        const book = books.find(b => b.id === chunk.bookId);
-                        return {
-                            bookId: chunk.bookId,
-                            bookTitle: book?.title || 'Libro',
-                            chapterTitle: chunk.chapterTitle || 'Capítulo',
-                            content: chunk.text,
-                            cfi: chunk.startCfi,
-                        };
-                    });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.results && data.results.length > 0) {
+                        contexts = data.results.map((r: any) => {
+                            const book = books.find(b => b.id === r.id);
+                            return {
+                                bookId: r.id,
+                                bookTitle: book?.title || 'Libro desconocido',
+                                chapterTitle: r.chapterTitle || 'Fragmento',
+                                content: r.text,
+                                cfi: ''
+                            };
+                        });
+                    }
                 }
-            } else {
-                // Demo context from book metadata
-                // Add explicit warning in chat that indexing is needed
+            } catch (err) {
+                console.error("Server search failed", err);
+            }
+
+            if (contexts.length === 0) {
                 addRagMessage({
                     id: uuid(),
                     role: 'assistant',
-                    content: '⚠️ Tu biblioteca no está indexada. Para que pueda consultar todos tus libros, necesitas generar el índice vectorial. Por ahora, solo puedo ver los títulos y autores.',
+                    content: '⚠️ No encontré resultados relevantes en el índice. Asegúrate de haber indexado tu biblioteca (Indexación Rápida) desde el dispositivo principal.',
                     timestamp: new Date(),
                 });
 
+                // Fallback to metadata context of first few books to avoid empty context error?
+                // Or just proceed with empty context (Gemini might hallucinate or say I don't know)
                 contexts = books.slice(0, 5).map(book => ({
                     bookId: book.id,
                     bookTitle: book.title,
                     chapterTitle: 'Metadatos',
                     content: `Libro: ${book.title} por ${book.author}. ${book.metadata.description || ''}`,
+                    cfi: ''
                 }));
             }
 
@@ -315,7 +298,7 @@ export default function InsightsPage() {
                             {books.length} libros disponibles
                         </p>
                         <p className="body-xs" style={{ marginTop: 'var(--space-1)', color: 'var(--color-text-tertiary)' }}>
-                            {chunkCount} fragmentos vectoriales
+                            {chunkCount} libros indexados
                         </p>
 
                         {/* Indexing Status */}
@@ -359,7 +342,7 @@ export default function InsightsPage() {
                                 </div>
                             ) : (
                                 <p className="body-xs" style={{ color: 'var(--color-text-tertiary)' }}>
-                                    Biblioteca no indexada o parcialmente indexada.
+                                    {chunkCount > 0 ? (chunkCount === books.length ? 'Biblioteca completamente indexada.' : 'Biblioteca parcialmente indexada.') : 'Biblioteca no indexada.'}
                                 </p>
                             )}
 
