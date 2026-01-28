@@ -68,6 +68,10 @@ export default function Home() {
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
 
+  // AI Search State
+  const [aiSearchResults, setAiSearchResults] = useState<string[] | null>(null);
+  const [isSearchingAI, setIsSearchingAI] = useState(false);
+
   // Selection Mode State
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(new Set());
@@ -86,6 +90,35 @@ export default function Home() {
       setSelectedBookId(null);
     }
   }, [selectedBookIds, setSelectedBookId]);
+
+  // AI Search Trigger
+  useEffect(() => {
+    if (!searchQuery) {
+      setAiSearchResults(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingAI(true);
+      try {
+        const res = await fetch('/api/ai/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: searchQuery, limit: 40 })
+        });
+        const data = await res.json();
+        if (data.results) {
+          setAiSearchResults(data.results.map((r: any) => r.id));
+        }
+      } catch (e) {
+        console.error("AI Search failed", e);
+      } finally {
+        setIsSearchingAI(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Handlers
   const handleSync = async () => {
@@ -204,20 +237,30 @@ export default function Home() {
     }
 
     if (searchQuery) {
-      const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
-      booksToFilter = booksToFilter.filter(book => {
-        const searchableText = [
-          book.title,
-          book.author,
-          ...(book.metadata?.categories || []),
-          book.metadata?.userRating || '',
-          ...(book.metadata?.subjects || []),
-          xrayKeywords[book.id] || ''
-        ].join(' ').toLowerCase();
+      if (aiSearchResults) {
+        // AI Search Results (Server-Side)
+        const aiIds = new Set(aiSearchResults);
+        booksToFilter = booksToFilter.filter(b => aiIds.has(b.id));
 
-        // All terms must be present
-        return terms.every(term => searchableText.includes(term));
-      });
+        // Sort by Relevance (order in aiSearchResults)
+        const rankMap = new Map(aiSearchResults.map((id, index) => [id, index]));
+        booksToFilter.sort((a, b) => (rankMap.get(a.id) ?? 9999) - (rankMap.get(b.id) ?? 9999));
+      } else {
+        // Local Text Fallback (Instant)
+        const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+        booksToFilter = booksToFilter.filter(book => {
+          const searchableText = [
+            book.title,
+            book.author,
+            ...(book.metadata?.categories || []),
+            book.metadata?.userRating || '',
+            ...(book.metadata?.subjects || []),
+            xrayKeywords[book.id] || ''
+          ].join(' ').toLowerCase();
+
+          return terms.every(term => searchableText.includes(term));
+        });
+      }
     }
 
     // Sort
@@ -232,7 +275,7 @@ export default function Home() {
     });
 
     setFilteredBooks(booksToFilter);
-  }, [books, searchQuery, activeCategory, activeFormat, sortBy, sortOrder, activeThematicCategory, activeUserRating]);
+  }, [books, searchQuery, activeCategory, activeFormat, sortBy, sortOrder, activeThematicCategory, activeUserRating, aiSearchResults]);
 
   // Auth Check & Init
   useEffect(() => {

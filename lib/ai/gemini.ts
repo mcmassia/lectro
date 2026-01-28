@@ -298,6 +298,36 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     }
 }
 
+export async function generateBatchEmbeddings(texts: string[]): Promise<number[][]> {
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+
+        // Prepare requests with forced dimensionality
+        const requests = texts.map(text => ({
+            content: { role: 'user', parts: [{ text }] },
+            outputDimensionality: 768
+        }));
+
+        // @ts-ignore - SDK types might miss this method or params
+        const result = await model.batchEmbedContents({
+            requests
+        } as any);
+
+        // Process results and ensure dimensionality
+        return result.embeddings.map((e: any) => {
+            const values = e.values;
+            if (values.length > 768) {
+                return values.slice(0, 768);
+            }
+            return values;
+        });
+
+    } catch (error) {
+        console.error('Batch Embedding generation failed:', error);
+        throw error;
+    }
+}
+
 export function cosineSimilarity(a: number[], b: number[]): number {
     let dotProduct = 0;
     let normA = 0;

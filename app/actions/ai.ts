@@ -40,6 +40,21 @@ export async function generateEmbeddingAction(text: string): Promise<{ success: 
     }
 }
 
+export async function generateBatchEmbeddingsAction(texts: string[]): Promise<{ success: boolean; embeddings?: number[][]; error?: string }> {
+    if (!process.env.GEMINI_API_KEY) {
+        return { success: false, error: 'Configuration Error: Gemini API Key is missing.' };
+    }
+
+    try {
+        const { generateBatchEmbeddings } = await import('@/lib/ai/gemini');
+        const embeddings = await generateBatchEmbeddings(texts);
+        return { success: true, embeddings };
+    } catch (error: any) {
+        console.error('Batch Embedding error:', error);
+        return { success: false, error: error.message || 'Failed to generate batch embeddings' };
+    }
+}
+
 export async function generateXRayAction(content: string, title: string, modelName: string = 'gemini-2.5-flash'): Promise<{ success: boolean; data?: XRayResult; error?: string }> {
     if (!process.env.GEMINI_API_KEY) {
         return { success: false, error: 'Configuration Error: Gemini API Key is missing.' };

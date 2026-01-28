@@ -39,7 +39,7 @@ export class LibraryIndexer {
 
     async indexLibrary(options?: IndexingOptions) {
         if (options?.mode === 'metadata') {
-            return this.indexMetadataOnly(options);
+            return this.indexMetadataBatch(options);
         }
 
         this.isCancelled = false;
@@ -120,6 +120,9 @@ export class LibraryIndexer {
 
                 if (chunksAdded === 0 && textChunks.length > 0) {
                     status.errors.push(`Failed to generate embeddings for ${book.title}`);
+                } else {
+                    // Success (or empty but processed)
+                    await db.books.update(book.id, { indexedAt: new Date() });
                 }
 
             } catch (error: any) {
@@ -245,15 +248,171 @@ export class LibraryIndexer {
         this.onProgress({ ...status });
     }
 
-    private async filterUnindexedBooks(books: Book[]): Promise<Book[]> {
-        const unindexed: Book[] = [];
-        for (const book of books) {
-            const count = await db.vectorChunks.where('bookId').equals(book.id).count();
-            if (count === 0) {
-                unindexed.push(book);
+    async indexMetadataBatch(options?: IndexingOptions) {
+        this.isCancelled = false;
+        let allBooks = await db.books.toArray();
+
+        // Apply filters
+        if (options?.filter?.value) {
+            const filterVal = options.filter.value.toLowerCase();
+            if (options.filter.type === 'startsWith') {
+                if (filterVal !== 'all') {
+                    allBooks = allBooks.filter(book =>
+                        book.title.toLowerCase().startsWith(filterVal)
+                    );
+                }
+            } else if (options.filter.type === 'titleMatch') {
+                allBooks = allBooks.filter(book =>
+                    book.title.toLowerCase().includes(filterVal)
+                );
             }
         }
-        return unindexed;
+
+        const status: IndexingStatus = {
+            totalBooks: allBooks.length,
+            processedBooks: 0,
+            currentBook: '',
+            isIndexing: true,
+            errors: []
+        };
+        this.onProgress(status);
+
+        const BATCH_SIZE = 50;
+        let pendingBatch: { book: Book, summary: string }[] = [];
+
+        // Helper to flush batch
+        const flushBatch = async () => {
+            if (pendingBatch.length === 0) return;
+
+            const summaries = pendingBatch.map(p => p.summary);
+            const bookIds = pendingBatch.map(p => p.book.id);
+
+            try {
+                // Rate limit wait (respect 10 RPM => 6s per request)
+                if (status.processedBooks > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 6000));
+                }
+
+                // Generate Batch Embeddings
+                const { generateBatchEmbeddingsAction } = await import('@/app/actions/ai');
+
+                // Retry Loop
+                let result: { success: boolean; embeddings?: number[][]; error?: string } = { success: false };
+                let attempts = 0;
+
+                while (attempts < 3 && !result.success) {
+                    try {
+                        if (attempts > 0) await new Promise(r => setTimeout(r, 5000));
+                        result = await generateBatchEmbeddingsAction(summaries);
+                        if (!result.success) throw new Error(result.error);
+                    } catch (e: any) {
+                        console.error(`Batch Attempt ${attempts + 1} failed:`, e);
+                        result = { success: false, error: e.message };
+                        attempts++;
+                    }
+                }
+
+                if (result.success && result.embeddings) {
+                    await db.transaction('rw', [db.vectorChunks, db.books], async () => {
+                        // Delete old chunks
+                        for (const bid of bookIds) {
+                            await db.vectorChunks.where('bookId').equals(bid).filter(c => c.chapterIndex === -999).delete();
+                        }
+
+                        const newChunks: VectorChunk[] = [];
+                        result.embeddings!.forEach((embedding, idx) => {
+                            const item = pendingBatch[idx];
+                            if (embedding && embedding.length > 0) {
+                                newChunks.push({
+                                    id: uuid(),
+                                    bookId: item.book.id,
+                                    chapterIndex: -999,
+                                    chapterTitle: 'METADATA_SUMMARY',
+                                    text: item.summary,
+                                    embedding: embedding,
+                                    startCfi: ''
+                                });
+                            }
+                        });
+
+                        if (newChunks.length > 0) {
+                            await addVectorChunks(newChunks);
+
+                            const now = new Date();
+                            for (const bid of bookIds) {
+                                await db.books.update(bid, { indexedAt: now });
+                            }
+
+                            console.log(`[Batch] Saved ${newChunks.length} chunks to DB & Updated indexedAt.`);
+                        }
+                    });
+
+                } else {
+                    status.errors.push(`Failed to generate batch embeddings: ${result.error}`);
+                }
+
+            } catch (e: any) {
+                status.errors.push(`Batch failed: ${e.message}`);
+                console.error(e);
+            }
+
+            status.processedBooks += pendingBatch.length;
+            this.onProgress({ ...status });
+            pendingBatch = [];
+        };
+
+        for (const book of allBooks) {
+            if (this.isCancelled) break;
+
+            // Generate Summary locally
+            status.currentBook = `Preparing: ${book.title}`;
+
+            try {
+                const userBookData = await db.userBookData.where('bookId').equals(book.id).first();
+                const xray = await db.xrayData.where('bookId').equals(book.id).first();
+
+                let summary = `Título: ${book.title}\nAutor: ${book.author}\n`;
+                if (book.metadata?.description) summary += `Descripción: ${book.metadata.description}\n`;
+                if (book.metadata?.tags?.length) summary += `Tags: ${book.metadata.tags.join(', ')}\n`;
+                if (userBookData?.userRating) summary += `Valoración Personal: ${userBookData.userRating}\n`;
+                if (xray) {
+                    summary += `\n-- ADN del Libro --\n`;
+                    if (xray.summary) summary += `Resumen: ${xray.summary}\n`;
+                    if (xray.characters?.length) summary += `Personajes Clave: ${xray.characters.map((c: any) => c.name).join(', ')}\n`;
+                    if (xray.terms?.length) summary += `Temas Clave: ${xray.terms.map((t: any) => t.name).join(', ')}\n`;
+                }
+
+                // Truncate
+                if (summary.length > 20000) summary = summary.slice(0, 20000);
+
+                pendingBatch.push({ book, summary });
+
+                if (pendingBatch.length >= BATCH_SIZE) {
+                    status.currentBook = `Indexing bucket of ${pendingBatch.length} books (Sending to AI)...`;
+                    this.onProgress({ ...status });
+                    await flushBatch();
+                }
+
+            } catch (e) {
+                console.error(`Error preparing ${book.title}`, e);
+            }
+        }
+
+        // Flush remaining
+        if (pendingBatch.length > 0) {
+            status.currentBook = `Indexing final batch...`;
+            this.onProgress({ ...status });
+            await flushBatch();
+        }
+
+        status.isIndexing = false;
+        status.currentBook = 'Completed (Metadata)';
+        this.onProgress({ ...status });
+    }
+
+    private async filterUnindexedBooks(books: Book[]): Promise<Book[]> {
+        // Strict check on indexedAt to support Hybrid Architecture (Server-Side Vectors)
+        return books.filter(b => !b.indexedAt);
     }
 
     private async extractAndChunkBook(book: Book): Promise<{ text: string, chapterTitle: string, cfi: string }[]> {

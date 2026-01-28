@@ -236,6 +236,9 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
 
         await pushLocalData();
 
+        // 10. Sync Vectors (New)
+        await syncVectors();
+
         return { success: true, message: 'Sync complete' };
 
     } catch (error) {
@@ -389,9 +392,68 @@ function hydrateUserBookDates(data: any): UserBookData {
     };
 }
 
+
 function hydrateXRayDates(data: any): XRayData {
     return {
         ...data,
         generatedAt: new Date(data.generatedAt)
     };
 }
+
+export async function syncVectors(): Promise<{ success: boolean; message: string }> {
+    try {
+        console.log('[Sync] Starting vector sync...');
+        const customPath = localStorage.getItem('lectro_server_path');
+        const headers: HeadersInit = {};
+        if (customPath) headers['x-library-path'] = customPath;
+
+        // 1. Pull Server Vectors
+        const res = await fetch('/api/library/vectors', { headers });
+        if (!res.ok) throw new Error('Failed to fetch vectors');
+
+        const serverData = await res.json();
+        const serverChunks = serverData.chunks || [];
+        console.log(`[Sync] Received ${serverChunks.length} vector chunks from server.`);
+
+        if (serverChunks.length > 0) {
+            await db.transaction('rw', db.vectorChunks, async () => {
+                await db.vectorChunks.bulkPut(serverChunks);
+            });
+            console.log('[Sync] Merged server vectors into local DB.');
+        }
+
+        // 2. Push Local Vectors
+        const localChunks = await db.vectorChunks.toArray();
+        if (localChunks.length > 0) {
+            console.log(`[Sync] Pushing ${localChunks.length} local chunks to server...`);
+
+            // Chunk payload to avoid request size limits
+            const BATCH_SIZE = 500;
+            const chunks = [];
+            for (let i = 0; i < localChunks.length; i += BATCH_SIZE) {
+                chunks.push(localChunks.slice(i, i + BATCH_SIZE));
+            }
+
+            for (let i = 0; i < chunks.length; i++) {
+                const batch = chunks[i];
+                console.log(`[Sync] Uploading vector batch ${i + 1}/${chunks.length}`);
+                const pushRes = await fetch('/api/library/vectors', {
+                    method: 'POST',
+                    headers: { ...headers, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chunks: batch
+                    })
+                });
+                if (!pushRes.ok) console.error('Failed to push vector batch', i);
+            }
+            console.log('[Sync] Vector push complete.');
+        }
+
+        return { success: true, message: 'Vector sync complete' };
+
+    } catch (e: any) {
+        console.error('[Sync] Vector sync failed:', e);
+        return { success: false, message: e.message };
+    }
+}
+

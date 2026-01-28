@@ -68,6 +68,7 @@ export interface Book {
   metadata: BookMetadata;
   isOnServer?: boolean;
   deletedAt?: Date;
+  indexedAt?: Date;
 
   // Deprecated fields (moved to UserBookData), kept optional for type compatibility during migration/types
   lastReadAt?: Date;
@@ -345,6 +346,10 @@ export class LectroDB extends Dexie {
         const updatedSessions = sessions.map(s => ({ ...s, userId }));
         await trans.table('readingSessions').bulkPut(updatedSessions);
       }
+    });
+
+    this.version(11).stores({
+      books: 'id, title, author, format, addedAt, lastReadAt, updatedAt, progress, status, fileName, filePath, isOnServer, isFavorite, deletedAt, indexedAt',
     });
   }
 }
