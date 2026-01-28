@@ -283,7 +283,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
         const result = await model.embedContent({
             content: { role: 'user', parts: [{ text }] },
             outputDimensionality: 768
-        });
+        } as any);
 
         const values = result.embedding.values;
         // Matryoshka models allow slicing the vector. Ensure we return 768 dims.
