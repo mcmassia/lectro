@@ -276,9 +276,21 @@ Provide a helpful, well-structured response.`;
 // This is a simplified approach using Gemini for context
 export async function generateEmbedding(text: string): Promise<number[]> {
     try {
-        const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
-        const result = await model.embedContent(text);
-        return result.embedding.values;
+        // Use gemini-embedding-001 and force 768 dimensions for backward compatibility
+        const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+
+        // @ts-ignore - outputDimensionality is supported by API but missing in some SDK type versions
+        const result = await model.embedContent({
+            content: { role: 'user', parts: [{ text }] },
+            outputDimensionality: 768
+        });
+
+        const values = result.embedding.values;
+        // Matryoshka models allow slicing the vector. Ensure we return 768 dims.
+        if (values.length > 768) {
+            return values.slice(0, 768);
+        }
+        return values;
     } catch (error) {
         console.error('Embedding generation failed:', error);
         // Fallback or rethrow? 
