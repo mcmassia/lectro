@@ -167,6 +167,10 @@ export class LibraryIndexer {
 
         for (const book of allBooks) {
             if (this.isCancelled) break;
+
+            // Rate limiting delay
+            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CHUNKS));
+
             status.currentBook = book.title;
             this.onProgress({ ...status });
 
