@@ -237,7 +237,8 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
         await pushLocalData();
 
         // 10. Sync Vectors (New)
-        await syncVectors();
+        // DISABLED (Emergency Fix): Causing massive network/CPU load on large libraries.
+        // await syncVectors();
 
         return { success: true, message: 'Sync complete' };
 

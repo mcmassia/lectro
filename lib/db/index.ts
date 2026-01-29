@@ -569,30 +569,13 @@ export async function getBookFile(id: string): Promise<Blob | undefined> {
 }
 
 export async function getAllBooks(): Promise<Book[]> {
-  // OPTIMIZED: Use each() and strip fileBlob to avoid OOM with large libraries (6000+ books)
-  const books: Book[] = [];
-  try {
-    await db.books.each(book => {
-      if (!book.deletedAt) {
-        // Destructure to exclude fileBlob from the list view object
-        // precise cast to avoid TS issues if fileBlob is optional
-        const { fileBlob, ...rest } = book;
-        books.push(rest as Book);
-      }
-    });
-  } catch (e) {
-    console.error('Error loading books:', e);
-  }
-  return books;
+  // Now that blobs are in a separate table, we can safely use toArray() again
+  const books = await db.books.toArray();
+  return books.filter(b => !b.deletedAt);
 }
 
 export async function getAllBooksIncludingDeleted(): Promise<Book[]> {
-  const books: Book[] = [];
-  await db.books.each(book => {
-    const { fileBlob, ...rest } = book;
-    books.push(rest as Book);
-  });
-  return books;
+  return db.books.toArray();
 }
 
 export async function getBooksForUser(userId: string): Promise<Book[]> {
