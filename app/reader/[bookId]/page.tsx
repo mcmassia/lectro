@@ -83,6 +83,13 @@ export default function ReaderPage() {
         };
     }, [bookId, router, setBook, setAnnotations, setIsLoading, currentUser]);
 
+    // Collapse sidebar by default on mobile
+    useEffect(() => {
+        if (window.innerWidth < 768) {
+            setReaderSidebarOpen(false);
+        }
+    }, [setReaderSidebarOpen]);
+
     const handleLocationChange = useCallback(async (cfi: string, page: number, total: number, chapter: string) => {
         setCurrentCfi(cfi);
         setCurrentPage(page);

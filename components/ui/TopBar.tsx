@@ -40,7 +40,7 @@ export function TopBar() {
         router.push('/login');
     };
 
-    if (pathname === '/login') return null;
+    if (pathname === '/login' || pathname?.startsWith('/reader')) return null;
 
     return (
         <header className="topbound">

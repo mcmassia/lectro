@@ -559,9 +559,10 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                                     placeholder="Description..."
                                 />
                             ) : (
-                                <div className="description-text">
-                                    {book.metadata?.description || 'No description available.'}
-                                </div>
+                                <div
+                                    className="description-text"
+                                    dangerouslySetInnerHTML={{ __html: book.metadata?.description || 'No description available.' }}
+                                />
                             )}
                         </div>
 
@@ -923,6 +924,66 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     overflow: hidden;
                 }
 
+                @media (max-width: 768px) {
+                    .modal-container {
+                        max-width: 100vw;
+                        width: 100vw;
+                        height: 100%; /* Full screen height */
+                        max-height: 100%;
+                        border-radius: 0;
+                        margin: 0;
+                        overflow-y: auto; /* Allow main container to scroll if needed */
+                    }
+                    .modal-content {
+                        grid-template-columns: 1fr;
+                        padding: var(--space-4);
+                        gap: var(--space-4);
+                        display: flex;
+                        flex-direction: column;
+                        width: 100%;
+                        box-sizing: border-box; /* Ensure padding doesn't overflow width */
+                        overflow-x: hidden; /* Prevent horizontal scroll */
+                    }
+                    .book-cover-wrapper {
+                        max-width: 140px; /* Smaller cover on mobile */
+                        margin: 0 auto;
+                        box-shadow: var(--shadow-md);
+                    }
+                    .header-info {
+                        text-align: center;
+                        width: 100%;
+                    }
+                    .book-title {
+                        font-size: var(--text-xl) !important; /* Smaller title */
+                        word-break: break-word;
+                    }
+                    .author-name {
+                        font-size: var(--text-md) !important;
+                    }
+                    .action-buttons {
+                        flex-wrap: wrap;
+                        justify-content: center;
+                        width: 100%;
+                    }
+                    .btn {
+                        flex: 1 1 45%; /* Buttons take approx half width, wrapping if needed */
+                        min-width: 120px;
+                        max-width: 100%;
+                        font-size: var(--text-xs) !important; 
+                        padding: 0 var(--space-2);
+                    }
+                    /* Ensure description text wraps */
+                    .description-text, .description-section {
+                        word-break: break-word;
+                        overflow-wrap: break-word;
+                        max-width: 100%;
+                    }
+                    /* Ensure metadata grid is responsive */
+                    .metadata-grid {
+                        grid-template-columns: 1fr 1fr; /* 2 columns on mobile */
+                    }
+                }
+
                 .close-btn {
                     position: absolute;
                     top: var(--space-4);
@@ -1221,8 +1282,6 @@ export function BookDetailsModal({ book: initialBook, onClose }: BookDetailsModa
                     font-size: var(--text-sm);
                     line-height: 1.6;
                     color: rgba(255,255,255,0.9);
-                    max-height: 150px;
-                    overflow-y: auto;
                 }
 
                 .edit-input, .edit-textarea {
