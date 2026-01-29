@@ -181,6 +181,14 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
         return colors[color] || colors.yellow;
     };
 
+    // Helper to convert hex to rgba
+    const hexToRgba = (hex: string, alpha: number): string => {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
     // Apply annotation highlights in the iframe content
     const applyAnnotationHighlights = useCallback(() => {
         if (!iframeRef.current || !iframeRef.current.contentDocument) return;
@@ -417,17 +425,12 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
                     // Create highlight span that wraps the range content
                     const highlightSpan = doc.createElement('span');
                     highlightSpan.className = 'lectro-highlight';
-                    highlightSpan.style.backgroundColor = color;
 
-                    // Theme-aware blending for better visibility
-                    if (settings.theme === 'dark') {
-                        highlightSpan.style.mixBlendMode = 'screen';
-                        highlightSpan.style.opacity = '0.5';
-                    } else {
-                        // Standard highlighter behavior for light/sepia
-                        highlightSpan.style.mixBlendMode = 'multiply';
-                        highlightSpan.style.opacity = '0.4';
-                    }
+                    // Use RGBA for transparent background without affecting text opacity
+                    // Dark mode needs slightly more opaque/different alpha for visibility
+                    const alpha = settings.theme === 'dark' ? 0.5 : 0.4;
+                    highlightSpan.style.backgroundColor = hexToRgba(color, alpha);
+
                     highlightSpan.dataset.annotationId = annotation.id;
                     highlightSpan.title = annotation.note || 'Nota';
 
@@ -485,10 +488,15 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
         `;
         doc.head.appendChild(styleEl);
 
-        // Add mouseup listener for text selection
-        doc.addEventListener('mouseup', handleIframeSelection);
-        // Add touchend for mobile selection
-        doc.addEventListener('touchend', handleIframeSelection);
+        // Listen for selection changes (robust for both mouse and touch)
+        // We use a small timeout to let the selection settle
+        const onSelectionChange = () => {
+            // Debounce slightly
+            setTimeout(() => {
+                handleIframeSelection();
+            }, 10);
+        };
+        doc.addEventListener('selectionchange', onSelectionChange);
 
         // Apply annotation highlights after styles are injected
         setTimeout(() => {
