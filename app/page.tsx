@@ -115,6 +115,24 @@ export default function Home() {
     }
   }, [selectedBookIds, setSelectedBookId]);
 
+  const virtuosoComponents = useMemo(() => ({
+    List: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(({ style, children, ...props }, ref) => (
+      <div
+        ref={ref}
+        {...props}
+        style={{ ...style, marginTop: 0 }} // Ensure no margins interfere
+        className={`${viewMode === 'grid' ? 'book-grid' : 'book-list'} animate-slide-up`}
+      >
+        {children}
+      </div>
+    )),
+    Item: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(({ children, ...props }, ref) => (
+      <div ref={ref} {...props} className="virtuoso-item-wrapper">
+        {children}
+      </div>
+    ))
+  }), [viewMode]);
+
   // AI Search Trigger
   useEffect(() => {
     if (!searchQuery) {
@@ -612,23 +630,7 @@ export default function Home() {
                 useWindowScroll
                 totalCount={displayBooks.length}
                 overscan={200}
-                components={useMemo(() => ({
-                  List: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(({ style, children, ...props }, ref) => (
-                    <div
-                      ref={ref}
-                      {...props}
-                      style={{ ...style, marginTop: 0 }} // Ensure no margins interfere
-                      className={`${viewMode === 'grid' ? 'book-grid' : 'book-list'} animate-slide-up`}
-                    >
-                      {children}
-                    </div>
-                  )),
-                  Item: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(({ children, ...props }, ref) => (
-                    <div ref={ref} {...props} className="virtuoso-item-wrapper">
-                      {children}
-                    </div>
-                  ))
-                }), [viewMode])}
+                components={virtuosoComponents}
                 itemContent={(index) => {
                   const book = displayBooks[index];
                   return (
