@@ -3,7 +3,7 @@
 import React from 'react';
 import { VirtuosoGrid } from 'react-virtuoso';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
 import { getAllBooks, Book, deleteBook, syncTagsFromBooks, getAllTags, updateBook } from '@/lib/db';
 import { BookCard } from '@/components/library/BookCard';
@@ -612,23 +612,23 @@ export default function Home() {
                 useWindowScroll
                 totalCount={displayBooks.length}
                 overscan={200}
-                components={{
+                components={useMemo(() => ({
                   List: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(({ style, children, ...props }, ref) => (
                     <div
                       ref={ref}
                       {...props}
-                      style={style}
+                      style={{ ...style, marginTop: 0 }} // Ensure no margins interfere
                       className={`${viewMode === 'grid' ? 'book-grid' : 'book-list'} animate-slide-up`}
                     >
                       {children}
                     </div>
                   )),
                   Item: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(({ children, ...props }, ref) => (
-                    <div ref={ref} {...props} style={{ display: 'contents' }}>
+                    <div ref={ref} {...props} className="virtuoso-item-wrapper">
                       {children}
                     </div>
                   ))
-                }}
+                }), [viewMode])}
                 itemContent={(index) => {
                   const book = displayBooks[index];
                   return (
