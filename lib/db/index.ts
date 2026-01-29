@@ -485,16 +485,34 @@ export async function getBook(id: string): Promise<Book | undefined> {
 }
 
 export async function getAllBooks(): Promise<Book[]> {
-  const all = await db.books.toArray();
-  return all.filter(b => !b.deletedAt);
+  // OPTIMIZED: Use each() and strip fileBlob to avoid OOM with large libraries (6000+ books)
+  const books: Book[] = [];
+  try {
+    await db.books.each(book => {
+      if (!book.deletedAt) {
+        // Destructure to exclude fileBlob from the list view object
+        // precise cast to avoid TS issues if fileBlob is optional
+        const { fileBlob, ...rest } = book;
+        books.push(rest as Book);
+      }
+    });
+  } catch (e) {
+    console.error('Error loading books:', e);
+  }
+  return books;
 }
 
 export async function getAllBooksIncludingDeleted(): Promise<Book[]> {
-  return db.books.toArray();
+  const books: Book[] = [];
+  await db.books.each(book => {
+    const { fileBlob, ...rest } = book;
+    books.push(rest as Book);
+  });
+  return books;
 }
 
 export async function getBooksForUser(userId: string): Promise<Book[]> {
-  const books = await getAllBooks();
+  const books = await getAllBooks(); // Now optimized
   const userData = await db.userBookData.where('userId').equals(userId).toArray();
   const userDataMap = new Map(userData.map(d => [d.bookId, d]));
 
@@ -864,30 +882,36 @@ export async function recoverLegacyData(targetUserId?: string): Promise<{ annota
   }
 
   // 3. Migrate book progress/status from books table to userBookData if missing
-  const books = await db.books.toArray();
+  // Optimized to avoid loading all books (with blobs) into memory at once
   const existingUserData = await db.userBookData.where('userId').equals(userId).toArray();
   const existingBookIds = new Set(existingUserData.map(d => d.bookId));
 
-  const booksToMigrate = books.filter(b =>
-    !existingBookIds.has(b.id) &&
-    (b.progress || b.status || b.lastReadAt || b.currentPosition)
-  );
+  const userBookDataItems: UserBookData[] = [];
 
-  if (booksToMigrate.length > 0) {
-    console.log(`[Recovery] Found ${booksToMigrate.length} books with progress to migrate`);
-    const userBookDataItems = booksToMigrate.map(book => ({
-      userId,
-      bookId: book.id,
-      progress: book.progress || 0,
-      status: book.status || 'unread',
-      lastReadAt: book.lastReadAt,
-      currentPosition: book.currentPosition,
-      currentPage: book.currentPage,
-      userRating: book.metadata?.userRating,
-      isFavorite: book.isFavorite,
-      manualCategories: book.metadata?.manualCategories,
-      updatedAt: new Date()
-    }));
+  // Use .each() to stream instead of .toArray() to prevent OOM with large libraries
+  await db.books.each(book => {
+    if (!existingBookIds.has(book.id) &&
+      (book.progress || book.status || book.lastReadAt || book.currentPosition)) {
+
+      userBookDataItems.push({
+        userId: userId!, // verified valid above
+        bookId: book.id,
+        progress: book.progress || 0,
+        status: book.status || 'unread',
+        lastReadAt: book.lastReadAt,
+        currentPosition: book.currentPosition,
+        currentPage: book.currentPage,
+        userRating: book.metadata?.userRating,
+        isFavorite: book.isFavorite,
+        manualCategories: book.metadata?.manualCategories,
+        updatedAt: new Date()
+      });
+    }
+  });
+
+  if (userBookDataItems.length > 0) {
+    console.log(`[Recovery] Found ${userBookDataItems.length} books with progress to migrate`);
+    // Batch insert in chunks if needed, but bulkAdd handles moderately large arrays well (meta data is small)
     await db.userBookData.bulkAdd(userBookDataItems);
     migratedUserBookData = userBookDataItems.length;
   }

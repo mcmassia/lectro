@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { LeftSidebar } from './LeftSidebar';
 import { RightSidebar } from './RightSidebar';
@@ -19,15 +19,29 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
     const { showImportModal, setShowImportModal, currentUser, login } = useAppStore();
 
     // Session Validation: ensure persisted user matches DB (handles ID migrations)
+    const isValidating = useRef(false);
+    const hasValidated = useRef(false);
+
     useEffect(() => {
-        // Run this check always to ensure DB consistency (Fixed ID vs Random ID)
+        // Run this check once per session load to avoid blocking UI
         async function validateSession() {
+            if (hasValidated.current || isValidating.current) return;
+            isValidating.current = true;
+
             try {
                 // Ensure default user state in DB is correct (migrates if needed)
                 await ensureDefaultUser();
 
-                // Recover any legacy data (annotations/sessions without userId)
-                await recoverLegacyData();
+                // Recover any legacy data - ONLY if not checked recently
+                // This is a heavy operation (scan all books), so we skip it if already done
+                const lastRecovery = localStorage.getItem('lectro_recovery_timestamp');
+                const now = Date.now();
+                // Run recovery at most once every 24 hours or if never run
+                if (!lastRecovery || (now - parseInt(lastRecovery)) > 24 * 60 * 60 * 1000) {
+                    console.log('Running scheduled data recovery check...');
+                    await recoverLegacyData();
+                    localStorage.setItem('lectro_recovery_timestamp', now.toString());
+                }
 
                 // If we are logged in as 'mcmassia', check if our session ID matches the DB one
                 if (currentUser && currentUser.username === 'mcmassia') {
@@ -37,11 +51,20 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
                         login(dbUser);
                     }
                 }
+                hasValidated.current = true;
             } catch (e) {
                 console.error('Session validation failed', e);
+            } finally {
+                isValidating.current = false;
             }
         }
-        validateSession();
+
+        // Short delay to allow UI to paint first
+        const timer = setTimeout(() => {
+            validateSession();
+        }, 100);
+
+        return () => clearTimeout(timer);
     }, [currentUser, login]);
 
     const importModal = showImportModal && (
