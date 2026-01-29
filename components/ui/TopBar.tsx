@@ -4,14 +4,15 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore, useLibraryStore } from '@/stores/appStore';
-import { Search, Moon, Sun, Bell, Plus, User, Menu, LogOut, Settings, BookOpen } from 'lucide-react';
+import { Search, Moon, Sun, Bell, Plus, User, Menu, LogOut, Settings, BookOpen, PanelRightOpen, ArrowLeft, X } from 'lucide-react';
 import { UserManagementModal } from '@/components/settings/UserManagementModal';
 
 export function TopBar() {
-    const { theme, setTheme, setShowImportModal, currentUser, logout } = useAppStore();
+    const { theme, setTheme, setShowImportModal, currentUser, logout, toggleMobileMenu, toggleMobileRightSidebarOpen } = useAppStore();
     const { searchQuery, setSearchQuery } = useLibraryStore();
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
     const [showUserModal, setShowUserModal] = useState(false);
+    const [showMobileSearch, setShowMobileSearch] = useState(false);
     const router = useRouter();
 
     const pathname = usePathname();
@@ -43,92 +44,128 @@ export function TopBar() {
 
     return (
         <header className="topbound">
-            <div className="logo-section">
-                <Link href="/" style={{ textDecoration: 'none' }}>
-                    <div className="app-logo">
-                        <div className="logo-icon-wrapper">
-                            <BookOpen size={24} strokeWidth={2.5} />
-                        </div>
-                        <span className="logo-text">LECTRO</span>
-                    </div>
-                </Link>
-            </div>
-
-            <div className="search-section">
-                <div className="search-input-wrapper">
-                    <Search className="search-icon" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Buscar libros, autores, etiquetas, x-ray..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="search-input"
-                    />
-                </div>
-            </div>
-
-            <div className="actions-section">
-                <button className="btn-icon" onClick={toggleTheme} title="Cambiar tema">
-                    {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-                </button>
-                <button className="btn-icon" title="Notificaciones">
-                    <Bell size={20} />
-                </button>
-                <button className="btn-primary btn-add" onClick={() => setShowImportModal(true)}>
-                    <Plus size={18} />
-                    <span>Añadir</span>
-                </button>
-
-                <div className="user-profile-wrapper" ref={userMenuRef}>
-                    <button
-                        className="avatar-placeholder"
-                        onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                    >
-                        {currentUser?.username ? (
-                            <span className="font-bold">{currentUser.username.charAt(0).toUpperCase()}</span>
-                        ) : (
-                            <User size={20} />
-                        )}
+            {/* Mobile Search Overlay Mode */}
+            {showMobileSearch ? (
+                <div className="mobile-search-bar">
+                    <button className="btn-icon" onClick={() => setShowMobileSearch(false)}>
+                        <ArrowLeft size={24} />
                     </button>
-
-                    {isUserMenuOpen && currentUser && (
-                        <div className="user-dropdown">
-                            <div className="user-info-section">
-                                <p className="username">@{currentUser.username}</p>
-                                <p className="role">{currentUser.isAdmin ? 'Administrador' : 'Lector'}</p>
-                            </div>
-
-                            <div className="menu-items">
-                                {/* Admin Only Section */}
-                                {currentUser.isAdmin && (
-                                    <button
-                                        className="menu-item"
-                                        onClick={() => {
-                                            setShowUserModal(true);
-                                            setIsUserMenuOpen(false);
-                                        }}
-                                    >
-                                        <User size={16} />
-                                        <span>Gestionar Usuarios</span>
-                                    </button>
-                                )}
-
-                                <button className="menu-item">
-                                    <Settings size={16} />
-                                    <span>Configuración</span>
-                                </button>
-
-                                <div className="divider"></div>
-
-                                <button className="menu-item logout" onClick={handleLogout}>
-                                    <LogOut size={16} />
-                                    <span>Cerrar Sesión</span>
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                    <div className="search-input-wrapper full-width">
+                        <input
+                            type="text"
+                            placeholder="Buscar..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="search-input"
+                            autoFocus
+                        />
+                        {searchQuery && (
+                            <button className="clear-search-btn" onClick={() => setSearchQuery('')}>
+                                <X size={16} />
+                            </button>
+                        )}
+                    </div>
                 </div>
-            </div>
+            ) : (
+                <>
+                    <div className="logo-section">
+                        <button className="mobile-menu-btn" onClick={toggleMobileMenu}>
+                            <Menu size={24} />
+                        </button>
+                        <Link href="/" style={{ textDecoration: 'none' }}>
+                            <div className="app-logo">
+                                <div className="logo-icon-wrapper">
+                                    <BookOpen size={24} strokeWidth={2.5} />
+                                </div>
+                                <span className="logo-text">LECTRO</span>
+                            </div>
+                        </Link>
+                    </div>
+
+                    <div className="search-section desktop-only">
+                        <div className="search-input-wrapper">
+                            <Search className="search-icon" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Buscar libros, autores, etiquetas..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="search-input"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="actions-section">
+                        <button className="btn-icon mobile-search-trigger" onClick={() => setShowMobileSearch(true)}>
+                            <Search size={22} />
+                        </button>
+                        <button className="btn-icon desktop-only" onClick={toggleTheme} title="Cambiar tema">
+                            {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+                        </button>
+                        <button className="btn-icon desktop-only" title="Notificaciones">
+                            <Bell size={20} />
+                        </button>
+                        <button className="btn-primary btn-add" onClick={() => setShowImportModal(true)}>
+                            <Plus size={18} />
+                            <span className="desktop-only-text">Añadir</span>
+                        </button>
+                        <button className="mobile-menu-btn" onClick={toggleMobileRightSidebarOpen}>
+                            <PanelRightOpen size={24} />
+                        </button>
+
+
+                        <div className="user-profile-wrapper" ref={userMenuRef}>
+                            <button
+                                className="avatar-placeholder"
+                                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                            >
+                                {currentUser?.username ? (
+                                    <span className="font-bold">{currentUser.username.charAt(0).toUpperCase()}</span>
+                                ) : (
+                                    <User size={20} />
+                                )}
+                            </button>
+
+                            {isUserMenuOpen && currentUser && (
+                                <div className="user-dropdown">
+                                    <div className="user-info-section">
+                                        <p className="username">@{currentUser.username}</p>
+                                        <p className="role">{currentUser.isAdmin ? 'Administrador' : 'Lector'}</p>
+                                    </div>
+
+                                    <div className="menu-items">
+                                        {/* Admin Only Section */}
+                                        {currentUser.isAdmin && (
+                                            <button
+                                                className="menu-item"
+                                                onClick={() => {
+                                                    setShowUserModal(true);
+                                                    setIsUserMenuOpen(false);
+                                                }}
+                                            >
+                                                <User size={16} />
+                                                <span>Gestionar Usuarios</span>
+                                            </button>
+                                        )}
+
+                                        <button className="menu-item">
+                                            <Settings size={16} />
+                                            <span>Configuración</span>
+                                        </button>
+
+                                        <div className="divider"></div>
+
+                                        <button className="menu-item logout" onClick={handleLogout}>
+                                            <LogOut size={16} />
+                                            <span>Cerrar Sesión</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </>
+            )}
 
             {showUserModal && <UserManagementModal onClose={() => setShowUserModal(false)} />}
 
@@ -142,13 +179,47 @@ export function TopBar() {
                     background: var(--color-bg-secondary);
                     border-bottom: 1px solid var(--color-divider);
                     position: relative;
-                    z-index: 50;
+                    z-index: 1000; /* Ensure TopBar is always on top */
+                }
+
+                @media (max-width: 1024px) {
+                    .topbound {
+                        padding: 0 16px;
+                        height: var(--header-height);
+                    }
                 }
 
                 .logo-section {
                     width: 260px; /* Aligns with left sidebar */
                     display: flex;
                     align-items: center;
+                }
+
+                @media (max-width: 1024px) {
+                    .logo-section {
+                        width: auto;
+                    }
+                }
+
+                .mobile-menu-btn {
+                    display: none;
+                    background: transparent;
+                    border: none;
+                    color: var(--color-text-primary);
+                    margin-right: 12px;
+                    padding: 4px;
+                    cursor: pointer;
+                }
+
+                @media (max-width: 768px) {
+                    .mobile-menu-btn {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+                    .logo-text {
+                        display: none; /* Hide text on mobile to save space if needed, or keep smaller */
+                    }
                 }
 
                 .app-logo {
@@ -186,6 +257,55 @@ export function TopBar() {
                     flex: 1;
                     max-width: 600px;
                     margin: 0 24px;
+                }
+
+                .desktop-only {
+                    display: flex;
+                }
+
+                .mobile-search-trigger {
+                    display: none;
+                }
+                
+                .mobile-search-bar {
+                     display: flex;
+                     align-items: center;
+                     width: 100%;
+                     gap: 12px;
+                }
+                
+                .full-width {
+                    flex: 1;
+                }
+                
+                .clear-search-btn {
+                    background: transparent;
+                    border: none;
+                    color: var(--color-text-tertiary);
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                }
+
+                @media (max-width: 1024px) {
+                    .actions-section {
+                        gap: 8px;
+                    }
+                    .search-section.desktop-only {
+                        display: none;
+                    }
+                    .actions-section .desktop-only {
+                        display: none;
+                    }
+                    .mobile-search-trigger {
+                        display: flex;
+                    }
+                    .btn-add span {
+                        display: none;
+                    }
+                    .btn-add {
+                        padding: 8px; /* Icon only */
+                    }
                 }
 
                 .search-input-wrapper {

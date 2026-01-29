@@ -120,6 +120,14 @@
   --reader-max-width: 720px;
 }
 
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 280px; /* Width when open */
+    --header-height: 56px;
+    --space-6: 1rem; /* Reduce padding on mobile */
+  }
+}
+
 /* ===================================
    Dark Mode (OLED Optimized)
    =================================== */
@@ -480,6 +488,13 @@ a {
   width: 100%;
 }
 
+@media (max-width: 768px) {
+  .main-layout {
+    position: relative;
+    overflow-x: hidden;
+  }
+}
+
 .content-area {
   flex: 1;
   display: flex;
@@ -504,6 +519,12 @@ a {
   padding: var(--space-6);
   /* Reduce padding slightly */
   margin: 0;
+}
+
+@media (max-width: 768px) {
+  .page-container {
+    padding: var(--space-4);
+  }
 }
 
 /* Force removal of underlines on specific components if needed */

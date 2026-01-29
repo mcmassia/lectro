@@ -316,501 +316,507 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
     };
 
     return (
-        <aside className="reader-sidebar" style={{ width: sidebarWidth, position: 'relative' }}>
+        <>
+            {/* Mobile Overlay */}
             <div
-                className="sidebar-resizer"
-                onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }}
-                style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: '16px', // Even wider hit area
-                    marginLeft: '-8px',
-                    cursor: 'col-resize',
-                    zIndex: 9999, // Ensure it's above everything
-                    background: isResizing ? 'rgba(0,0,0,0.1)' : 'transparent',
-                    transition: 'background 0.2s'
-                }}
+                className="reader-sidebar-overlay"
+                onClick={() => setReaderSidebarOpen(false)}
             />
-            <div className="reader-sidebar-header">
-                <div className="sidebar-header-top" style={{ display: 'flex', alignItems: 'center', marginBottom: '12px', justifyContent: 'space-between' }}>
-                    <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-                        {readerSidebarTab === 'toc' ? 'Índice' :
-                            readerSidebarTab === 'annotations' ? 'Notas' :
-                                readerSidebarTab === 'xray' ? 'X-Ray' : 'Ajustes'}
-                    </h3>
-                    <button
-                        className="close-sidebar-btn"
-                        onClick={() => setReaderSidebarOpen(false)}
-                        title="Cerrar barra lateral"
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                </div>
-                <div className="reader-sidebar-tabs">
-                    <button
-                        className={`reader-sidebar-tab ${readerSidebarTab === 'toc' ? 'active' : ''}`}
-                        onClick={() => setReaderSidebarTab('toc')}
-                        title="Índice"
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                            <line x1="8" y1="6" x2="21" y2="6"></line>
-                            <line x1="8" y1="12" x2="21" y2="12"></line>
-                            <line x1="8" y1="18" x2="21" y2="18"></line>
-                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                        </svg>
-                    </button>
-                    <button
-                        className={`reader-sidebar-tab ${readerSidebarTab === 'annotations' ? 'active' : ''}`}
-                        onClick={() => setReaderSidebarTab('annotations')}
-                        title="Notas"
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-                        </svg>
-                    </button>
-                    <button
-                        className={`reader-sidebar-tab ${readerSidebarTab === 'xray' ? 'active' : ''}`}
-                        onClick={() => setReaderSidebarTab('xray')}
-                        title="X-Ray"
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                            <path d="M2 12h20"></path>
-                            <path d="M2 12l5-5"></path>
-                            <path d="M2 12l5 5"></path>
-                            <path d="M22 12l-5-5"></path>
-                            <path d="M22 12l-5 5"></path>
-                        </svg>
-                    </button>
-                    <button
-                        className={`reader-sidebar-tab ${readerSidebarTab === 'settings' ? 'active' : ''}`}
-                        onClick={() => setReaderSidebarTab('settings')}
-                        title="Ajustes"
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            <div className="reader-sidebar-content">
-                {/* Table of Contents */}
-                {readerSidebarTab === 'toc' && (
-                    <div className="toc-content">
-                        {toc.length === 0 ? (
-                            <p className="empty-state-text">
-                                Cargando tabla de contenidos...
-                            </p>
-                        ) : (
-                            <div className="toc-list">
-                                {toc.map((item, index) => (
-                                    <div key={index} className="toc-item-container">
-                                        <button
-                                            className="toc-item"
-                                            onClick={() => onTocItemClick?.(item.href)}
-                                        >
-                                            {item.label}
-                                        </button>
-                                        {item.subitems && item.subitems.length > 0 && (
-                                            <div className="toc-subitems">
-                                                {item.subitems.map((subitem, subIndex) => (
-                                                    <button
-                                                        key={subIndex}
-                                                        className="toc-item toc-subitem"
-                                                        onClick={() => onTocItemClick?.(subitem.href)}
-                                                    >
-                                                        {subitem.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+            <aside className="reader-sidebar" style={{ width: sidebarWidth, position: 'relative' }}>
+                <div
+                    className="sidebar-resizer"
+                    onMouseDown={(e) => { e.preventDefault(); setIsResizing(true); }}
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: '16px', // Even wider hit area
+                        marginLeft: '-8px',
+                        cursor: 'col-resize',
+                        zIndex: 9999, // Ensure it's above everything
+                        background: isResizing ? 'rgba(0,0,0,0.1)' : 'transparent',
+                        transition: 'background 0.2s'
+                    }}
+                />
+                <div className="reader-sidebar-header">
+                    <div className="sidebar-header-top" style={{ display: 'flex', alignItems: 'center', marginBottom: '12px', justifyContent: 'space-between' }}>
+                        <h3 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
+                            {readerSidebarTab === 'toc' ? 'Índice' :
+                                readerSidebarTab === 'annotations' ? 'Notas' :
+                                    readerSidebarTab === 'xray' ? 'X-Ray' : 'Ajustes'}
+                        </h3>
+                        <button
+                            className="close-sidebar-btn"
+                            onClick={() => setReaderSidebarOpen(false)}
+                            title="Cerrar barra lateral"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
                     </div>
-                )}
+                    <div className="reader-sidebar-tabs">
+                        <button
+                            className={`reader-sidebar-tab ${readerSidebarTab === 'toc' ? 'active' : ''}`}
+                            onClick={() => setReaderSidebarTab('toc')}
+                            title="Índice"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                                <line x1="8" y1="6" x2="21" y2="6"></line>
+                                <line x1="8" y1="12" x2="21" y2="12"></line>
+                                <line x1="8" y1="18" x2="21" y2="18"></line>
+                                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            </svg>
+                        </button>
+                        <button
+                            className={`reader-sidebar-tab ${readerSidebarTab === 'annotations' ? 'active' : ''}`}
+                            onClick={() => setReaderSidebarTab('annotations')}
+                            title="Notas"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
+                            </svg>
+                        </button>
+                        <button
+                            className={`reader-sidebar-tab ${readerSidebarTab === 'xray' ? 'active' : ''}`}
+                            onClick={() => setReaderSidebarTab('xray')}
+                            title="X-Ray"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                                <path d="M2 12h20"></path>
+                                <path d="M2 12l5-5"></path>
+                                <path d="M2 12l5 5"></path>
+                                <path d="M22 12l-5-5"></path>
+                                <path d="M22 12l-5 5"></path>
+                            </svg>
+                        </button>
+                        <button
+                            className={`reader-sidebar-tab ${readerSidebarTab === 'settings' ? 'active' : ''}`}
+                            onClick={() => setReaderSidebarTab('settings')}
+                            title="Ajustes"
+                        >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
 
-                {/* Annotations */}
-                {readerSidebarTab === 'annotations' && (
-                    <div className="annotations-content">
-                        {annotations.length === 0 ? (
-                            <div className="empty-state">
+                <div className="reader-sidebar-content">
+                    {/* Table of Contents */}
+                    {readerSidebarTab === 'toc' && (
+                        <div className="toc-content">
+                            {toc.length === 0 ? (
                                 <p className="empty-state-text">
-                                    Selecciona texto en el libro para crear anotaciones
+                                    Cargando tabla de contenidos...
                                 </p>
-                            </div>
-                        ) : (
-                            <div className="annotation-list">
-                                {annotations.map((annotation) => (
-                                    <div
-                                        key={annotation.id}
-                                        className={`annotation-item ${deleteConfirmId === annotation.id ? 'deleting' : ''}`}
-                                        onClick={() => onAnnotationClick?.(annotation.cfi)}
-                                    >
-                                        <div
-                                            className="annotation-color"
-                                            style={{ backgroundColor: getColorValue(annotation.color) }}
-                                        />
-                                        <div className="annotation-content">
-                                            <div className="annotation-context">
-                                                {annotation.chapterTitle && (
-                                                    <span className="context-chapter">{annotation.chapterTitle}</span>
-                                                )}
-                                                {annotation.pageNumber && (
-                                                    <span className="context-page">Pág. {annotation.pageNumber}</span>
-                                                )}
-                                            </div>
-                                            <p className="annotation-text">&quot;{annotation.text}&quot;</p>
-                                            {annotation.note && (
-                                                <p className="annotation-note">{annotation.note}</p>
+                            ) : (
+                                <div className="toc-list">
+                                    {toc.map((item, index) => (
+                                        <div key={index} className="toc-item-container">
+                                            <button
+                                                className="toc-item"
+                                                onClick={() => onTocItemClick?.(item.href)}
+                                            >
+                                                {item.label}
+                                            </button>
+                                            {item.subitems && item.subitems.length > 0 && (
+                                                <div className="toc-subitems">
+                                                    {item.subitems.map((subitem, subIndex) => (
+                                                        <button
+                                                            key={subIndex}
+                                                            className="toc-item toc-subitem"
+                                                            onClick={() => onTocItemClick?.(subitem.href)}
+                                                        >
+                                                            {subitem.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             )}
                                         </div>
-                                        <div className="annotation-actions">
-                                            <button
-                                                className="action-btn edit-btn"
-                                                onClick={(e) => handleStartEdit(annotation, e)}
-                                                title="Editar anotación"
-                                            >
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
-                                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                                </svg>
-                                            </button>
-                                            <button
-                                                className="action-btn delete-btn"
-                                                onClick={(e) => handleDeleteClick(annotation.id, e)}
-                                                title="Eliminar anotación"
-                                            >
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
-                                                    <polyline points="3 6 5 6 21 6" />
-                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
 
-                {/* X-Ray */}
-                {readerSidebarTab === 'xray' && (
-                    <div
-                        className="xray-content"
-                        style={{
-                            fontFamily: readerSettings.fontFamily,
-                            // Use a relative size or specific size based on settings, but maybe slightly smaller/adjusted for sidebar density?
-                            // User asked: "el estilo de fuente y su tamaño configurado en los ajustes del lector no está aplicando al x-ray"
-                            // So let's apply it directly.
-                            fontSize: `${readerSettings.fontSize}px`,
-                            lineHeight: readerSettings.lineHeight
-                        }}
-                    >
-                        {xrayData ? (
-                            <div className="xray-sections">
-                                <div className="xray-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '16px' }}>
+                    {/* Annotations */}
+                    {readerSidebarTab === 'annotations' && (
+                        <div className="annotations-content">
+                            {annotations.length === 0 ? (
+                                <div className="empty-state">
+                                    <p className="empty-state-text">
+                                        Selecciona texto en el libro para crear anotaciones
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="annotation-list">
+                                    {annotations.map((annotation) => (
+                                        <div
+                                            key={annotation.id}
+                                            className={`annotation-item ${deleteConfirmId === annotation.id ? 'deleting' : ''}`}
+                                            onClick={() => onAnnotationClick?.(annotation.cfi)}
+                                        >
+                                            <div
+                                                className="annotation-color"
+                                                style={{ backgroundColor: getColorValue(annotation.color) }}
+                                            />
+                                            <div className="annotation-content">
+                                                <div className="annotation-context">
+                                                    {annotation.chapterTitle && (
+                                                        <span className="context-chapter">{annotation.chapterTitle}</span>
+                                                    )}
+                                                    {annotation.pageNumber && (
+                                                        <span className="context-page">Pág. {annotation.pageNumber}</span>
+                                                    )}
+                                                </div>
+                                                <p className="annotation-text">&quot;{annotation.text}&quot;</p>
+                                                {annotation.note && (
+                                                    <p className="annotation-note">{annotation.note}</p>
+                                                )}
+                                            </div>
+                                            <div className="annotation-actions">
+                                                <button
+                                                    className="action-btn edit-btn"
+                                                    onClick={(e) => handleStartEdit(annotation, e)}
+                                                    title="Editar anotación"
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    className="action-btn delete-btn"
+                                                    onClick={(e) => handleDeleteClick(annotation.id, e)}
+                                                    title="Eliminar anotación"
+                                                >
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                                                        <polyline points="3 6 5 6 21 6" />
+                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* X-Ray */}
+                    {readerSidebarTab === 'xray' && (
+                        <div
+                            className="xray-content"
+                            style={{
+                                fontFamily: readerSettings.fontFamily,
+                                // Use a relative size or specific size based on settings, but maybe slightly smaller/adjusted for sidebar density?
+                                // User asked: "el estilo de fuente y su tamaño configurado en los ajustes del lector no está aplicando al x-ray"
+                                // So let's apply it directly.
+                                fontSize: `${readerSettings.fontSize}px`,
+                                lineHeight: readerSettings.lineHeight
+                            }}
+                        >
+                            {xrayData ? (
+                                <div className="xray-sections">
+                                    <div className="xray-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginBottom: '16px' }}>
+                                        <button
+                                            className="btn btn-ghost btn-sm btn-icon"
+                                            onClick={handleGenerateXRay}
+                                            title="Regenerar X-Ray"
+                                            disabled={isGeneratingXray}
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                                                <path d="M21 3v5h-5" />
+                                                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                                                <path d="M3 21v-5h5" />
+                                            </svg>
+                                        </button>
+                                        <button
+                                            className="btn btn-ghost btn-sm btn-icon"
+                                            onClick={handleExportMarkdown}
+                                            title="Exportar como Markdown"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                <polyline points="7 10 12 15 17 10" />
+                                                <line x1="12" x2="12" y1="15" y2="3" />
+                                            </svg>
+                                        </button>
+                                    </div>
+
+                                    {xrayData.summary && (
+                                        <div className="xray-section">
+                                            <h4 className="xray-section-title">Resumen</h4>
+                                            <p className="xray-description">{xrayData.summary}</p>
+                                        </div>
+                                    )}
+
+                                    {xrayData.plot && (
+                                        <div className="xray-section">
+                                            <h4 className="xray-section-title">Trama / Historia</h4>
+                                            <p className="xray-description">{xrayData.plot}</p>
+                                        </div>
+                                    )}
+
+                                    {xrayData.keyPoints && xrayData.keyPoints.length > 0 && (
+                                        <div className="xray-section">
+                                            <h4 className="xray-section-title">Puntos Clave</h4>
+                                            <ul className="xray-list" style={{
+                                                paddingLeft: '20px',
+                                                margin: 0,
+                                                // Inherit fonts from reader settings or app defaults to match rest of text
+                                                fontFamily: 'inherit',
+                                                fontSize: 'inherit'
+                                            }}>
+                                                {xrayData.keyPoints.map((point, i) => (
+                                                    <li key={i} className="xray-list-item" style={{ marginBottom: '8px' }}>
+                                                        {point}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {xrayData.characters.length > 0 && (
+                                        <div className="xray-section">
+                                            <h4 className="xray-section-title">Personajes</h4>
+                                            {xrayData.characters.map((char, i) => (
+                                                <div key={i} className="xray-item">
+                                                    <div className="xray-header">
+                                                        <span className="xray-name">{char.name || 'Sin nombre'}</span>
+                                                        <span className={`xray-badge badge-${char.importance}`}>{char.importance === 'main' ? 'Principal' : char.importance === 'secondary' ? 'Secundario' : 'Menor'}</span>
+                                                    </div>
+                                                    <p className="xray-description">{char.description || ''}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {xrayData.places.length > 0 && (
+                                        <div className="xray-section">
+                                            <h4 className="xray-section-title">Lugares</h4>
+                                            {xrayData.places.map((place, i) => (
+                                                <div key={i} className="xray-item">
+                                                    <span className="xray-name">{place.name || (typeof place === 'string' ? place : 'Sin nombre')}</span>
+                                                    <p className="xray-description">{place.description || ''}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {xrayData.terms.length > 0 && (
+                                        <div className="xray-section">
+                                            <h4 className="xray-section-title">Términos</h4>
+                                            {xrayData.terms.map((term, i) => (
+                                                <div key={i} className="xray-item">
+                                                    <span className="xray-name">{term.name || (typeof term === 'string' ? term : 'Sin nombre')}</span>
+                                                    <p className="xray-description">{term.description || ''}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="empty-state">
+                                    <p className="empty-state-text">
+                                        X-Ray analiza personajes, lugares y términos del libro
+                                    </p>
                                     <button
-                                        className="btn btn-ghost btn-sm btn-icon"
+                                        className="btn btn-primary"
                                         onClick={handleGenerateXRay}
-                                        title="Regenerar X-Ray"
                                         disabled={isGeneratingXray}
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                                            <path d="M21 3v5h-5" />
-                                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-                                            <path d="M3 21v-5h5" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        className="btn btn-ghost btn-sm btn-icon"
-                                        onClick={handleExportMarkdown}
-                                        title="Exportar como Markdown"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                            <polyline points="7 10 12 15 17 10" />
-                                            <line x1="12" x2="12" y1="15" y2="3" />
-                                        </svg>
+                                        {isGeneratingXray ? 'Generando...' : 'Generar X-Ray'}
                                     </button>
                                 </div>
+                            )}
+                        </div>
+                    )}
 
-                                {xrayData.summary && (
-                                    <div className="xray-section">
-                                        <h4 className="xray-section-title">Resumen</h4>
-                                        <p className="xray-description">{xrayData.summary}</p>
-                                    </div>
-                                )}
-
-                                {xrayData.plot && (
-                                    <div className="xray-section">
-                                        <h4 className="xray-section-title">Trama / Historia</h4>
-                                        <p className="xray-description">{xrayData.plot}</p>
-                                    </div>
-                                )}
-
-                                {xrayData.keyPoints && xrayData.keyPoints.length > 0 && (
-                                    <div className="xray-section">
-                                        <h4 className="xray-section-title">Puntos Clave</h4>
-                                        <ul className="xray-list" style={{
-                                            paddingLeft: '20px',
-                                            margin: 0,
-                                            // Inherit fonts from reader settings or app defaults to match rest of text
-                                            fontFamily: 'inherit',
-                                            fontSize: 'inherit'
-                                        }}>
-                                            {xrayData.keyPoints.map((point, i) => (
-                                                <li key={i} className="xray-list-item" style={{ marginBottom: '8px' }}>
-                                                    {point}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
-
-                                {xrayData.characters.length > 0 && (
-                                    <div className="xray-section">
-                                        <h4 className="xray-section-title">Personajes</h4>
-                                        {xrayData.characters.map((char, i) => (
-                                            <div key={i} className="xray-item">
-                                                <div className="xray-header">
-                                                    <span className="xray-name">{char.name || 'Sin nombre'}</span>
-                                                    <span className={`xray-badge badge-${char.importance}`}>{char.importance === 'main' ? 'Principal' : char.importance === 'secondary' ? 'Secundario' : 'Menor'}</span>
-                                                </div>
-                                                <p className="xray-description">{char.description || ''}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                {xrayData.places.length > 0 && (
-                                    <div className="xray-section">
-                                        <h4 className="xray-section-title">Lugares</h4>
-                                        {xrayData.places.map((place, i) => (
-                                            <div key={i} className="xray-item">
-                                                <span className="xray-name">{place.name || (typeof place === 'string' ? place : 'Sin nombre')}</span>
-                                                <p className="xray-description">{place.description || ''}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                                {xrayData.terms.length > 0 && (
-                                    <div className="xray-section">
-                                        <h4 className="xray-section-title">Términos</h4>
-                                        {xrayData.terms.map((term, i) => (
-                                            <div key={i} className="xray-item">
-                                                <span className="xray-name">{term.name || (typeof term === 'string' ? term : 'Sin nombre')}</span>
-                                                <p className="xray-description">{term.description || ''}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="empty-state">
-                                <p className="empty-state-text">
-                                    X-Ray analiza personajes, lugares y términos del libro
-                                </p>
-                                <button
-                                    className="btn btn-primary"
-                                    onClick={handleGenerateXRay}
-                                    disabled={isGeneratingXray}
+                    {/* Settings */}
+                    {readerSidebarTab === 'settings' && (
+                        <div className="settings-content">
+                            <div className="settings-section">
+                                <label className="settings-label">Fuente</label>
+                                <select
+                                    className="input"
+                                    value={readerSettings.fontFamily}
+                                    onChange={(e) => updateReaderSettings({ fontFamily: e.target.value })}
                                 >
-                                    {isGeneratingXray ? 'Generando...' : 'Generar X-Ray'}
-                                </button>
+                                    <option value="Georgia, serif">Georgia</option>
+                                    <option value="'Times New Roman', serif">Times New Roman</option>
+                                    <option value="'Palatino Linotype', serif">Palatino</option>
+                                    <option value="'Merriweather', serif">Merriweather</option>
+                                    <option value="'Inter', sans-serif">Inter</option>
+                                    <option value="'Arial', sans-serif">Arial</option>
+                                    <option value="'OpenDyslexic', sans-serif">OpenDyslexic</option>
+                                </select>
                             </div>
-                        )}
-                    </div>
-                )}
 
-                {/* Settings */}
-                {readerSidebarTab === 'settings' && (
-                    <div className="settings-content">
-                        <div className="settings-section">
-                            <label className="settings-label">Fuente</label>
-                            <select
-                                className="input"
-                                value={readerSettings.fontFamily}
-                                onChange={(e) => updateReaderSettings({ fontFamily: e.target.value })}
-                            >
-                                <option value="Georgia, serif">Georgia</option>
-                                <option value="'Times New Roman', serif">Times New Roman</option>
-                                <option value="'Palatino Linotype', serif">Palatino</option>
-                                <option value="'Merriweather', serif">Merriweather</option>
-                                <option value="'Inter', sans-serif">Inter</option>
-                                <option value="'Arial', sans-serif">Arial</option>
-                                <option value="'OpenDyslexic', sans-serif">OpenDyslexic</option>
-                            </select>
-                        </div>
-
-                        <div className="settings-section">
-                            <label className="settings-label">Tamaño de fuente: {readerSettings.fontSize}px</label>
-                            <input
-                                type="range"
-                                min="12"
-                                max="28"
-                                value={readerSettings.fontSize}
-                                onChange={(e) => updateReaderSettings({ fontSize: Number(e.target.value) })}
-                                className="range-input"
-                            />
-                        </div>
-
-                        <div className="settings-section">
-                            <label className="settings-label">Altura de línea: {readerSettings.lineHeight}</label>
-                            <input
-                                type="range"
-                                min="1.2"
-                                max="2.5"
-                                step="0.1"
-                                value={readerSettings.lineHeight}
-                                onChange={(e) => updateReaderSettings({ lineHeight: Number(e.target.value) })}
-                                className="range-input"
-                            />
-                        </div>
-
-                        <div className="settings-section">
-                            <label className="settings-label">Espaciado entre letras: {readerSettings.letterSpacing}em</label>
-                            <input
-                                type="range"
-                                min="-0.05"
-                                max="0.15"
-                                step="0.01"
-                                value={readerSettings.letterSpacing}
-                                onChange={(e) => updateReaderSettings({ letterSpacing: Number(e.target.value) })}
-                                className="range-input"
-                            />
-                        </div>
-
-                        <div className="settings-section">
-                            <label className="settings-label">Margen horizontal: {readerSettings.marginHorizontal}px</label>
-                            <input
-                                type="range"
-                                min="20"
-                                max="120"
-                                value={readerSettings.marginHorizontal}
-                                onChange={(e) => updateReaderSettings({ marginHorizontal: Number(e.target.value) })}
-                                className="range-input"
-                            />
-                        </div>
-
-                        <div className="settings-section">
-                            <label className="settings-label">Tema</label>
-                            <div className="theme-buttons">
-                                {(['light', 'sepia', 'dark'] as const).map((theme) => (
-                                    <button
-                                        key={theme}
-                                        className={`theme-btn ${theme} ${readerSettings.theme === theme ? 'active' : ''}`}
-                                        onClick={() => updateReaderSettings({ theme })}
-                                    >
-                                        {theme === 'light' ? 'Claro' : theme === 'sepia' ? 'Sepia' : 'Oscuro'}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="settings-section">
-                            <label className="settings-label">Alineación</label>
-                            <div className="align-buttons">
-                                <button
-                                    className={`align-btn ${readerSettings.textAlign === 'left' ? 'active' : ''}`}
-                                    onClick={() => updateReaderSettings({ textAlign: 'left' })}
-                                >
-                                    Izquierda
-                                </button>
-                                <button
-                                    className={`align-btn ${readerSettings.textAlign === 'justify' ? 'active' : ''}`}
-                                    onClick={() => updateReaderSettings({ textAlign: 'justify' })}
-                                >
-                                    Justificado
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="settings-section">
-                            <label className="settings-toggle">
+                            <div className="settings-section">
+                                <label className="settings-label">Tamaño de fuente: {readerSettings.fontSize}px</label>
                                 <input
-                                    type="checkbox"
-                                    checked={readerSettings.scrollMode}
-                                    onChange={(e) => updateReaderSettings({ scrollMode: e.target.checked })}
+                                    type="range"
+                                    min="12"
+                                    max="28"
+                                    value={readerSettings.fontSize}
+                                    onChange={(e) => updateReaderSettings({ fontSize: Number(e.target.value) })}
+                                    className="range-input"
                                 />
-                                <span>Modo scroll</span>
-                            </label>
+                            </div>
+
+                            <div className="settings-section">
+                                <label className="settings-label">Altura de línea: {readerSettings.lineHeight}</label>
+                                <input
+                                    type="range"
+                                    min="1.2"
+                                    max="2.5"
+                                    step="0.1"
+                                    value={readerSettings.lineHeight}
+                                    onChange={(e) => updateReaderSettings({ lineHeight: Number(e.target.value) })}
+                                    className="range-input"
+                                />
+                            </div>
+
+                            <div className="settings-section">
+                                <label className="settings-label">Espaciado entre letras: {readerSettings.letterSpacing}em</label>
+                                <input
+                                    type="range"
+                                    min="-0.05"
+                                    max="0.15"
+                                    step="0.01"
+                                    value={readerSettings.letterSpacing}
+                                    onChange={(e) => updateReaderSettings({ letterSpacing: Number(e.target.value) })}
+                                    className="range-input"
+                                />
+                            </div>
+
+                            <div className="settings-section">
+                                <label className="settings-label">Margen horizontal: {readerSettings.marginHorizontal}px</label>
+                                <input
+                                    type="range"
+                                    min="20"
+                                    max="120"
+                                    value={readerSettings.marginHorizontal}
+                                    onChange={(e) => updateReaderSettings({ marginHorizontal: Number(e.target.value) })}
+                                    className="range-input"
+                                />
+                            </div>
+
+                            <div className="settings-section">
+                                <label className="settings-label">Tema</label>
+                                <div className="theme-buttons">
+                                    {(['light', 'sepia', 'dark'] as const).map((theme) => (
+                                        <button
+                                            key={theme}
+                                            className={`theme-btn ${theme} ${readerSettings.theme === theme ? 'active' : ''}`}
+                                            onClick={() => updateReaderSettings({ theme })}
+                                        >
+                                            {theme === 'light' ? 'Claro' : theme === 'sepia' ? 'Sepia' : 'Oscuro'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="settings-section">
+                                <label className="settings-label">Alineación</label>
+                                <div className="align-buttons">
+                                    <button
+                                        className={`align-btn ${readerSettings.textAlign === 'left' ? 'active' : ''}`}
+                                        onClick={() => updateReaderSettings({ textAlign: 'left' })}
+                                    >
+                                        Izquierda
+                                    </button>
+                                    <button
+                                        className={`align-btn ${readerSettings.textAlign === 'justify' ? 'active' : ''}`}
+                                        onClick={() => updateReaderSettings({ textAlign: 'justify' })}
+                                    >
+                                        Justificado
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="settings-section">
+                                <label className="settings-toggle">
+                                    <input
+                                        type="checkbox"
+                                        checked={readerSettings.scrollMode}
+                                        onChange={(e) => updateReaderSettings({ scrollMode: e.target.checked })}
+                                    />
+                                    <span>Modo scroll</span>
+                                </label>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Delete Confirmation Modal - outside scrollable content */}
+                {deleteConfirmId && (
+                    <div className="sidebar-modal-overlay" onClick={handleCancelDelete}>
+                        <div className="sidebar-modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
+                            <h4>¿Eliminar anotación?</h4>
+                            <p>Esta acción no se puede deshacer.</p>
+                            <div className="modal-actions">
+                                <button className="btn btn-ghost btn-sm" onClick={handleCancelDelete}>
+                                    Cancelar
+                                </button>
+                                <button className="btn btn-danger btn-sm" onClick={handleConfirmDelete}>
+                                    Eliminar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
-            </div>
 
-            {/* Delete Confirmation Modal - outside scrollable content */}
-            {deleteConfirmId && (
-                <div className="sidebar-modal-overlay" onClick={handleCancelDelete}>
-                    <div className="sidebar-modal-content delete-modal" onClick={(e) => e.stopPropagation()}>
-                        <h4>¿Eliminar anotación?</h4>
-                        <p>Esta acción no se puede deshacer.</p>
-                        <div className="modal-actions">
-                            <button className="btn btn-ghost btn-sm" onClick={handleCancelDelete}>
-                                Cancelar
-                            </button>
-                            <button className="btn btn-danger btn-sm" onClick={handleConfirmDelete}>
-                                Eliminar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Edit Modal - outside scrollable content */}
-            {editingAnnotation && (
-                <div className="sidebar-modal-overlay" onClick={handleCancelEdit}>
-                    <div className="sidebar-modal-content edit-modal" onClick={(e) => e.stopPropagation()}>
-                        <h4>Editar anotación</h4>
-                        <div className="edit-text-preview">
-                            &quot;{editingAnnotation.text.substring(0, 100)}{editingAnnotation.text.length > 100 ? '...' : ''}&quot;
-                        </div>
-                        <div className="edit-color-section">
-                            <label>Color:</label>
-                            <div className="color-buttons">
-                                {(['yellow', 'green', 'blue', 'pink', 'orange'] as const).map((color) => (
-                                    <button
-                                        key={color}
-                                        className={`color-btn ${editColor === color ? 'selected' : ''}`}
-                                        style={{ backgroundColor: getColorValue(color) }}
-                                        onClick={() => setEditColor(color)}
-                                    />
-                                ))}
+                {/* Edit Modal - outside scrollable content */}
+                {editingAnnotation && (
+                    <div className="sidebar-modal-overlay" onClick={handleCancelEdit}>
+                        <div className="sidebar-modal-content edit-modal" onClick={(e) => e.stopPropagation()}>
+                            <h4>Editar anotación</h4>
+                            <div className="edit-text-preview">
+                                &quot;{editingAnnotation.text.substring(0, 100)}{editingAnnotation.text.length > 100 ? '...' : ''}&quot;
+                            </div>
+                            <div className="edit-color-section">
+                                <label>Color:</label>
+                                <div className="color-buttons">
+                                    {(['yellow', 'green', 'blue', 'pink', 'orange'] as const).map((color) => (
+                                        <button
+                                            key={color}
+                                            className={`color-btn ${editColor === color ? 'selected' : ''}`}
+                                            style={{ backgroundColor: getColorValue(color) }}
+                                            onClick={() => setEditColor(color)}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="edit-note-section">
+                                <label>Nota:</label>
+                                <textarea
+                                    className="edit-note-input"
+                                    value={editNote}
+                                    onChange={(e) => setEditNote(e.target.value)}
+                                    placeholder="Añade una nota..."
+                                    rows={3}
+                                />
+                            </div>
+                            <div className="modal-actions">
+                                <button className="btn btn-ghost btn-sm" onClick={handleCancelEdit}>
+                                    Cancelar
+                                </button>
+                                <button className="btn btn-primary btn-sm" onClick={handleSaveEdit}>
+                                    Guardar
+                                </button>
                             </div>
                         </div>
-                        <div className="edit-note-section">
-                            <label>Nota:</label>
-                            <textarea
-                                className="edit-note-input"
-                                value={editNote}
-                                onChange={(e) => setEditNote(e.target.value)}
-                                placeholder="Añade una nota..."
-                                rows={3}
-                            />
-                        </div>
-                        <div className="modal-actions">
-                            <button className="btn btn-ghost btn-sm" onClick={handleCancelEdit}>
-                                Cancelar
-                            </button>
-                            <button className="btn btn-primary btn-sm" onClick={handleSaveEdit}>
-                                Guardar
-                            </button>
-                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            <style jsx>{`
+                <style jsx>{`
         .reader-sidebar {
           position: fixed;
           top: 0;
@@ -823,6 +829,28 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
           flex-direction: column;
           z-index: 90;
           box-shadow: var(--shadow-xl);
+        }
+
+        @media (max-width: 768px) {
+          .reader-sidebar {
+            position: fixed !important;
+            width: 85% !important;
+            max-width: 320px;
+            z-index: 200;
+          }
+          
+          .reader-sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            backdrop-filter: blur(2px);
+            display: block;
+          }
+        }
+        
+        .reader-sidebar-overlay {
+            display: none; /* Hidden on desktop */
         }
 
         .reader-sidebar-header {
@@ -1271,7 +1299,8 @@ export function ReaderSidebar({ book, annotations, toc = [], onAnnotationClick, 
           color: var(--color-text-primary);
         }
       `}</style>
-        </aside>
+            </aside>
+        </>
     );
 }
 

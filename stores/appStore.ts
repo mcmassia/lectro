@@ -59,6 +59,12 @@ interface AppState {
     // UI State
     sidebarCollapsed: boolean;
     toggleSidebar: () => void;
+    mobileMenuOpen: boolean;
+    setMobileMenuOpen: (open: boolean) => void;
+    toggleMobileMenu: () => void;
+    mobileRightSidebarOpen: boolean;
+    setMobileRightSidebarOpen: (open: boolean) => void;
+    toggleMobileRightSidebarOpen: () => void;
 
     // Reader sidebar
     readerSidebarOpen: boolean;
@@ -136,6 +142,12 @@ export const useAppStore = create<AppState>()(
             // UI State
             sidebarCollapsed: false,
             toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+            mobileMenuOpen: false,
+            setMobileMenuOpen: (open) => set({ mobileMenuOpen: open }),
+            toggleMobileMenu: () => set((state) => ({ mobileMenuOpen: !state.mobileMenuOpen })),
+            mobileRightSidebarOpen: false,
+            setMobileRightSidebarOpen: (open) => set({ mobileRightSidebarOpen: open }),
+            toggleMobileRightSidebarOpen: () => set((state) => ({ mobileRightSidebarOpen: !state.mobileRightSidebarOpen })),
 
             // Reader sidebar
             readerSidebarOpen: true,

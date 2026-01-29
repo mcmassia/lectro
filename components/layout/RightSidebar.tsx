@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
 import { ActivityRings } from '@/components/dashboard/ActivityRings';
-import { ChevronRight, ChevronLeft, Info, BrainCircuit, Eye, Sparkles } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Info, BrainCircuit, Eye, Sparkles, PanelRightClose } from 'lucide-react';
 import { getAllTags, db, XRayData, Book } from '@/lib/db';
 import { usePathname, useRouter } from 'next/navigation';
 import { generateXRayAction } from '@/app/actions/ai';
@@ -11,7 +11,7 @@ import { generateXRayAction } from '@/app/actions/ai';
 
 export function RightSidebar() {
     const { books, tags, setTags, setView, setActiveCategory, selectedBookId } = useLibraryStore();
-    const { currentUser, setXrayModalData } = useAppStore();
+    const { currentUser, setXrayModalData, mobileRightSidebarOpen, setMobileRightSidebarOpen } = useAppStore();
     const [isCollapsed, setIsCollapsed] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
@@ -170,129 +170,150 @@ export function RightSidebar() {
     const selectedBook = books.find(b => b.id === selectedBookId);
 
     return (
-        <aside className={`right-sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-            <button
-                className="collapse-btn"
-                onClick={() => setIsCollapsed(!isCollapsed)}
-                title={isCollapsed ? "Expandir" : "Colapsar"}
-            >
-                {isCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-            </button>
-
-            <div className="sidebar-content">
-
-                {/* Insights Section */}
-                <div className="sidebar-section">
-                    <div className="section-header">
-                        <h3 className="heading-4">Insights de Lectura</h3>
-                        <Info size={14} className="info-icon" />
-                    </div>
-                    <div className="section-subheader">Objetivo Semanal</div>
-
-                    {!isCollapsed && (
-                        <div className="rings-wrapper">
-                            <ActivityRings size="sm" />
-                        </div>
-                    )}
+        <>
+            {/* Mobile Overlay */}
+            {mobileRightSidebarOpen && (
+                <div
+                    className="mobile-overlay"
+                    onClick={() => setMobileRightSidebarOpen(false)}
+                />
+            )}
+            <aside className={`right-sidebar ${isCollapsed ? 'collapsed' : ''} ${mobileRightSidebarOpen ? 'mobile-open' : ''}`}>
+                <div className="mobile-header">
+                    <h3>Panel Lateral</h3>
+                    <button className="close-btn" onClick={() => setMobileRightSidebarOpen(false)}>
+                        <PanelRightClose size={20} />
+                    </button>
                 </div>
+                <button
+                    className="collapse-btn"
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    title={isCollapsed ? "Expandir" : "Colapsar"}
+                >
+                    {isCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                </button>
 
-                {/* Stats Section */}
-                <div className="sidebar-section">
-                    <div className="section-header">
-                        <h3 className="section-title">Números</h3>
-                    </div>
+                <div className="sidebar-content">
 
-                    {!isCollapsed && (
-                        <div className="stats-grid">
-                            <button className="stat-card blue clickable" onClick={() => {
-                                setView('library');
-                                setActiveCategory('all');
-                            }}>
-                                <span className="stat-value">{stats.books}</span>
-                                <span className="stat-label">Libros</span>
-                            </button>
-                            <button className="stat-card purple clickable" onClick={() => {
-                                setView('library');
-                                setActiveCategory('authors' as any);
-                            }}>
-                                <span className="stat-value">{stats.authors}</span>
-                                <span className="stat-label">Autores</span>
-                            </button>
-                            <button className="stat-card green clickable" onClick={() => {
-                                setView('tags');
-                            }}>
-                                <span className="stat-value">{stats.tags}</span>
-                                <span className="stat-label">Etiquetas</span>
-                            </button>
+                    {/* Insights Section */}
+                    <div className="sidebar-section">
+                        <div className="section-header">
+                            <h3 className="heading-4">Insights de Lectura</h3>
+                            <Info size={14} className="info-icon" />
                         </div>
-                    )}
-                </div>
+                        <div className="section-subheader">Objetivo Semanal</div>
 
-                {/* Book DNA / X-Ray */}
-                <div className="sidebar-section xray-section">
-                    <div className="section-header">
-                        <h3 className="section-title">ADN del Libro</h3>
-                        <span className="badge-ai">AI</span>
+                        {!isCollapsed && (
+                            <div className="rings-wrapper">
+                                <ActivityRings size="sm" />
+                            </div>
+                        )}
                     </div>
 
-                    {!isCollapsed && (
-                        <div className="xray-container">
-                            {selectedBookId ? (
-                                xrayData ? (
-                                    <div className="xray-content-preview animate-fade-in">
-                                        <p className="xray-summary-clamp">
-                                            {xrayData.summary}
-                                        </p>
-                                        <button
-                                            className="btn-view-more"
-                                            onClick={(e) => {
-                                                console.log('RightSidebar: Navigating to X-Ray View');
-                                                e.stopPropagation();
-                                                setView('xray');
-                                            }}
-                                        >
-                                            <Eye size={14} />
-                                            Ver todo
-                                        </button>
-                                    </div>
+                    {/* Stats Section */}
+                    <div className="sidebar-section">
+                        <div className="section-header">
+                            <h3 className="section-title">Números</h3>
+                        </div>
+
+                        {!isCollapsed && (
+                            <div className="stats-grid">
+                                <button className="stat-card blue clickable" onClick={() => {
+                                    setView('library');
+                                    setActiveCategory('all');
+                                }}>
+                                    <span className="stat-value">{stats.books}</span>
+                                    <span className="stat-label">Libros</span>
+                                </button>
+                                <button className="stat-card purple clickable" onClick={() => {
+                                    setView('library');
+                                    setActiveCategory('authors' as any);
+                                }}>
+                                    <span className="stat-value">{stats.authors}</span>
+                                    <span className="stat-label">Autores</span>
+                                </button>
+                                <button className="stat-card green clickable" onClick={() => {
+                                    setView('tags');
+                                }}>
+                                    <span className="stat-value">{stats.tags}</span>
+                                    <span className="stat-label">Etiquetas</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Book DNA / X-Ray */}
+                    <div className="sidebar-section xray-section">
+                        <div className="section-header">
+                            <h3 className="section-title">ADN del Libro</h3>
+                            <span className="badge-ai">AI</span>
+                        </div>
+
+                        {!isCollapsed && (
+                            <div className="xray-container">
+                                {selectedBookId ? (
+                                    xrayData ? (
+                                        <div className="xray-content-preview animate-fade-in">
+                                            <p className="xray-summary-clamp">
+                                                {xrayData.summary}
+                                            </p>
+                                            <button
+                                                className="btn-view-more"
+                                                onClick={(e) => {
+                                                    console.log('RightSidebar: Navigating to X-Ray View');
+                                                    e.stopPropagation();
+                                                    setView('xray');
+                                                }}
+                                            >
+                                                <Eye size={14} />
+                                                Ver todo
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="xray-empty-state animate-fade-in">
+                                            <p className="empty-text">
+                                                {selectedBook ? `Genera el ADN de "${selectedBook.title}"` : "Selecciona un libro"}
+                                            </p>
+                                            <button
+                                                className="btn-generate-ai"
+                                                onClick={handleGenerateXRay}
+                                                disabled={isGenerating || !selectedBook}
+                                            >
+                                                {isGenerating ? (
+                                                    <>
+                                                        <Sparkles size={14} className="animate-spin-slow" />
+                                                        Generando...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <BrainCircuit size={14} />
+                                                        Generar ADN
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    )
                                 ) : (
-                                    <div className="xray-empty-state animate-fade-in">
-                                        <p className="empty-text">
-                                            {selectedBook ? `Genera el ADN de "${selectedBook.title}"` : "Selecciona un libro"}
-                                        </p>
-                                        <button
-                                            className="btn-generate-ai"
-                                            onClick={handleGenerateXRay}
-                                            disabled={isGenerating || !selectedBook}
-                                        >
-                                            {isGenerating ? (
-                                                <>
-                                                    <Sparkles size={14} className="animate-spin-slow" />
-                                                    Generando...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <BrainCircuit size={14} />
-                                                    Generar ADN
-                                                </>
-                                            )}
-                                        </button>
+                                    <div className="no-selection-state">
+                                        <p>Selecciona un libro de la biblioteca para ver su ADN.</p>
                                     </div>
-                                )
-                            ) : (
-                                <div className="no-selection-state">
-                                    <p>Selecciona un libro de la biblioteca para ver su ADN.</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
 
 
-            <style jsx>{`
-                /* ... (User Profile Styles removed) ... */
-                
+                <style jsx>{`
+                .mobile-header {
+                    display: none; /* Hidden by default (Desktop) */
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 16px;
+                    border-bottom: 1px solid var(--color-border);
+                    background: var(--color-bg-tertiary);
+                }
+
                 .right-sidebar {
                     width: 300px;
                     border-left: 1px solid var(--color-divider);
@@ -534,8 +555,73 @@ export function RightSidebar() {
 
                 @media (max-width: 1024px) {
                     .right-sidebar {
-                        display: none;
+                        position: fixed;
+                        z-index: 900; /* Below TopBar (1000) */
+                        height: calc(100vh - 64px);
+                        top: 64px; /* Below TopBar */
+                        right: 0;
+                        bottom: 0;
+                        width: 100vw; /* Full screen width below header */
+                        transform: translateX(100%);
+                        background: var(--color-bg-secondary);
+                        box-shadow: none;
+                        border-left: none;
+                        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                     }
+
+                    /* Reset .collapsed specific styles for mobile */
+                    .right-sidebar.collapsed {
+                        width: 100vw !important; 
+                        border: none;
+                    }
+                    
+                    .right-sidebar.mobile-open {
+                        transform: translateX(0);
+                        display: flex;
+                        flex-direction: column; /* Ensure header stacks */
+                    }
+
+                    .mobile-header {
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 16px;
+                        border-bottom: 1px solid var(--color-border);
+                        background: var(--color-bg-tertiary);
+                    }
+
+                    .mobile-header h3 {
+                        font-size: 16px;
+                        font-weight: 600;
+                        margin: 0;
+                        color: var(--color-text-primary);
+                    }
+
+                    .close-btn {
+                        background: transparent;
+                        border: none;
+                        color: var(--color-text-secondary);
+                        cursor: pointer;
+                        padding: 4px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+
+                    .right-sidebar .collapse-btn {
+                        display: none; /* Hide desktop collapse button on mobile */
+                    }
+                }
+                
+
+
+                .mobile-overlay {
+                    position: fixed;
+                    inset: 0;
+                    background: rgba(0, 0, 0, 0.5);
+                    z-index: 100;
+                    backdrop-filter: blur(2px);
+                    animation: fadeIn 0.2s ease-out;
                 }
                 
                 @media (min-width: 1024px) {
@@ -554,7 +640,8 @@ export function RightSidebar() {
                 }
 
             `}</style>
-        </aside >
+            </aside >
+        </>
     );
 }
 
