@@ -104,7 +104,7 @@ export default function Home() {
         const res = await fetch('/api/ai/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: searchQuery, limit: 40 })
+          body: JSON.stringify({ query: searchQuery, limit: 100 })
         });
         const data = await res.json();
         if (data.results) {
@@ -237,28 +237,36 @@ export default function Home() {
     }
 
     if (searchQuery) {
+      // Hybrid Search: Combine AI Results (Semantic) + Local Text Match (Deterministic)
+      const aiIds = new Set(aiSearchResults || []);
+      const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+
+      booksToFilter = booksToFilter.filter(book => {
+        // 1. Check AI Match
+        if (aiIds.has(book.id)) return true;
+
+        // 2. Check Local Text Match
+        const searchableText = [
+          book.title,
+          book.author,
+          ...(book.metadata?.categories || []),
+          book.metadata?.userRating || '',
+          ...(book.metadata?.subjects || []),
+          xrayKeywords[book.id] || ''
+        ].join(' ').toLowerCase();
+
+        return terms.every(term => searchableText.includes(term));
+      });
+
+      // Sort: AI matches first, then text matches
+      // Note: We need a stable sort. Ideally we rank by AI confidence then others.
+      // For now, if AI results exist, we prioritize them?
       if (aiSearchResults) {
-        // AI Search Results (Server-Side)
-        const aiIds = new Set(aiSearchResults);
-        booksToFilter = booksToFilter.filter(b => aiIds.has(b.id));
-
-        // Sort by Relevance (order in aiSearchResults)
         const rankMap = new Map(aiSearchResults.map((id, index) => [id, index]));
-        booksToFilter.sort((a, b) => (rankMap.get(a.id) ?? 9999) - (rankMap.get(b.id) ?? 9999));
-      } else {
-        // Local Text Fallback (Instant)
-        const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
-        booksToFilter = booksToFilter.filter(book => {
-          const searchableText = [
-            book.title,
-            book.author,
-            ...(book.metadata?.categories || []),
-            book.metadata?.userRating || '',
-            ...(book.metadata?.subjects || []),
-            xrayKeywords[book.id] || ''
-          ].join(' ').toLowerCase();
-
-          return terms.every(term => searchableText.includes(term));
+        booksToFilter.sort((a, b) => {
+          const rankA = rankMap.get(a.id) ?? 9999;
+          const rankB = rankMap.get(b.id) ?? 9999;
+          return rankA - rankB;
         });
       }
     }
