@@ -128,39 +128,46 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
     }, [manifest, onTocLoaded]);
 
 
+    // ... (keeping previous code unchanged until handlers)
+
     // Handle text selection in iframe
     const handleIframeSelection = useCallback(() => {
         if (!iframeRef.current || !iframeRef.current.contentDocument) return;
 
         const doc = iframeRef.current.contentDocument;
-        const selection = doc.getSelection();
+        // Small delay to ensure selection is populated on touch devices
+        setTimeout(() => {
+            const selection = doc.getSelection();
+            if (!selection || selection.isCollapsed) return;
 
-        if (!selection || selection.isCollapsed) return;
+            const text = selection.toString().trim();
+            if (!text) return;
 
-        const text = selection.toString().trim();
-        if (!text) return;
+            try {
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
 
-        try {
-            const range = selection.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
+                // Get the iframe position
+                const iframeRect = iframeRef.current!.getBoundingClientRect();
 
-            // Get the iframe position
-            const iframeRect = iframeRef.current.getBoundingClientRect();
+                // Convert iframe-relative coords to viewport coords
+                const viewportX = iframeRect.left + rect.left + (rect.width / 2);
+                const viewportY = iframeRect.top + rect.top;
 
-            // Convert iframe-relative coords to viewport coords
-            const viewportX = iframeRect.left + rect.left + (rect.width / 2);
-            const viewportY = iframeRect.top + rect.top;
+                // Generate a CFI-like identifier using the current resource href and text content
+                const currentResource = manifest?.readingOrder[currentResourceIndex];
+                const cfiLike = `${currentResource?.href || 'unknown'}#text=${encodeURIComponent(text.substring(0, 50))}`;
 
-            // Generate a CFI-like identifier using the current resource href and text content
-            const currentResource = manifest?.readingOrder[currentResourceIndex];
-            const cfiLike = `${currentResource?.href || 'unknown'}#text=${encodeURIComponent(text.substring(0, 50))}`;
-
-            console.log('WebPub text selected:', text.substring(0, 50), 'at', viewportX, viewportY);
-            onTextSelect(text, cfiLike, { x: viewportX, y: viewportY });
-        } catch (err) {
-            console.warn('Could not get selection rect:', err);
-        }
+                console.log('WebPub text selected:', text.substring(0, 50), 'at', viewportX, viewportY);
+                onTextSelect(text, cfiLike, { x: viewportX, y: viewportY });
+            } catch (err) {
+                console.warn('Could not get selection rect:', err);
+            }
+        }, 10);
     }, [manifest, currentResourceIndex, onTextSelect]);
+
+
+
 
     // Helper function to get highlight color
     const getHighlightColor = (color: Annotation['color']): string => {
@@ -411,7 +418,16 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
                     const highlightSpan = doc.createElement('span');
                     highlightSpan.className = 'lectro-highlight';
                     highlightSpan.style.backgroundColor = color;
-                    highlightSpan.style.opacity = '0.3';
+
+                    // Theme-aware blending for better visibility
+                    if (settings.theme === 'dark') {
+                        highlightSpan.style.mixBlendMode = 'screen';
+                        highlightSpan.style.opacity = '0.5';
+                    } else {
+                        // Standard highlighter behavior for light/sepia
+                        highlightSpan.style.mixBlendMode = 'multiply';
+                        highlightSpan.style.opacity = '0.4';
+                    }
                     highlightSpan.dataset.annotationId = annotation.id;
                     highlightSpan.title = annotation.note || 'Nota';
 
@@ -471,6 +487,8 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
 
         // Add mouseup listener for text selection
         doc.addEventListener('mouseup', handleIframeSelection);
+        // Add touchend for mobile selection
+        doc.addEventListener('touchend', handleIframeSelection);
 
         // Apply annotation highlights after styles are injected
         setTimeout(() => {
@@ -667,16 +685,17 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
                 ` : ''}
 
                 .nav-controls {
-                    height: 50px;
+                    height: 36px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    gap: 20px;
+                    gap: 12px;
                     border-top: 1px solid var(--color-border);
                     background: var(--color-bg-elevated);
                 }
                 .nav-btn {
-                    padding: 8px 16px;
+                    padding: 4px 10px;
+                    font-size: 13px;
                     border-radius: 4px;
                     border: 1px solid var(--color-border);
                     background: var(--color-bg-secondary);
@@ -685,6 +704,10 @@ export const WebPubReader = forwardRef<WebPubReaderRef, WebPubReaderProps>(funct
                 .nav-btn:disabled {
                     opacity: 0.5;
                     cursor: not-allowed;
+                }
+                .progress-info {
+                    font-size: 12px;
+                    color: var(--color-text-secondary);
                 }
                 .loading, .error {
                      display: flex;
