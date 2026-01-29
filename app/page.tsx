@@ -574,7 +574,7 @@ export default function Home() {
 
                 return (
                   <>
-                    {groups.slice(0, visibleCount).map(([author, authorBooks]) => (
+                    {groups.map(([author, authorBooks]) => (
                       <div key={author} className="author-group mb-10">
                         <div className="flex items-center gap-3 mb-4 border-b border-border pb-2">
                           <h3 className="text-xl font-bold text-primary">{author}</h3>
@@ -598,14 +598,14 @@ export default function Home() {
                         </div>
                       </div>
                     ))}
-                    {groups.length > visibleCount && <div ref={loadMoreRef} className="h-20 flex items-center justify-center text-sm text-secondary">Cargando más autores...</div>}
+
                   </>
                 );
               })()}
             </div>
           ) : (
             <div className={`${viewMode === 'grid' ? 'book-grid' : 'book-list'} animate-slide-up`}>
-              {displayBooks.slice(0, visibleCount).map(book => (
+              {displayBooks.map(book => (
                 <BookCard
                   key={book.id}
                   book={book}
@@ -619,11 +619,7 @@ export default function Home() {
                   onToggleSelection={handleToggleSelection}
                 />
               ))}
-              {displayBooks.length > visibleCount && (
-                <div ref={loadMoreRef} className="col-span-full h-20 flex items-center justify-center w-full text-secondary">
-                  Cargando más libros...
-                </div>
-              )}
+
             </div>
           )
         ) : (
