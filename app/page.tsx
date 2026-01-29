@@ -56,7 +56,7 @@ export default function Home() {
     books, isLoading, isFullyLoaded, setBooks, setIsLoading,
     sortBy, setSortBy, activeCategory, setActiveCategory,
     activeFormat, sortOrder, setSortOrder, currentView, setView,
-    syncMetadata, loadRecentBooks, loadBooks, searchQuery,
+    syncMetadata, loadRecentBooks, loadBooks, searchQuery, setSearchQuery,
     activeThematicCategory, activeUserRating, setActiveThematicCategory, setActiveUserRating, xrayKeywords,
     setSelectedBookId, selectedBookId
   } = useLibraryStore();
@@ -132,6 +132,14 @@ export default function Home() {
       </div>
     ))
   }), [viewMode]);
+
+  // Determine scroll parent for Virtuoso
+  const [scrollParent, setScrollParent] = useState<HTMLElement | undefined>(undefined);
+  useEffect(() => {
+    // Lectro uses .content-area as the main scrollable container
+    const el = document.querySelector('.content-area') as HTMLElement;
+    if (el) setScrollParent(el);
+  }, []);
 
   // AI Search Trigger
   useEffect(() => {
@@ -471,83 +479,42 @@ export default function Home() {
 
               {/* Separator */}
               <div style={{ width: '1px', height: '20px', backgroundColor: '#4b5563', margin: '0 8px' }}></div>
-
-              {/* Toggle Switch with Label */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}>
-                <span style={{
-                  color: isGrouped ? '#0a84ff' : '#6b7280',
-                  fontWeight: isGrouped ? 600 : 500,
-                  fontSize: '0.875rem'
-                }}>
-                  Por autor
-                </span>
-                <div style={{ position: 'relative', width: '44px', height: '24px' }}>
-                  <input
-                    type="checkbox"
-                    checked={isGrouped}
-                    onChange={() => {
-                      setIsGrouped(!isGrouped);
-                      if (!isGrouped) setSortBy('author');
-                    }}
-                    style={{
-                      position: 'absolute',
-                      width: '100%',
-                      height: '100%',
-                      opacity: 0,
-                      cursor: 'pointer',
-                      zIndex: 1
-                    }}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: isGrouped ? '#0a84ff' : '#374151',
-                    borderRadius: '12px',
-                    transition: 'background-color 0.2s'
-                  }}></div>
-                  <div style={{
-                    position: 'absolute',
-                    top: '2px',
-                    left: isGrouped ? '22px' : '2px',
-                    width: '20px',
-                    height: '20px',
-                    backgroundColor: 'white',
-                    borderRadius: '50%',
-                    transition: 'left 0.2s',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
-                  }}></div>
-                </div>
-              </label>
+              <div style={{ width: '1px', height: '16px', background: '#e5e7eb' }} />
+              <span className="flex items-center gap-2">
+                <span className="text-sm text-secondary">Por autor</span>
+                <button
+                  role="switch"
+                  aria-checked={isGrouped}
+                  onClick={() => {
+                    setIsGrouped(!isGrouped);
+                    if (!isGrouped) setSortBy('author');
+                  }}
+                  className={`w-10 h-6 rounded-full transition-colors relative ${isGrouped ? 'bg-accent' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${isGrouped ? 'translate-x-4' : 'translate-x-0'}`} />
+                </button>
+              </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Sort & View Controls */}
-            <div className="flex items-center gap-1 bg-secondary p-1 rounded-lg">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-transparent border-none text-sm text-secondary focus:outline-none cursor-pointer py-1 pl-2 pr-1"
-              >
-                <option value="title">Título</option>
-                <option value="author">Autor</option>
-                <option value="addedDate">Fecha inclusión</option>
-                <option value="progress">% Progreso</option>
-                <option value="fileSize">Tamaño archivo</option>
-                <option value="lastRead">Último leído</option>
-              </select>
-              <button onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} className="p-1 text-secondary hover:text-primary">
-                {/* Simple icon */}
-                {sortOrder === 'asc' ? <ArrowUpNarrowWide size={16} /> : <ArrowDownNarrowWide size={16} />}
-              </button>
+          <div className="flex items-center gap-4">
+            {/* Search Bar - styled as pill */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Título"
+                className="pl-3 pr-8 py-1.5 bg-secondary text-sm rounded-md border-none focus:ring-2 focus:ring-accent w-48 text-primary placeholder-text-tertiary"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-tertiary">
+                {/* <FilterIcon /> */}
+                {/* Sort Icon/Button could go here if needed separate */}
+              </div>
             </div>
 
-            <div className="w-px h-6 bg-border mx-2"></div>
-
-            <div className="flex bg-secondary rounded-lg p-0.5">
+            {/* View Toggles */}
+            <div className="flex bg-secondary rounded-lg p-1">
               <button className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-elevated text-accent shadow-sm' : 'text-tertiary'}`} onClick={() => setViewMode('grid')}>
                 <GridIcon />
               </button>
@@ -570,7 +537,7 @@ export default function Home() {
               title="Sincronizar"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 0 0 1-2-2V5a2 0 0 1 2-2h7" />
               </svg>
             </button>
           </div>
@@ -585,49 +552,40 @@ export default function Home() {
           /* Library Content */
           isGrouped ? (
             <div className="grouped-library animate-slide-up">
-              {(() => {
-                const groups = Object.entries(displayBooks.reduce((acc, book) => {
-                  const author = book.author || 'Sin autor';
-                  if (!acc[author]) acc[author] = [];
-                  acc[author].push(book);
-                  return acc;
-                }, {} as Record<string, Book[]>)).sort((a, b) => a[0].localeCompare(b[0]));
-
-                return (
-                  <>
-                    {groups.map(([author, authorBooks]) => (
-                      <div key={author} className="author-group mb-10">
-                        <div className="flex items-center gap-3 mb-4 border-b border-border pb-2">
-                          <h3 className="text-xl font-bold text-primary">{author}</h3>
-                          <span className="text-sm text-secondary bg-secondary px-2 py-0.5 rounded-full">{authorBooks.length}</span>
-                        </div>
-                        <div className={viewMode === 'grid' ? 'book-grid' : 'book-list'}>
-                          {authorBooks.map(book => (
-                            <BookCard
-                              key={book.id}
-                              book={book}
-                              viewMode={viewMode}
-                              onClick={(b) => {
-                                setSelectedBook(b);
-                                setSelectedBookId(b.id);
-                              }}
-                              selectionMode={isSelectionMode}
-                              isSelected={selectedBookIds.has(book.id)}
-                              onToggleSelection={handleToggleSelection}
-                            />
-                          ))}
-                        </div>
-                      </div>
+              {Object.entries(displayBooks.reduce((acc, book) => {
+                const author = book.author || 'Sin autor';
+                if (!acc[author]) acc[author] = [];
+                acc[author].push(book);
+                return acc;
+              }, {} as Record<string, Book[]>)).sort((a, b) => a[0].localeCompare(b[0])).map(([author, authorBooks]) => (
+                <div key={author} className="author-group mb-10">
+                  <div className="flex items-center gap-3 mb-4 border-b border-border pb-2">
+                    <h3 className="text-xl font-bold text-primary">{author}</h3>
+                    <span className="text-sm text-secondary bg-secondary px-2 py-0.5 rounded-full">{authorBooks.length}</span>
+                  </div>
+                  <div className={viewMode === 'grid' ? 'book-grid' : 'book-list'}>
+                    {authorBooks.map(book => (
+                      <BookCard
+                        key={book.id}
+                        book={book}
+                        viewMode={viewMode}
+                        onClick={(b) => {
+                          setSelectedBook(b);
+                          setSelectedBookId(b.id);
+                        }}
+                        selectionMode={isSelectionMode}
+                        isSelected={selectedBookIds.has(book.id)}
+                        onToggleSelection={handleToggleSelection}
+                      />
                     ))}
-
-                  </>
-                );
-              })()}
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="virtualized-container min-h-screen">
               <VirtuosoGrid
-                useWindowScroll
+                customScrollParent={scrollParent}
                 totalCount={displayBooks.length}
                 overscan={200}
                 components={virtuosoComponents}
