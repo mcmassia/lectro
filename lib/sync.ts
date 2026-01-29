@@ -232,9 +232,9 @@ export async function syncData(): Promise<{ success: boolean; message: string }>
         }
 
         // 9. Push merged state back to server
-        // We always push the final state to ensure server is strictly consistent with the latest merge.
-
-        await pushLocalData();
+        // DISABLED (Perf): Preventing full library push on every sync. 
+        // We should only push if we have local changes, or rely on individual updates.
+        // await pushLocalData();
 
         // 10. Sync Vectors (New)
         // DISABLED (Emergency Fix): Causing massive network/CPU load on large libraries.
