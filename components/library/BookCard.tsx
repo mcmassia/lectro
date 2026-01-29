@@ -1,6 +1,7 @@
 'use client';
 
-import { Book } from '@/lib/db';
+import { Book, getBookCover } from '@/lib/db';
+import { useState, useEffect } from 'react';
 
 interface BookCardProps {
   book: Book;
@@ -21,7 +22,21 @@ export function BookCard({
   isSelected = false,
   onToggleSelection
 }: BookCardProps) {
+  const [localCover, setLocalCover] = useState<string | undefined>(book.cover);
   const progressPercent = book.progress || 0;
+
+  useEffect(() => {
+    // If book is local and has no cover loaded, fetch it
+    if (!book.isOnServer && !book.filePath && !localCover && !book.cover) {
+      getBookCover(book.id).then(blob => {
+        if (blob) setLocalCover(blob);
+      });
+    }
+    // If book has cover prop, sync it
+    if (book.cover && book.cover !== localCover) {
+      setLocalCover(book.cover);
+    }
+  }, [book.id, book.isOnServer, book.filePath, book.cover]);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -63,12 +78,12 @@ export function BookCard({
         )}
         <div className="book-list-cover">
           <img
-            src={book.isOnServer || book.filePath ? `/api/covers/${book.id}?width=400&v=${new Date(book.updatedAt || 0).getTime()}` : (book.cover || '/default-cover.png')}
+            src={book.isOnServer || book.filePath ? `/api/covers/${book.id}?width=400&v=${new Date(book.updatedAt || 0).getTime()}` : (localCover || '/default-cover.png')}
             alt={book.title}
             onError={(e) => {
               // Fallback to local cover or default cover if proxy fails
-              if (book.cover && (e.target as HTMLImageElement).src !== book.cover) {
-                (e.target as HTMLImageElement).src = book.cover!;
+              if (localCover && (e.target as HTMLImageElement).src !== localCover) {
+                (e.target as HTMLImageElement).src = localCover;
               } else if ((e.target as HTMLImageElement).src !== '/default-cover.png') {
                 (e.target as HTMLImageElement).src = '/default-cover.png';
               }

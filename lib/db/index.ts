@@ -214,6 +214,12 @@ export interface FileEntry {
   fileBlob: Blob;
 }
 
+// Cover separation (Version 13)
+export interface CoverEntry {
+  bookId: string;
+  coverBlob: string; // Base64
+}
+
 // ===================================
 // Default Values
 // ===================================
@@ -253,6 +259,7 @@ export class LectroDB extends Dexie {
   settings!: Table<AppSettings, string>;
   tags!: Table<Tag, string>;
   files!: Table<FileEntry, string>; // New table for blobs
+  covers!: Table<CoverEntry, string>; // New table for covers
 
   constructor() {
     super('LectroDB');
@@ -411,6 +418,43 @@ export class LectroDB extends Dexie {
       }
       console.log(`[Migration v12] Migration complete.`);
     });
+
+    this.version(13).stores({
+      covers: 'bookId, coverBlob', // New table for COVERS
+      books: 'id, title, author, format, addedAt, lastReadAt, updatedAt, progress, status, fileName, filePath, isOnServer, isFavorite, deletedAt, indexedAt'
+    }).upgrade(async (trans) => {
+      // Critical Migration: Move Covers to Covers Table
+      const booksCount = await trans.table('books').count();
+      console.log(`[Migration v13] Starting cover migration for ${booksCount} books...`);
+
+      const BATCH_SIZE = 50;
+      let offset = 0;
+
+      while (true) {
+        const books = await trans.table('books').offset(offset).limit(BATCH_SIZE).toArray();
+        if (books.length === 0) break;
+
+        const coversBatch: any[] = [];
+
+        for (const book of books) {
+          if (book.cover) {
+            coversBatch.push({ bookId: book.id, coverBlob: book.cover });
+            delete book.cover; // Remove string from book object
+          }
+        }
+
+        if (coversBatch.length > 0) {
+          await trans.table('covers').bulkPut(coversBatch);
+        }
+
+        // Update books
+        await trans.table('books').bulkPut(books);
+
+        offset += BATCH_SIZE;
+        console.log(`[Migration v13] Processed ${offset} books (covers)...`);
+      }
+      console.log(`[Migration v13] Cover migration complete.`);
+    });
   }
 }
 
@@ -534,16 +578,21 @@ export async function addBook(book: Book): Promise<string> {
     book.updatedAt = new Date();
   }
 
-  // Separate blob
-  const { fileBlob, ...rest } = book;
+  // Separate heavy fields
+  const { fileBlob, cover, ...rest } = book;
 
-  await db.transaction('rw', [db.books, db.files], async () => {
+  await db.transaction('rw', [db.books, db.files, db.covers], async () => {
     // 1. Save metadata
     await db.books.add(rest as Book);
 
     // 2. Save blob if present
     if (fileBlob) {
       await db.files.add({ bookId: book.id, fileBlob });
+    }
+
+    // 3. Save cover if present
+    if (cover) {
+      await db.covers.add({ bookId: book.id, coverBlob: cover });
     }
   });
 
@@ -560,12 +609,23 @@ export async function getBook(id: string): Promise<Book | undefined> {
     book.fileBlob = fileEntry.fileBlob;
   }
 
+  // Retrieve cover if exists (needed for Detail view)
+  const coverEntry = await db.covers.get(id);
+  if (coverEntry) {
+    book.cover = coverEntry.coverBlob;
+  }
+
   return book;
 }
 
 export async function getBookFile(id: string): Promise<Blob | undefined> {
   const entry = await db.files.get(id);
   return entry?.fileBlob;
+}
+
+export async function getBookCover(id: string): Promise<string | undefined> {
+  const entry = await db.covers.get(id);
+  return entry?.coverBlob;
 }
 
 export async function getAllBooks(): Promise<Book[]> {
@@ -692,9 +752,9 @@ export async function getReadingBooksForUser(userId: string): Promise<Book[]> {
 }
 
 export async function updateBook(id: string, updates: Partial<Book>): Promise<number> {
-  const { fileBlob, ...rest } = updates;
+  const { fileBlob, cover, ...rest } = updates;
 
-  await db.transaction('rw', [db.books, db.files], async () => {
+  await db.transaction('rw', [db.books, db.files, db.covers], async () => {
     // 1. Update metadata
     if (Object.keys(rest).length > 0) {
       await db.books.update(id, { ...rest, updatedAt: new Date() });
@@ -703,6 +763,11 @@ export async function updateBook(id: string, updates: Partial<Book>): Promise<nu
     // 2. Update blob if present
     if (fileBlob) {
       await db.files.put({ bookId: id, fileBlob });
+    }
+
+    // 3. Update cover if present
+    if (cover) {
+      await db.covers.put({ bookId: id, coverBlob: cover });
     }
   });
   return 1;
