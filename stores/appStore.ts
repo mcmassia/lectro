@@ -284,17 +284,52 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         }
     },
     loadRecentBooks: async () => {
-        // Updated to use user data sort if possible, but for 'Recent' we used to verify updatedAt.
-        // Now 'Recent' should probably be based on User's LAST READ.
-        // So we need loadBooks() then sort? Or getBooksForUser sort?
-        // Let's re-use loadBooks logic but maybe set activeCategory to recent.
-        // Actually, getRecentBooks(12) was efficient db query. 
-        // With UserBookData, we need to join. 
-        // For simplicity, let's load all for now (client side sort is fast for <1000 books).
-        // If optimizing, we need getBooksForUserSortedByRead(userId).
+        set({ isLoading: true });
+        try {
+            // Optimized loading: Fetch only 20 recent books from IndexedDB
+            // This is crucial for large libraries to avoid blocking the main thread on init
+            const recentBooks = await getRecentBooks(20);
 
-        // Just call loadBooks for now to ensure we have user data.
-        return get().loadBooks();
+            const currentUser = useAppStore.getState().currentUser;
+            let booksWithUser = recentBooks;
+
+            if (currentUser) {
+                // We need to fetch user data only for these 20 books, or all user data?
+                // Fetching all user data is cheap (no blobs).
+                // Better: Fetch user data for just these books?
+                // Current getBooksForUser fetches ALL books then merges. Bad.
+                // We'll reimplement partial merge here.
+                const allUserData = await db.userBookData.where('userId').equals(currentUser.id).toArray();
+                const userDataMap = new Map(allUserData.map(d => [d.bookId, d]));
+
+                booksWithUser = recentBooks.map(book => {
+                    const data = userDataMap.get(book.id);
+                    if (data) {
+                        return {
+                            ...book,
+                            progress: data.progress,
+                            status: data.status,
+                            lastReadAt: data.lastReadAt,
+                            currentPosition: data.currentPosition,
+                            currentPage: data.currentPage,
+                            isFavorite: data.isFavorite,
+                            metadata: {
+                                ...book.metadata,
+                                userRating: data.userRating,
+                                manualCategories: data.manualCategories
+                            }
+                        };
+                    }
+                    return book;
+                });
+            }
+
+            const tags = await getAllTags();
+            set({ books: booksWithUser, tags, isLoading: false, isFullyLoaded: false }); // Note: isFullyLoaded = false
+        } catch (e) {
+            console.error(e);
+            set({ isLoading: false });
+        }
     },
     syncMetadata: async () => {
         try {

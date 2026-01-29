@@ -577,7 +577,13 @@ export async function getRecentBooks(limit: number = 12): Promise<Book[]> {
     .filter(b => !b.deletedAt)
     .limit(limit)
     .toArray();
-  return books;
+
+  // Check if we need to strip blobs? 
+  // Yes, cleaner for store.
+  return books.map(book => {
+    const { fileBlob, ...rest } = book;
+    return rest as Book;
+  });
 }
 
 export async function updateBook(id: string, updates: Partial<Book>): Promise<number> {
