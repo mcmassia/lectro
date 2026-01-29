@@ -1,5 +1,8 @@
 'use client';
 
+import React from 'react';
+import { VirtuosoGrid } from 'react-virtuoso';
+
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
 import { getAllBooks, Book, deleteBook, syncTagsFromBooks, getAllTags, updateBook } from '@/lib/db';
@@ -604,22 +607,46 @@ export default function Home() {
               })()}
             </div>
           ) : (
-            <div className={`${viewMode === 'grid' ? 'book-grid' : 'book-list'} animate-slide-up`}>
-              {displayBooks.map(book => (
-                <BookCard
-                  key={book.id}
-                  book={book}
-                  viewMode={viewMode}
-                  onClick={(b) => {
-                    setSelectedBook(b);
-                    setSelectedBookId(b.id);
-                  }}
-                  selectionMode={isSelectionMode}
-                  isSelected={selectedBookIds.has(book.id)}
-                  onToggleSelection={handleToggleSelection}
-                />
-              ))}
-
+            <div className="virtualized-container min-h-screen">
+              <VirtuosoGrid
+                useWindowScroll
+                totalCount={displayBooks.length}
+                overscan={200}
+                components={{
+                  List: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(({ style, children, ...props }, ref) => (
+                    <div
+                      ref={ref}
+                      {...props}
+                      style={style}
+                      className={`${viewMode === 'grid' ? 'book-grid' : 'book-list'} animate-slide-up`}
+                    >
+                      {children}
+                    </div>
+                  )),
+                  Item: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(({ children, ...props }, ref) => (
+                    <div ref={ref} {...props} style={{ display: 'contents' }}>
+                      {children}
+                    </div>
+                  ))
+                }}
+                itemContent={(index) => {
+                  const book = displayBooks[index];
+                  return (
+                    <BookCard
+                      key={book.id}
+                      book={book}
+                      viewMode={viewMode}
+                      onClick={(b) => {
+                        setSelectedBook(b);
+                        setSelectedBookId(b.id);
+                      }}
+                      selectionMode={isSelectionMode}
+                      isSelected={selectedBookIds.has(book.id)}
+                      onToggleSelection={handleToggleSelection}
+                    />
+                  );
+                }}
+              />
             </div>
           )
         ) : (
