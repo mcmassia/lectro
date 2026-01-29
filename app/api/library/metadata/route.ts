@@ -37,7 +37,17 @@ export async function GET(req: NextRequest) {
         }
 
         const data = fs.readFileSync(dbPath, 'utf8');
-        return NextResponse.json(JSON.parse(data));
+        const json = JSON.parse(data);
+
+        // OPTIMIZATION: Strip heavy fields (covers, blobs) to make initial sync lightweight
+        if (json.books) {
+            json.books = json.books.map((b: any) => {
+                const { cover, fileBlob, ...rest } = b;
+                return rest;
+            });
+        }
+
+        return NextResponse.json(json);
 
     } catch (error) {
         console.error('Error reading metadata:', error);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
 import { getAllBooks, Book, deleteBook, syncTagsFromBooks, getAllTags, updateBook } from '@/lib/db';
 import { BookCard } from '@/components/library/BookCard';
@@ -80,6 +80,27 @@ export default function Home() {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
   const [syncLogs, setSyncLogs] = useState<string[]>([]);
+
+  // Virtualization / Infinite Scroll State
+  const [visibleCount, setVisibleCount] = useState(40);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useCallback((node: HTMLDivElement | null) => {
+    if (isLoading) return;
+    if (observerRef.current) observerRef.current.disconnect();
+
+    observerRef.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount(prev => prev + 40);
+      }
+    });
+
+    if (node) observerRef.current.observe(node);
+  }, [isLoading]);
+
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(40);
+  }, [activeCategory, searchQuery, activeFormat, activeThematicCategory, activeUserRating, isGrouped, sortBy]);
 
   // Sync specific selection to global store for Sidebar X-Ray
   useEffect(() => {
@@ -543,39 +564,48 @@ export default function Home() {
           /* Library Content */
           isGrouped ? (
             <div className="grouped-library animate-slide-up">
-              {Object.entries(displayBooks.reduce((acc, book) => {
-                const author = book.author || 'Sin autor';
-                if (!acc[author]) acc[author] = [];
-                acc[author].push(book);
-                return acc;
-              }, {} as Record<string, Book[]>)).sort((a, b) => a[0].localeCompare(b[0])).map(([author, authorBooks]) => (
-                <div key={author} className="author-group mb-10">
-                  <div className="flex items-center gap-3 mb-4 border-b border-border pb-2">
-                    <h3 className="text-xl font-bold text-primary">{author}</h3>
-                    <span className="text-sm text-secondary bg-secondary px-2 py-0.5 rounded-full">{authorBooks.length}</span>
-                  </div>
-                  <div className={viewMode === 'grid' ? 'book-grid' : 'book-list'}>
-                    {authorBooks.map(book => (
-                      <BookCard
-                        key={book.id}
-                        book={book}
-                        viewMode={viewMode}
-                        onClick={(b) => {
-                          setSelectedBook(b);
-                          setSelectedBookId(b.id);
-                        }}
-                        selectionMode={isSelectionMode}
-                        isSelected={selectedBookIds.has(book.id)}
-                        onToggleSelection={handleToggleSelection}
-                      />
+              {(() => {
+                const groups = Object.entries(displayBooks.reduce((acc, book) => {
+                  const author = book.author || 'Sin autor';
+                  if (!acc[author]) acc[author] = [];
+                  acc[author].push(book);
+                  return acc;
+                }, {} as Record<string, Book[]>)).sort((a, b) => a[0].localeCompare(b[0]));
+
+                return (
+                  <>
+                    {groups.slice(0, visibleCount).map(([author, authorBooks]) => (
+                      <div key={author} className="author-group mb-10">
+                        <div className="flex items-center gap-3 mb-4 border-b border-border pb-2">
+                          <h3 className="text-xl font-bold text-primary">{author}</h3>
+                          <span className="text-sm text-secondary bg-secondary px-2 py-0.5 rounded-full">{authorBooks.length}</span>
+                        </div>
+                        <div className={viewMode === 'grid' ? 'book-grid' : 'book-list'}>
+                          {authorBooks.map(book => (
+                            <BookCard
+                              key={book.id}
+                              book={book}
+                              viewMode={viewMode}
+                              onClick={(b) => {
+                                setSelectedBook(b);
+                                setSelectedBookId(b.id);
+                              }}
+                              selectionMode={isSelectionMode}
+                              isSelected={selectedBookIds.has(book.id)}
+                              onToggleSelection={handleToggleSelection}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     ))}
-                  </div>
-                </div>
-              ))}
+                    {groups.length > visibleCount && <div ref={loadMoreRef} className="h-20 flex items-center justify-center text-sm text-secondary">Cargando más autores...</div>}
+                  </>
+                );
+              })()}
             </div>
           ) : (
             <div className={`${viewMode === 'grid' ? 'book-grid' : 'book-list'} animate-slide-up`}>
-              {displayBooks.map(book => (
+              {displayBooks.slice(0, visibleCount).map(book => (
                 <BookCard
                   key={book.id}
                   book={book}
@@ -589,6 +619,11 @@ export default function Home() {
                   onToggleSelection={handleToggleSelection}
                 />
               ))}
+              {displayBooks.length > visibleCount && (
+                <div ref={loadMoreRef} className="col-span-full h-20 flex items-center justify-center w-full text-secondary">
+                  Cargando más libros...
+                </div>
+              )}
             </div>
           )
         ) : (
