@@ -16,6 +16,7 @@ import {
     db,
     User,
     getBooksForUser,
+    getReadingBooksForUser,
     getAnnotationsForUserBook,
     updateUserBookData
 } from '@/lib/db';
@@ -286,19 +287,18 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     loadRecentBooks: async () => {
         set({ isLoading: true });
         try {
-            // Optimized loading: Fetch only 20 recent books from IndexedDB
-            // This is crucial for large libraries to avoid blocking the main thread on init
+            // Optimized loading: Fetch only 20 recent books + Reading books
             const recentBooks = await getRecentBooks(20);
 
             const currentUser = useAppStore.getState().currentUser;
             let booksWithUser = recentBooks;
+            let readingBooks: Book[] = [];
 
             if (currentUser) {
-                // We need to fetch user data only for these 20 books, or all user data?
-                // Fetching all user data is cheap (no blobs).
-                // Better: Fetch user data for just these books?
-                // Current getBooksForUser fetches ALL books then merges. Bad.
-                // We'll reimplement partial merge here.
+                // 1. Get Reading Books specifically (for Continue Reading section)
+                readingBooks = await getReadingBooksForUser(currentUser.id);
+
+                // 2. Hydrate recent books with user data
                 const allUserData = await db.userBookData.where('userId').equals(currentUser.id).toArray();
                 const userDataMap = new Map(allUserData.map(d => [d.bookId, d]));
 
@@ -324,8 +324,15 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
                 });
             }
 
+            // Merge Lists: recentBooks + readingBooks (deduplicated)
+            const combinedMap = new Map<string, Book>();
+            [...readingBooks, ...booksWithUser].forEach(b => combinedMap.set(b.id, b));
+            const finalBooks = Array.from(combinedMap.values())
+                .sort((a, b) => (new Date(b.lastReadAt || b.updatedAt || 0).getTime() - new Date(a.lastReadAt || a.updatedAt || 0).getTime()))
+                .slice(0, 40); // Increased limit slightly to accommodate both
+
             const tags = await getAllTags();
-            set({ books: booksWithUser, tags, isLoading: false, isFullyLoaded: false }); // Note: isFullyLoaded = false
+            set({ books: finalBooks, tags, isLoading: false, isFullyLoaded: false }); // Note: isFullyLoaded = false
         } catch (e) {
             console.error(e);
             set({ isLoading: false });

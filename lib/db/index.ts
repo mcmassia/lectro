@@ -208,6 +208,12 @@ export interface ReaderSettings {
   customCSS?: string;
 }
 
+// File Blob separation (Version 12)
+export interface FileEntry {
+  bookId: string;
+  fileBlob: Blob;
+}
+
 // ===================================
 // Default Values
 // ===================================
@@ -246,6 +252,7 @@ export class LectroDB extends Dexie {
   summaries!: Table<BookSummary, string>;
   settings!: Table<AppSettings, string>;
   tags!: Table<Tag, string>;
+  files!: Table<FileEntry, string>; // New table for blobs
 
   constructor() {
     super('LectroDB');
@@ -350,6 +357,59 @@ export class LectroDB extends Dexie {
 
     this.version(11).stores({
       books: 'id, title, author, format, addedAt, lastReadAt, updatedAt, progress, status, fileName, filePath, isOnServer, isFavorite, deletedAt, indexedAt',
+    });
+
+    this.version(12).stores({
+      files: 'bookId, fileBlob', // New table for BLOBS
+      books: 'id, title, author, format, addedAt, lastReadAt, updatedAt, progress, status, fileName, filePath, isOnServer, isFavorite, deletedAt, indexedAt'
+    }).upgrade(async (trans) => {
+      // Critical Migration: Move Blobs to Files Table
+      const booksCount = await trans.table('books').count();
+      console.log(`[Migration v12] Starting migration for ${booksCount} books. Separating BLOBS...`);
+
+      // Iterate using cursor to avoid loading all at once
+      await trans.table('books').toCollection().modify((book, ref) => {
+        if (book.fileBlob) {
+          // We cannot use await here in modify? modify handles sync updates mostly?
+          // Dexie .modify doesn't support async writing to ANOTHER table easily inside the callback if it returns void.
+          // Actually, modify() expects modifications to the object.
+
+          // STRATEGY CHANGE: 
+          // We cannot easily move data between tables inside a .modify().
+          // We should iterate.
+        }
+      });
+
+      // Dexie upgrade transactions are special. We can use bulk ops.
+      // But we need to be careful about memory.
+      const BATCH_SIZE = 50;
+      let offset = 0;
+
+      while (true) {
+        const books = await trans.table('books').offset(offset).limit(BATCH_SIZE).toArray();
+        if (books.length === 0) break;
+
+        const filesBatch: any[] = [];
+
+        for (const book of books) {
+          if (book.fileBlob) {
+            filesBatch.push({ bookId: book.id, fileBlob: book.fileBlob });
+            delete book.fileBlob; // Remove from book object in memory
+          }
+        }
+
+        if (filesBatch.length > 0) {
+          await trans.table('files').bulkPut(filesBatch);
+        }
+
+        // Update books to remove blob property in DB
+        // We can use bulkPut to overwrite the books (now without fileBlob)
+        await trans.table('books').bulkPut(books);
+
+        offset += BATCH_SIZE;
+        console.log(`[Migration v12] Processed ${offset} books...`);
+      }
+      console.log(`[Migration v12] Migration complete.`);
     });
   }
 }
@@ -473,15 +533,39 @@ export async function addBook(book: Book): Promise<string> {
   if (!book.updatedAt) {
     book.updatedAt = new Date();
   }
-  // Remove user-specific fields from book object before saving to 'books' table to keep it clean
-  // But strictly Dexie stores what we give it. 
-  // We'll keep legacy fields for now to avoid breaking other parts of app that might read them directly before we refactor all.
-  // But ideally we should strip them.
-  return db.books.add(book);
+
+  // Separate blob
+  const { fileBlob, ...rest } = book;
+
+  await db.transaction('rw', [db.books, db.files], async () => {
+    // 1. Save metadata
+    await db.books.add(rest as Book);
+
+    // 2. Save blob if present
+    if (fileBlob) {
+      await db.files.add({ bookId: book.id, fileBlob });
+    }
+  });
+
+  return book.id;
 }
 
 export async function getBook(id: string): Promise<Book | undefined> {
-  return db.books.get(id);
+  const book = await db.books.get(id);
+  if (!book) return undefined;
+
+  // Retrieve blob if exists
+  const fileEntry = await db.files.get(id);
+  if (fileEntry) {
+    book.fileBlob = fileEntry.fileBlob;
+  }
+
+  return book;
+}
+
+export async function getBookFile(id: string): Promise<Blob | undefined> {
+  const entry = await db.files.get(id);
+  return entry?.fileBlob;
 }
 
 export async function getAllBooks(): Promise<Book[]> {
@@ -586,8 +670,59 @@ export async function getRecentBooks(limit: number = 12): Promise<Book[]> {
   });
 }
 
+export async function getReadingBooksForUser(userId: string): Promise<Book[]> {
+  const readingData = await db.userBookData
+    .where('userId') // We don't have composite index on status, so filter in memory or rely on small reading set
+    .equals(userId)
+    .filter(d => d.status === 'reading')
+    .toArray();
+
+  if (readingData.length === 0) return [];
+
+  const bookIds = readingData.map(d => d.bookId);
+  const books = await db.books.where('id').anyOf(bookIds).toArray();
+
+  // Merge data and STRIP BLOBS
+  const booksMap = new Map(books.map(b => [b.id, b]));
+
+  return readingData.map(data => {
+    const book = booksMap.get(data.bookId);
+    if (!book) return null;
+
+    const { fileBlob, ...rest } = book; // Strip blob!
+
+    return {
+      ...rest,
+      progress: data.progress,
+      status: data.status,
+      lastReadAt: data.lastReadAt,
+      currentPosition: data.currentPosition,
+      currentPage: data.currentPage,
+      isFavorite: data.isFavorite,
+      metadata: {
+        ...book.metadata,
+        userRating: data.userRating,
+        manualCategories: data.manualCategories
+      }
+    } as Book;
+  }).filter(b => b !== null) as Book[];
+}
+
 export async function updateBook(id: string, updates: Partial<Book>): Promise<number> {
-  return db.books.update(id, { ...updates, updatedAt: new Date() });
+  const { fileBlob, ...rest } = updates;
+
+  await db.transaction('rw', [db.books, db.files], async () => {
+    // 1. Update metadata
+    if (Object.keys(rest).length > 0) {
+      await db.books.update(id, { ...rest, updatedAt: new Date() });
+    }
+
+    // 2. Update blob if present
+    if (fileBlob) {
+      await db.files.put({ bookId: id, fileBlob });
+    }
+  });
+  return 1;
 }
 
 export async function deleteBook(id: string): Promise<void> {
