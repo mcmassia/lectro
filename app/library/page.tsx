@@ -71,6 +71,10 @@ export default function LibraryPage() {
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedBookIds, setSelectedBookIds] = useState<Set<string>>(new Set());
 
+    // Pagination / Virtualization State
+    const [visibleCount, setVisibleCount] = useState(50);
+    const LOAD_INCREMENT = 50;
+
     useEffect(() => {
         async function loadBooks() {
             try {
@@ -85,6 +89,11 @@ export default function LibraryPage() {
 
         loadBooks();
     }, [setBooks, setIsLoading]);
+
+    // Reset visible count when filters change
+    useEffect(() => {
+        setVisibleCount(LOAD_INCREMENT);
+    }, [searchQuery, activeCategory, activeThematicCategory, activeUserRating, sortBy]);
 
     // Sync specific selection to global store for Sidebar X-Ray
     useEffect(() => {
@@ -106,7 +115,28 @@ export default function LibraryPage() {
         setSelectedBookIds(newSelected);
     };
 
-    const displayBooks = filteredBooks();
+    const allFilteredBooks = filteredBooks();
+    const displayBooks = allFilteredBooks.slice(0, visibleCount);
+    const hasMore = visibleCount < allFilteredBooks.length;
+
+    // Intersection Observer for Infinite Scroll
+    useEffect(() => {
+        if (!hasMore) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    setVisibleCount((prev) => prev + LOAD_INCREMENT);
+                }
+            },
+            { threshold: 0.1, rootMargin: '200px' }
+        );
+
+        const sentinel = document.getElementById('scroll-sentinel');
+        if (sentinel) observer.observe(sentinel);
+
+        return () => observer.disconnect();
+    }, [hasMore, visibleCount]);
 
 
     // X-Ray View Data Loading
@@ -174,7 +204,7 @@ export default function LibraryPage() {
                                 <path d="M15 18l-6-6 6-6" />
                             </svg>
                         </Link>
-                        <h1 className="header-title">Biblioteca</h1>
+                        <h1 className="header-title">Biblioteca <span style={{ opacity: 0.5, fontSize: '0.6em', marginLeft: '10px' }}>({allFilteredBooks.length})</span></h1>
 
                         {/* Selection Mode Toggle in Header if desired, or keep in toolbar */}
                         {selectedBookIds.size > 0 && (
@@ -366,26 +396,35 @@ export default function LibraryPage() {
                         ))}
                     </div>
                 ) : displayBooks.length > 0 ? (
-                    <div className={viewMode === 'grid' ? 'book-grid' : 'book-list'}>
-                        {displayBooks.map((book) => (
-                            <BookCard
-                                key={book.id}
-                                book={book}
-                                viewMode={viewMode}
-                                selectionMode={isSelectionMode}
-                                isSelected={selectedBookIds.has(book.id)}
-                                onToggleSelection={handleToggleSelection}
-                                onClick={(bk) => {
-                                    // If we are in selection mode, Card handles it via onToggleSelection
-                                    // But if NOT in selection mode, we select standard way AND set ID for Sidebar
-                                    // BUT, maybe user wants sidebar even without modal?
-                                    // For now, keep modal behavior + sidebar update
-                                    setSelectedBook(bk);
-                                    setSelectedBookId(bk.id);
-                                }}
-                            />
-                        ))}
-                    </div>
+                    <>
+                        <div className={viewMode === 'grid' ? 'book-grid' : 'book-list'}>
+                            {displayBooks.map((book) => (
+                                <BookCard
+                                    key={book.id}
+                                    book={book}
+                                    viewMode={viewMode}
+                                    selectionMode={isSelectionMode}
+                                    isSelected={selectedBookIds.has(book.id)}
+                                    onToggleSelection={handleToggleSelection}
+                                    onClick={(bk) => {
+                                        // If we are in selection mode, Card handles it via onToggleSelection
+                                        // But if NOT in selection mode, we select standard way AND set ID for Sidebar
+                                        // BUT, maybe user wants sidebar even without modal?
+                                        // For now, keep modal behavior + sidebar update
+                                        setSelectedBook(bk);
+                                        setSelectedBookId(bk.id);
+                                    }}
+                                />
+                            ))}
+                        </div>
+
+                        {/* Sentinel for Infinite Scroll */}
+                        {hasMore && (
+                            <div id="scroll-sentinel" style={{ height: '40px', margin: '20px 0', display: 'flex', justifyContent: 'center', opacity: 0.5 }}>
+                                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <div className="empty-library">
                         <div className="empty-icon">
@@ -468,6 +507,8 @@ export default function LibraryPage() {
                     font-weight: 700;
                     margin: 0;
                     flex: 1;
+                    display: flex; /* Allow badge alignment */
+                    align-items: center;
                 }
 
                 .library-toolbar-combined {

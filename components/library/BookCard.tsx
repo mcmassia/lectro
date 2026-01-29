@@ -63,7 +63,7 @@ export function BookCard({
         )}
         <div className="book-list-cover">
           <img
-            src={book.isOnServer || book.filePath ? `/api/covers/${book.id}?width=100&v=${new Date(book.updatedAt || 0).getTime()}` : (book.cover || '/default-cover.png')}
+            src={book.isOnServer || book.filePath ? `/api/covers/${book.id}?width=400&v=${new Date(book.updatedAt || 0).getTime()}` : (book.cover || '/default-cover.png')}
             alt={book.title}
             onError={(e) => {
               // Fallback to local cover or default cover if proxy fails
