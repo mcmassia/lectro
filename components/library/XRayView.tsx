@@ -17,6 +17,8 @@ interface XRayViewProps {
 export function XRayView({ data, book, onBack }: XRayViewProps) {
     const [activeSection, setActiveSection] = useState<'overview' | 'characters' | 'world' | 'author_books' | 'recommendations' | 'web_info'>('overview');
     const [showChat, setShowChat] = useState(false);
+    const [chatMessages, setChatMessages] = useState<Message[]>([]);
+    const [chatInput, setChatInput] = useState('');
     const [webInfo, setWebInfo] = useState<GoogleBook | null>(null);
     const [isLoadingWeb, setIsLoadingWeb] = useState(false);
 
@@ -49,9 +51,6 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
 
     return (
         <div className="xray-dashboard animate-fade-in">
-            {/* Modal Layer */}
-
-
             {/* Header / Navigation */}
             <div className="dashboard-header h-32">
                 <button onClick={onBack} className="back-btn">
@@ -81,26 +80,14 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
 
                 <div className="header-actions">
                     <button
-                        className="action-btn primary"
-                        onClick={() => setShowChat(true)}
+                        className={`action-btn ${showChat ? 'active' : 'primary'}`}
+                        onClick={() => setShowChat(!showChat)}
                     >
-                        <Sparkles size={16} />
+                        <MessageSquare size={16} />
                         <span>Chat con IA</span>
                     </button>
                 </div>
             </div>
-
-            {showChat && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-                    <div className="bg-bg-secondary w-full max-w-2xl h-[80vh] rounded-2xl shadow-2xl overflow-hidden relative">
-                        <BookChat
-                            book={book}
-                            xrayData={data}
-                            onClose={() => setShowChat(false)}
-                        />
-                    </div>
-                </div>
-            )}
 
             {/* Main Layout Grid */}
             <div className="dashboard-grid">
