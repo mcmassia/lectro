@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Book, XRayData } from '@/lib/db';
 import { useAppStore } from '@/stores/appStore';
-import { getRagResponseAction } from '@/app/actions/ai';
+import { db, VectorChunk } from '@/lib/db';
+import { generateEmbeddingAction, getRagResponseAction } from '@/app/actions/ai';
 import { Send, Sparkles, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
@@ -57,147 +58,220 @@ export function BookChat({ book, xrayData, onClose, messages, setMessages, input
             // Construct context from X-Ray data
             const contexts = [];
 
-            if (xrayData) {
-                const xrayContent = `
+
+            // ... imports need to include generateEmbeddingAction, db, etc.
+            // Assuming DB and server actions are available in scope or imported at top of file.
+
+            const handleSend = async () => {
+                if (!input.trim() || isSending) return;
+
+                const userMsg: Message = {
+                    id: crypto.randomUUID(),
+                    role: 'user',
+                    content: input.trim(),
+                    timestamp: new Date()
+                };
+
+                setMessages(prev => [...prev, userMsg]);
+                setInput('');
+                setIsSending(true);
+
+                try {
+                    const contexts = [];
+
+                    // 1. Add X-Ray context (High Level)
+                    if (xrayData) {
+                        const xrayContent = `
 Summary: ${xrayData.summary}
 Plot: ${xrayData.plot}
 Key Points: ${(xrayData.keyPoints || []).join('\n- ')}
 Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('\n')}
                 `.trim();
 
-                contexts.push({
-                    bookId: book.id,
-                    bookTitle: book.title,
-                    chapterTitle: 'AI Analysis',
-                    content: xrayContent
-                });
-            } else {
-                // Fallback context if no X-Ray (chat will be limited)
-                contexts.push({
-                    bookId: book.id,
-                    bookTitle: book.title,
-                    chapterTitle: 'Metadata',
-                    content: `Title: ${book.title}\nAuthor: ${book.author}\nDescription: ${book.metadata?.description || 'No description available.'}`
-                });
-            }
+                        contexts.push({
+                            bookId: book.id,
+                            bookTitle: book.title,
+                            chapterTitle: 'AI Analysis',
+                            content: xrayContent
+                        });
+                    } else {
+                        contexts.push({
+                            bookId: book.id,
+                            bookTitle: book.title,
+                            chapterTitle: 'Metadata',
+                            content: `Title: ${book.title}\nAuthor: ${book.author}\nDescription: ${book.metadata?.description || 'No description available.'}`
+                        });
+                    }
 
-            const history = messages.map(m => ({ role: m.role, content: m.content }));
+                    // 2. Client-Side Vector Search (Deep Detail)
+                    if (isIndexed) {
+                        console.log('Performing vector search for query:', userMsg.content);
+                        // a. Generate embedding for query
+                        const { embedding, error } = await generateEmbeddingAction(userMsg.content);
 
-            const result = await getRagResponseAction(
-                userMsg.content,
-                contexts,
-                history
-            );
+                        if (embedding) {
+                            // b. Fetch all chunks for this book
+                            const chunks = await db.vectorChunks.where('bookId').equals(book.id).toArray();
 
-            if (result.success && result.data) {
-                const botMsg: Message = {
-                    id: crypto.randomUUID(),
-                    role: 'assistant',
-                    content: result.data.response,
-                    timestamp: new Date()
-                };
-                setMessages(prev => [...prev, botMsg]);
-            } else {
-                throw new Error(result.error || 'Failed to get response');
-            }
+                            if (chunks.length > 0) {
+                                // c. Cosine Similarity
+                                const scoredChunks = chunks.map(chunk => {
+                                    const similarity = cosineSimilarity(embedding, chunk.embedding);
+                                    return { ...chunk, score: similarity };
+                                });
 
-        } catch (error) {
-            console.error(error);
-            const errorMsg: Message = {
-                id: crypto.randomUUID(),
-                role: 'assistant',
-                content: 'Sorry, I encountered an error while analyzing the book content.',
-                timestamp: new Date()
+                                // d. Sort and Slice Top K
+                                const topChunks = scoredChunks
+                                    .sort((a, b) => b.score - a.score)
+                                    .slice(0, 5);
+
+                                console.log(`Found ${topChunks.length} relevant chunks. Top score: ${topChunks[0]?.score}`);
+
+                                // e. Add to context
+                                topChunks.forEach(chunk => {
+                                    contexts.push({
+                                        bookId: book.id,
+                                        bookTitle: book.title,
+                                        chapterTitle: chunk.chapterTitle || 'Content',
+                                        content: chunk.text
+                                    });
+                                });
+                            }
+                        } else {
+                            console.error('Failed to generate query embedding:', error);
+                        }
+                    }
+
+                    const history = messages.map(m => ({ role: m.role, content: m.content }));
+
+                    const result = await getRagResponseAction(
+                        userMsg.content,
+                        contexts,
+                        history
+                    );
+
+                    if (result.success && result.data) {
+                        const botMsg: Message = {
+                            id: crypto.randomUUID(),
+                            role: 'assistant',
+                            content: result.data.response,
+                            timestamp: new Date()
+                        };
+                        setMessages(prev => [...prev, botMsg]);
+                    } else {
+                        throw new Error(result.error || 'Failed to get response');
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                    const errorMsg: Message = {
+                        id: crypto.randomUUID(),
+                        role: 'assistant',
+                        content: 'Sorry, I encountered an error while analyzing the book content.',
+                        timestamp: new Date()
+                    };
+                    setMessages(prev => [...prev, errorMsg]);
+                } finally {
+                    setIsSending(false);
+                }
             };
-            setMessages(prev => [...prev, errorMsg]);
-        } finally {
-            setIsSending(false);
-        }
-    };
 
-    return (
-        <div className="book-chat-container animate-fade-in">
-            {onIndexBook && (
-                <div className={`indexing-banner ${isIndexed ? 'indexed' : ''}`}>
-                    <div className="banner-content">
-                        <Sparkles size={16} />
-                        <span>{isIndexed ? 'Libro indexado para respuestas profundas.' : 'Este chat solo usa el resumen X-Ray. Para respuestas precisas sobre todo el contenido:'}</span>
-                    </div>
-                    <button
-                        onClick={onIndexBook}
-                        disabled={isIndexing}
-                        className="index-btn"
-                    >
-                        {isIndexing ? 'Indexando...' : (isIndexed ? 'Actualizar Índice' : 'Indexar Profundo')}
-                    </button>
-                </div>
-            )}
+            // Helper function for Cosine Similarity
+            function cosineSimilarity(vecA: number[], vecB: number[]) {
+                let dotProduct = 0;
+                let normA = 0;
+                let normB = 0;
+                for (let i = 0; i < vecA.length; i++) {
+                    dotProduct += vecA[i] * vecB[i];
+                    normA += vecA[i] * vecA[i];
+                    normB += vecB[i] * vecB[i];
+                }
+                return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+            }
 
-            <div className="chat-header hidden">
-                <div className="header-title">
-                    <Sparkles size={18} className="text-accent" />
-                    <h3>Chat con {book.title}</h3>
-                </div>
-                {/* Close button removed for tab usage */}
-            </div>
-
-            <div className="messages-list" ref={scrollRef}>
-                {messages.length === 0 && (
-                    <div className="empty-chat">
-                        <Sparkles size={32} className="mb-2 opacity-50" />
-                        <p>Pregúntame algo sobre este libro.</p>
-                        <div className="suggestions">
-                            <button onClick={() => setInput("¿De qué trata el libro?")}>¿De qué trata?</button>
-                            <button onClick={() => setInput("¿Quién es el protagonista?")}>¿Quién es el protagonista?</button>
-                            <button onClick={() => setInput("Dime los temas principales")}>Temas principales</button>
+            return (
+                <div className="book-chat-container animate-fade-in">
+                    {onIndexBook && (
+                        <div className={`indexing-banner ${isIndexed ? 'indexed' : ''}`}>
+                            <div className="banner-content">
+                                <Sparkles size={16} />
+                                <span>{isIndexed ? 'Libro indexado para respuestas profundas.' : 'Este chat solo usa el resumen X-Ray. Para respuestas precisas sobre todo el contenido:'}</span>
+                            </div>
+                            <button
+                                onClick={onIndexBook}
+                                disabled={isIndexing}
+                                className="index-btn"
+                            >
+                                {isIndexing ? 'Indexando...' : (isIndexed ? 'Actualizar Índice' : 'Indexar Profundo')}
+                            </button>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {messages.map(msg => (
-                    <div key={msg.id} className={`message ${msg.role}`}>
-                        <div className="message-content">
-                            {msg.role === 'assistant' ? (
-                                <div className="markdown-content">
-                                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <div className="chat-header hidden">
+                        <div className="header-title">
+                            <Sparkles size={18} className="text-accent" />
+                            <h3>Chat con {book.title}</h3>
+                        </div>
+                        {/* Close button removed for tab usage */}
+                    </div>
+
+                    <div className="messages-list" ref={scrollRef}>
+                        {messages.length === 0 && (
+                            <div className="empty-chat">
+                                <Sparkles size={32} className="mb-2 opacity-50" />
+                                <p>Pregúntame algo sobre este libro.</p>
+                                <div className="suggestions">
+                                    <button onClick={() => setInput("¿De qué trata el libro?")}>¿De qué trata?</button>
+                                    <button onClick={() => setInput("¿Quién es el protagonista?")}>¿Quién es el protagonista?</button>
+                                    <button onClick={() => setInput("Dime los temas principales")}>Temas principales</button>
                                 </div>
-                            ) : (
-                                msg.content
-                            )}
-                        </div>
+                            </div>
+                        )}
+
+                        {messages.map(msg => (
+                            <div key={msg.id} className={`message ${msg.role}`}>
+                                <div className="message-content">
+                                    {msg.role === 'assistant' ? (
+                                        <div className="markdown-content">
+                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                        </div>
+                                    ) : (
+                                        msg.content
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+
+                        {isSending && (
+                            <div className="message assistant">
+                                <div className="message-content typing">
+                                    <span className="dot"></span>
+                                    <span className="dot"></span>
+                                    <span className="dot"></span>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                ))}
 
-                {isSending && (
-                    <div className="message assistant">
-                        <div className="message-content typing">
-                            <span className="dot"></span>
-                            <span className="dot"></span>
-                            <span className="dot"></span>
-                        </div>
+                    <div className="input-area">
+                        <input
+                            type="text"
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                            placeholder="Escribe tu mensaje..."
+                            disabled={isSending}
+                        />
+                        <button
+                            className="send-btn"
+                            onClick={handleSend}
+                            disabled={!input.trim() || isSending}
+                        >
+                            <Send size={18} />
+                        </button>
                     </div>
-                )}
-            </div>
 
-            <div className="input-area">
-                <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder="Escribe tu mensaje..."
-                    disabled={isSending}
-                />
-                <button
-                    className="send-btn"
-                    onClick={handleSend}
-                    disabled={!input.trim() || isSending}
-                >
-                    <Send size={18} />
-                </button>
-            </div>
-
-            <style jsx>{`
+                    <style jsx>{`
                 .book-chat-container {
                     display: flex;
                     flex-direction: column;
@@ -408,6 +482,6 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
                 .markdown-content :global(li) { margin-bottom: 4px; }
                 .markdown-content :global(strong) { font-weight: 700; color: inherit; }
             `}</style>
-        </div>
-    );
-}
+                </div>
+            );
+        }
