@@ -69,6 +69,7 @@ export interface Book {
   isOnServer?: boolean;
   deletedAt?: Date;
   indexedAt?: Date;
+  deepIndexedAt?: Date; // Explicit field for Vector Embeddings status
 
   // Deprecated fields (moved to UserBookData), kept optional for type compatibility during migration/types
   lastReadAt?: Date;
@@ -451,10 +452,21 @@ export class LectroDB extends Dexie {
         await trans.table('books').bulkPut(books);
 
         offset += BATCH_SIZE;
-        console.log(`[Migration v13] Processed ${offset} books (covers)...`);
+        console.log(`[Migration v13] Processed ${offset} books...`);
       }
       console.log(`[Migration v13] Cover migration complete.`);
     });
+
+    this.version(14).stores({
+      books: 'id, title, author, format, addedAt, lastReadAt, updatedAt, progress, status, fileName, filePath, isOnServer, isFavorite, deletedAt, indexedAt, deepIndexedAt'
+    });
+    await trans.table('books').bulkPut(books);
+
+    offset += BATCH_SIZE;
+    console.log(`[Migration v13] Processed ${offset} books (covers)...`);
+  }
+      console.log(`[Migration v13] Cover migration complete.`);
+});
   }
 }
 
