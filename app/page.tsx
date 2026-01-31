@@ -9,7 +9,7 @@ import { getAllBooks, Book, deleteBook, syncTagsFromBooks, getAllTags, updateBoo
 import { BookCard } from '@/components/library/BookCard';
 import { ContinueReadingPanel } from '@/components/home/ContinueReadingPanel';
 import { ImportModal } from '@/components/library/ImportModal';
-import { BookDetailsModal } from '@/components/library/BookDetailsModal';
+import { BookDetailsView } from '@/components/library/BookDetailsView';
 import { MassTagManagerModal } from '@/components/library/MassTagManagerModal';
 import { syncWithServer } from '@/lib/fileSystem';
 import { SyncReportModal } from '@/components/library/SyncReportModal';
@@ -386,6 +386,22 @@ export default function Home() {
   if (currentView === 'tags') return <TagManagerView />;
   if (activeCategory === 'authors') return <AuthorsView />;
 
+  // Handle Book Details View
+  const detailsBook = selectedBook || books.find(b => b.id === selectedBookId);
+  if (currentView === 'book-details' && detailsBook) {
+    return (
+      <div className="h-full w-full">
+        <BookDetailsView
+          book={detailsBook}
+          onBack={() => {
+            setView('library');
+            setSelectedBook(null);
+          }}
+        />
+      </div>
+    );
+  }
+
   if (currentView === 'xray') {
     if (!selectedBookId) return (
       <div className="flex flex-col items-center justify-center h-full p-10">
@@ -420,7 +436,14 @@ export default function Home() {
           <div className="mb-8">
             <div className="continue-reading-section">
               {/* Pass the list of recent books to the panel, it handles the grid/list itself */}
-              <ContinueReadingPanel books={recentBooks} onOpenDetails={setSelectedBook} />
+              <ContinueReadingPanel
+                books={recentBooks}
+                onOpenDetails={(b) => {
+                  setSelectedBook(b);
+                  setSelectedBookId(b.id);
+                  setView('book-details');
+                }}
+              />
             </div>
           </div>
         )}
@@ -572,6 +595,7 @@ export default function Home() {
                         onClick={(b) => {
                           setSelectedBook(b);
                           setSelectedBookId(b.id);
+                          setView('book-details');
                         }}
                         selectionMode={isSelectionMode}
                         isSelected={selectedBookIds.has(book.id)}
@@ -599,6 +623,7 @@ export default function Home() {
                       onClick={(b) => {
                         setSelectedBook(b);
                         setSelectedBookId(b.id);
+                        setView('book-details');
                       }}
                       selectionMode={isSelectionMode}
                       isSelected={selectedBookIds.has(book.id)}
@@ -659,7 +684,6 @@ export default function Home() {
 
       {showImport && <ImportModal onClose={() => setShowImport(false)} />}
       <SyncReportModal isOpen={showSyncReport} onClose={() => setShowSyncReport(false)} results={syncResults} isLoading={isSyncing} progressLogs={syncLogs} />
-      {selectedBook && <BookDetailsModal book={selectedBook} onClose={() => setSelectedBook(null)} />}
       <MassTagManagerModal isOpen={showMassTagsModal} onClose={() => setShowMassTagsModal(false)} selectedBooks={books.filter(b => selectedBookIds.has(b.id))} onSuccess={async () => { if (activeCategory === 'recientes') await loadRecentBooks(); else await loadBooks(); }} />
 
       <style jsx>{`

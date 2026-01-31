@@ -204,7 +204,7 @@ interface LibraryState {
     xrayKeywords: Record<string, string>;         // Keywords for search from X-Ray
     tags: Tag[];
     sortOrder: 'asc' | 'desc';
-    currentView: 'library' | 'tags' | 'xray';
+    currentView: 'library' | 'tags' | 'xray' | 'book-details';
 
     setBooks: (books: Book[]) => void;
     addBook: (book: Book) => void;
@@ -221,7 +221,7 @@ interface LibraryState {
     removeTag: (id: string) => void;
     setSortOrder: (order: 'asc' | 'desc') => void;
     setIsLoading: (loading: boolean) => void;
-    setView: (view: 'library' | 'tags' | 'xray') => void;
+    setView: (view: 'library' | 'tags' | 'xray' | 'book-details') => void;
     setActiveThematicCategory: (cat: BookCategory | null) => void;
     setActiveUserRating: (rating: UserBookRating | null) => void;
     loadBooks: () => Promise<void>;

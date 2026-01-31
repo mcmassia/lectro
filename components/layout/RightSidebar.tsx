@@ -10,9 +10,11 @@ import { generateXRayAction } from '@/app/actions/ai';
 
 
 export function RightSidebar() {
-    const { books, tags, setTags, setView, setActiveCategory, selectedBookId } = useLibraryStore();
+    const { books, tags, setTags, setView, setActiveCategory, selectedBookId, currentView } = useLibraryStore();
     const { currentUser, setXrayModalData, mobileRightSidebarOpen, setMobileRightSidebarOpen } = useAppStore();
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [localCollapsed, setLocalCollapsed] = useState(false);
+    // Auto-collapse if in details or xray view
+    const isCollapsed = localCollapsed || currentView === 'book-details' || currentView === 'xray';
     const pathname = usePathname();
     const router = useRouter();
 
@@ -187,7 +189,7 @@ export function RightSidebar() {
                 </div>
                 <button
                     className="collapse-btn"
-                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    onClick={() => setLocalCollapsed(!localCollapsed)}
                     title={isCollapsed ? "Expandir" : "Colapsar"}
                 >
                     {isCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}

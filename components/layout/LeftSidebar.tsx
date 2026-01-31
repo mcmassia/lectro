@@ -42,13 +42,17 @@ export function LeftSidebar() {
         activeTag, setActiveTag,
         activeUserRating, setActiveUserRating,
         setView,
-        setTags
+        setTags,
+        currentView
     } = useLibraryStore();
 
     const { mobileMenuOpen, setMobileMenuOpen } = useAppStore();
     const pathname = usePathname();
     const router = useRouter();
-    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [localCollapsed, setLocalCollapsed] = useState(false);
+
+    // Auto-collapse if in details or xray view
+    const isCollapsed = localCollapsed || currentView === 'book-details' || currentView === 'xray';
 
     useEffect(() => {
         getAllTags().then(setTags);
@@ -96,7 +100,7 @@ export function LeftSidebar() {
             <aside className={`left-sidebar ${isCollapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'mobile-open' : ''}`}>
                 <button
                     className="collapse-btn"
-                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    onClick={() => setLocalCollapsed(!localCollapsed)}
                     title={isCollapsed ? "Expandir" : "Colapsar"}
                 >
                     {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}

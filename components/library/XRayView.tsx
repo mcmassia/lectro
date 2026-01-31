@@ -5,7 +5,6 @@ import { useLibraryStore } from '@/stores/appStore';
 import { ArrowLeft, BrainCircuit, Users, MapPin, BookOpen, FileText, Sparkles, Zap, Library } from 'lucide-react';
 import { useState } from 'react';
 import { BookCard } from './BookCard';
-import { BookDetailsModal } from './BookDetailsModal';
 
 interface XRayViewProps {
     data: XRayData;
@@ -15,8 +14,7 @@ interface XRayViewProps {
 
 export function XRayView({ data, book, onBack }: XRayViewProps) {
     const [activeSection, setActiveSection] = useState<'overview' | 'characters' | 'world' | 'author_books' | 'recommendations'>('overview');
-    const [viewingBook, setViewingBook] = useState<Book | null>(null);
-    const { books, setSelectedBookId } = useLibraryStore();
+    const { books, setSelectedBookId, setView } = useLibraryStore();
 
     // Data Filtering for Tabs
     const authorBooks = books.filter(b => b.author === book.author && b.id !== book.id);
@@ -35,12 +33,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
     return (
         <div className="xray-dashboard animate-fade-in">
             {/* Modal Layer */}
-            {viewingBook && (
-                <BookDetailsModal
-                    book={viewingBook}
-                    onClose={() => setViewingBook(null)}
-                />
-            )}
+
 
             {/* Header / Navigation */}
             <div className="dashboard-header h-32">
@@ -240,7 +233,10 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                                             <BookCard
                                                 book={b}
                                                 viewMode="grid"
-                                                onClick={() => setViewingBook(b)}
+                                                onClick={() => {
+                                                    setSelectedBookId(b.id);
+                                                    setView('book-details');
+                                                }}
                                             />
                                         </div>
                                     ))}
@@ -268,7 +264,10 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                                             <BookCard
                                                 book={b}
                                                 viewMode="grid"
-                                                onClick={() => setViewingBook(b)}
+                                                onClick={() => {
+                                                    setSelectedBookId(b.id);
+                                                    setView('book-details');
+                                                }}
                                             />
                                         </div>
                                     ))}
