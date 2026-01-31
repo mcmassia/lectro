@@ -26,7 +26,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
 
     // Indexing state
     const [isIndexing, setIsIndexing] = useState(false);
-    const [isIndexed, setIsIndexed] = useState(!!book.indexedAt);
+    const [isIndexed, setIsIndexed] = useState(!!book.deepIndexedAt);
 
     const { books, setSelectedBookId, setView, setSelectedAuthor, updateBook: updateBookInStore } = useLibraryStore();
 
@@ -114,8 +114,8 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
 
             // 4. Update Book Status
             const now = new Date();
-            await updateBook(book.id, { indexedAt: now });
-            updateBookInStore(book.id, { indexedAt: now });
+            await updateBook(book.id, { deepIndexedAt: now, indexedAt: now });
+            updateBookInStore(book.id, { deepIndexedAt: now, indexedAt: now });
             setIsIndexed(true);
             alert('Libro indexado correctamente. Ahora puedes hacer preguntas profundas.');
 
@@ -261,8 +261,8 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                                     onClick={handleIndexBook}
                                     disabled={isIndexing}
                                     className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${isIndexed
-                                            ? 'bg-transparent text-gray-400 border border-gray-700 hover:text-white hover:border-white'
-                                            : 'bg-purple-600 text-white hover:bg-purple-500 shadow-lg hover:shadow-purple-500/20'
+                                        ? 'bg-transparent text-gray-400 border border-gray-700 hover:text-white hover:border-white'
+                                        : 'bg-purple-600 text-white hover:bg-purple-500 shadow-lg hover:shadow-purple-500/20'
                                         }`}
                                 >
                                     {isIndexing ? 'Indexando...' : (isIndexed ? 'Actualizar' : 'Indexar Ahora')}
