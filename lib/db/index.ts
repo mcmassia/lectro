@@ -462,12 +462,13 @@ export class LectroDB extends Dexie {
     });
 
   }
+}
 
-  // ===================================
-  // Database Instance
-  // ===================================
+// ===================================
+// Database Instance
+// ===================================
 
-  export const db = new LectroDB();
+export const db = new LectroDB();
 
 // Seed default user
 import { hashPassword } from '../auth';
