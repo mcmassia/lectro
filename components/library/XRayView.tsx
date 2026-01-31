@@ -2,9 +2,11 @@
 
 import { XRayData, Book } from '@/lib/db';
 import { useLibraryStore } from '@/stores/appStore';
-import { ArrowLeft, BrainCircuit, Users, MapPin, BookOpen, FileText, Sparkles, Zap, Library } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, BrainCircuit, Users, MapPin, BookOpen, FileText, Sparkles, Zap, Library, Globe, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { BookCard } from './BookCard';
+import { BookChat } from '../ai/BookChat';
+import { GoogleBook, searchBooks } from '@/lib/services/googleBooks';
 
 interface XRayViewProps {
     data: XRayData;
@@ -13,8 +15,12 @@ interface XRayViewProps {
 }
 
 export function XRayView({ data, book, onBack }: XRayViewProps) {
-    const [activeSection, setActiveSection] = useState<'overview' | 'characters' | 'world' | 'author_books' | 'recommendations'>('overview');
-    const { books, setSelectedBookId, setView } = useLibraryStore();
+    const [activeSection, setActiveSection] = useState<'overview' | 'characters' | 'world' | 'author_books' | 'recommendations' | 'web_info'>('overview');
+    const [showChat, setShowChat] = useState(false);
+    const [webInfo, setWebInfo] = useState<GoogleBook | null>(null);
+    const [isLoadingWeb, setIsLoadingWeb] = useState(false);
+
+    const { books, setSelectedBookId, setView, setSelectedAuthor } = useLibraryStore();
 
     // Data Filtering for Tabs
     const authorBooks = books.filter(b => b.author === book.author && b.id !== book.id);
@@ -29,6 +35,17 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
 
         return hasCommonCategory || hasCommonSubject;
     }).slice(0, 8); // Limit to 8
+
+    useEffect(() => {
+        if (activeSection === 'web_info' && !webInfo && !isLoadingWeb) {
+            setIsLoadingWeb(true);
+            searchBooks(`intitle:${book.title} inauthor:${book.author}`, 1)
+                .then(results => {
+                    if (results.length > 0) setWebInfo(results[0]);
+                })
+                .finally(() => setIsLoadingWeb(false));
+        }
+    }, [activeSection, book, webInfo, isLoadingWeb]);
 
     return (
         <div className="xray-dashboard animate-fade-in">
@@ -63,12 +80,27 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                 </div>
 
                 <div className="header-actions">
-                    <button className="action-btn primary">
+                    <button
+                        className="action-btn primary"
+                        onClick={() => setShowChat(true)}
+                    >
                         <Sparkles size={16} />
                         <span>Chat con IA</span>
                     </button>
                 </div>
             </div>
+
+            {showChat && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-bg-secondary w-full max-w-2xl h-[80vh] rounded-2xl shadow-2xl overflow-hidden relative">
+                        <BookChat
+                            book={book}
+                            xrayData={data}
+                            onClose={() => setShowChat(false)}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Main Layout Grid */}
             <div className="dashboard-grid">
@@ -115,6 +147,13 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                             <Sparkles size={18} />
                             <span>Similares</span>
                             {recommendations.length > 0 && <span className="nav-badge">{recommendations.length}</span>}
+                        </button>
+                        <button
+                            className={`nav-item ${activeSection === 'web_info' ? 'active' : ''}`}
+                            onClick={() => setActiveSection('web_info')}
+                        >
+                            <Globe size={18} />
+                            <span>Info Web</span>
                         </button>
                     </div>
 
@@ -223,7 +262,18 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                         <div className="content-slide animate-slide-up">
                             <div className="section-header">
                                 <h2>Más de {book.author}</h2>
-                                <p>Otros títulos de este autor en tu biblioteca</p>
+                                <div className="flex items-center justify-between">
+                                    <p>Otros títulos de este autor en tu biblioteca</p>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedAuthor(book.author);
+                                            setView('author-details');
+                                        }}
+                                        className="text-accent text-sm font-medium hover:underline flex items-center gap-1"
+                                    >
+                                        Ver perfil completo <ArrowLeft size={14} className="rotate-180" />
+                                    </button>
+                                </div>
                             </div>
 
                             {authorBooks.length > 0 ? (
@@ -245,6 +295,74 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                                 <div className="empty-state">
                                     <Library size={48} className="text-gray-600 mb-4" />
                                     <p>No tienes más libros de este autor.</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+
+
+                    {activeSection === 'web_info' && (
+                        <div className="content-slide animate-slide-up">
+                            <div className="section-header">
+                                <h2>Información de la Web</h2>
+                                <p>Datos obtenidos de Google Books</p>
+                            </div>
+
+                            {isLoadingWeb ? (
+                                <div className="flex flex-col items-center justify-center py-20 text-secondary">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-accent mb-4"></div>
+                                    <p>Buscando información...</p>
+                                </div>
+                            ) : webInfo ? (
+                                <div className="content-card featured flex gap-8">
+                                    <div className="shrink-0 w-32">
+                                        {webInfo.volumeInfo.imageLinks?.thumbnail ? (
+                                            <img src={webInfo.volumeInfo.imageLinks.thumbnail} alt="Cover" className="w-full rounded shadow-md" />
+                                        ) : (
+                                            <div className="w-full aspect-[2/3] bg-bg-tertiary rounded flex items-center justify-center text-text-tertiary">N/A</div>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col gap-4 flex-1">
+                                        <div>
+                                            <h3 className="text-xl font-bold mb-2">{webInfo.volumeInfo.title}</h3>
+                                            <div className="flex items-center gap-2 text-sm text-secondary mb-4">
+                                                <span>{webInfo.volumeInfo.publisher}</span>
+                                                <span>•</span>
+                                                <span>{webInfo.volumeInfo.publishedDate}</span>
+                                                {webInfo.volumeInfo.averageRating && (
+                                                    <>
+                                                        <span>•</span>
+                                                        <span className="flex items-center text-yellow-500">
+                                                            ★ {webInfo.volumeInfo.averageRating} ({webInfo.volumeInfo.ratingsCount})
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </div>
+                                            <p className="text-body text-sm leading-relaxed text-secondary mb-4">
+                                                {webInfo.volumeInfo.description?.replace(/<[^>]*>?/gm, '') || 'Sin descripción disponible.'}
+                                            </p>
+                                            <div className="flex flex-wrap gap-2 mb-6">
+                                                {webInfo.volumeInfo.categories?.map(c => (
+                                                    <span key={c} className="px-2 py-1 bg-bg-tertiary rounded text-xs text-secondary">{c}</span>
+                                                ))}
+                                            </div>
+                                            <a
+                                                href={webInfo.volumeInfo.previewLink || webInfo.volumeInfo.infoLink}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="btn btn-primary inline-flex items-center gap-2"
+                                                style={{ width: 'fit-content' }}
+                                            >
+                                                Ver en Google Books <Globe size={14} />
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="empty-state">
+                                    <Globe size={48} className="text-gray-600 mb-4" />
+                                    <p>No se encontró información adicional en la web para este libro.</p>
                                 </div>
                             )}
                         </div>
@@ -616,6 +734,6 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                 }
                 .animate-slide-up { animation: slideUp 0.4s ease-out; }
             `}</style>
-        </div>
+        </div >
     );
 }

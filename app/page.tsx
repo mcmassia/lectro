@@ -15,6 +15,7 @@ import { syncWithServer } from '@/lib/fileSystem';
 import { SyncReportModal } from '@/components/library/SyncReportModal';
 import TagManagerView from '@/components/library/TagManagerView';
 import { AuthorsView } from '@/components/library/AuthorsView';
+import { AuthorDetailsView } from '@/components/library/AuthorDetailsView';
 import { ArrowDownNarrowWide, ArrowUpNarrowWide } from 'lucide-react';
 import { XRayView } from '@/components/library/XRayView';
 import { db } from '@/lib/db';
@@ -58,7 +59,7 @@ export default function Home() {
     activeFormat, sortOrder, setSortOrder, currentView, setView,
     syncMetadata, loadRecentBooks, loadBooks, searchQuery, setSearchQuery,
     activeThematicCategory, activeUserRating, setActiveThematicCategory, setActiveUserRating, xrayKeywords,
-    setSelectedBookId, selectedBookId
+    setSelectedBookId, selectedBookId, selectedAuthor, setSelectedAuthor
   } = useLibraryStore();
   const { onboardingComplete, currentUser } = useAppStore();
   const router = useRouter();
@@ -384,7 +385,26 @@ export default function Home() {
   }, [currentView, selectedBookId, books, selectedBook]);
 
   if (currentView === 'tags') return <TagManagerView />;
-  if (activeCategory === 'authors') return <AuthorsView />;
+  if (activeCategory === 'authors' && currentView !== 'author-details') return <AuthorsView />;
+
+  if (currentView === 'author-details' && selectedAuthor) {
+    return (
+      <div className="h-full w-full">
+        <AuthorDetailsView
+          author={selectedAuthor}
+          onBack={() => {
+            if (activeCategory === 'authors') {
+              // Stay in authors mode but clear view
+              setView('library');
+            } else {
+              setView('library');
+            }
+            setSelectedAuthor(null);
+          }}
+        />
+      </div>
+    );
+  }
 
   // Handle Book Details View
   const detailsBook = selectedBook || books.find(b => b.id === selectedBookId);

@@ -4,7 +4,16 @@ import { useLibraryStore } from '@/stores/appStore';
 import { User, BookOpen } from 'lucide-react';
 
 export function AuthorsView() {
-    const { books, searchQuery, setSearchQuery, setView, setActiveCategory } = useLibraryStore();
+    const { books, searchQuery, setSearchQuery, setView, setSelectedAuthor } = useLibraryStore();
+
+    // ... (rest is same but I can't easily skip lines in block diff)
+    // Actually I need to replace the whole hook usage + function
+
+    // Let's replace line 7 and line 34-37
+    // I'll do two chunks if multireplace is available, but this tool is replace_file_content (single block).
+    // I can do multiple steps.
+    // Wait, the tool definition says "use the multi_replace_file_content tool instead" for multiple chunks.
+    // I'll use multi_replace for AuthorsView.
 
     // Group books by author
     const authorsMap = books.reduce((acc, book) => {
@@ -31,9 +40,11 @@ export function AuthorsView() {
     }
 
     const handleAuthorClick = (authorName: string) => {
-        setSearchQuery(authorName);
-        setActiveCategory('all');
-        setView('library');
+        // setSearchQuery(authorName);
+        // setActiveCategory('all');
+        // setView('library');
+        setSelectedAuthor(authorName);
+        setView('author-details');
     };
 
     return (

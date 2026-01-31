@@ -204,7 +204,7 @@ interface LibraryState {
     xrayKeywords: Record<string, string>;         // Keywords for search from X-Ray
     tags: Tag[];
     sortOrder: 'asc' | 'desc';
-    currentView: 'library' | 'tags' | 'xray' | 'book-details';
+    currentView: 'library' | 'tags' | 'xray' | 'book-details' | 'author-details';
 
     setBooks: (books: Book[]) => void;
     addBook: (book: Book) => void;
@@ -221,7 +221,7 @@ interface LibraryState {
     removeTag: (id: string) => void;
     setSortOrder: (order: 'asc' | 'desc') => void;
     setIsLoading: (loading: boolean) => void;
-    setView: (view: 'library' | 'tags' | 'xray' | 'book-details') => void;
+    setView: (view: 'library' | 'tags' | 'xray' | 'book-details' | 'author-details') => void;
     setActiveThematicCategory: (cat: BookCategory | null) => void;
     setActiveUserRating: (rating: UserBookRating | null) => void;
     loadBooks: () => Promise<void>;
@@ -231,6 +231,9 @@ interface LibraryState {
 
     selectedBookId: string | null;
     setSelectedBookId: (id: string | null) => void;
+
+    selectedAuthor: string | null;
+    setSelectedAuthor: (author: string | null) => void;
 
     // Computed
     filteredBooks: () => Book[];
@@ -252,9 +255,11 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     sortOrder: 'desc',
     currentView: 'library',
     selectedBookId: null,
+    selectedAuthor: null,
 
     setBooks: (books) => set({ books, isLoading: false }),
     setSelectedBookId: (id) => set({ selectedBookId: id }),
+    setSelectedAuthor: (author) => set({ selectedAuthor: author }),
     loadBooks: async () => {
         set({ isLoading: true });
         try {
