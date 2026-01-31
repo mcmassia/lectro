@@ -5,9 +5,17 @@ import { useLibraryStore } from '@/stores/appStore';
 import { ArrowLeft, BrainCircuit, Users, MapPin, BookOpen, FileText, Sparkles, Zap, Library, Globe, X, MessageSquare } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BookCard } from './BookCard';
+import { BookChat, Message } from '../ai/BookChat';
+import { GoogleBook, searchBooks } from '@/lib/services/googleBooks';
 import { generateBatchEmbeddingsAction } from '@/app/actions/ai';
 import { extractBookText } from '@/lib/utils/extractBookText';
 import { db, VectorChunk, updateBook } from '@/lib/db';
+
+interface XRayViewProps {
+    data: XRayData;
+    book: Book;
+    onBack: () => void;
+}
 
 export function XRayView({ data, book, onBack }: XRayViewProps) {
     const [activeSection, setActiveSection] = useState<'overview' | 'characters' | 'world' | 'author_books' | 'recommendations' | 'web_info' | 'chat'>('overview');
