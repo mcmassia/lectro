@@ -4,15 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { Book, XRayData } from '@/lib/db';
 import { useAppStore } from '@/stores/appStore';
 import { getRagResponseAction } from '@/app/actions/ai';
-import { Send, User, Sparkles, X } from 'lucide-react';
+import { Send, Sparkles, X } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
-interface BookChatProps {
-    book: Book;
-    xrayData?: XRayData | null;
-    onClose: () => void;
-}
-
-interface Message {
+export interface Message {
     id: string;
     role: 'user' | 'assistant';
     content: string;
@@ -20,9 +15,17 @@ interface Message {
     isLoading?: boolean;
 }
 
-export function BookChat({ book, xrayData, onClose }: BookChatProps) {
-    const [messages, setMessages] = useState<Message[]>([]);
-    const [input, setInput] = useState('');
+interface BookChatProps {
+    book: Book;
+    xrayData?: XRayData | null;
+    onClose: () => void;
+    messages: Message[];
+    setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+    input: string;
+    setInput: React.Dispatch<React.SetStateAction<string>>;
+}
+
+export function BookChat({ book, xrayData, onClose, messages, setMessages, input, setInput }: BookChatProps) {
     const [isSending, setIsSending] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const { currentUser } = useAppStore();
@@ -137,7 +140,13 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
                 {messages.map(msg => (
                     <div key={msg.id} className={`message ${msg.role}`}>
                         <div className="message-content">
-                            {msg.content}
+                            {msg.role === 'assistant' ? (
+                                <div className="markdown-content">
+                                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                </div>
+                            ) : (
+                                msg.content
+                            )}
                         </div>
                     </div>
                 ))}
@@ -335,23 +344,12 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
                     to { opacity: 1; transform: translateY(0); }
                 }
 
-                .markdown-content p {
-                    margin-bottom: 8px;
-                }
-                .markdown-content p:last-child {
-                    margin-bottom: 0;
-                }
-                .markdown-content ul, .markdown-content ol {
-                    padding-left: 20px;
-                    margin-bottom: 8px;
-                }
-                .markdown-content li {
-                    margin-bottom: 4px;
-                }
-                .markdown-content strong {
-                    font-weight: 700;
-                    color: inherit;
-                }
+                /* Markdown Styles */
+                .markdown-content :global(p) { margin-bottom: 8px; }
+                .markdown-content :global(p:last-child) { margin-bottom: 0; }
+                .markdown-content :global(ul), .markdown-content :global(ol) { padding-left: 20px; margin-bottom: 8px; }
+                .markdown-content :global(li) { margin-bottom: 4px; }
+                .markdown-content :global(strong) { font-weight: 700; color: inherit; }
             `}</style>
         </div>
     );
