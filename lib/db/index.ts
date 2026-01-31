@@ -460,21 +460,14 @@ export class LectroDB extends Dexie {
     this.version(14).stores({
       books: 'id, title, author, format, addedAt, lastReadAt, updatedAt, progress, status, fileName, filePath, isOnServer, isFavorite, deletedAt, indexedAt, deepIndexedAt'
     });
-    await trans.table('books').bulkPut(books);
 
-    offset += BATCH_SIZE;
-    console.log(`[Migration v13] Processed ${offset} books (covers)...`);
   }
-      console.log(`[Migration v13] Cover migration complete.`);
-});
-  }
-}
 
-// ===================================
-// Database Instance
-// ===================================
+  // ===================================
+  // Database Instance
+  // ===================================
 
-export const db = new LectroDB();
+  export const db = new LectroDB();
 
 // Seed default user
 import { hashPassword } from '../auth';
