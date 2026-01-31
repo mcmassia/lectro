@@ -23,9 +23,12 @@ interface BookChatProps {
     setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
     input: string;
     setInput: React.Dispatch<React.SetStateAction<string>>;
+    isIndexed?: boolean;
+    isIndexing?: boolean;
+    onIndexBook?: () => void;
 }
 
-export function BookChat({ book, xrayData, onClose, messages, setMessages, input, setInput }: BookChatProps) {
+export function BookChat({ book, xrayData, onClose, messages, setMessages, input, setInput, isIndexed, isIndexing, onIndexBook }: BookChatProps) {
     const [isSending, setIsSending] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const { currentUser } = useAppStore();
@@ -113,15 +116,29 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
     };
 
     return (
-        <div className="book-chat-container animate-slide-up">
-            <div className="chat-header">
+        <div className="book-chat-container animate-fade-in">
+            {!isIndexed && onIndexBook && (
+                <div className="indexing-banner">
+                    <div className="banner-content">
+                        <Sparkles size={16} />
+                        <span>Este chat solo usa el resumen X-Ray. Para respuestas precisas sobre todo el contenido:</span>
+                    </div>
+                    <button
+                        onClick={onIndexBook}
+                        disabled={isIndexing}
+                        className="index-btn"
+                    >
+                        {isIndexing ? 'Indexando...' : 'Indexar Profundo'}
+                    </button>
+                </div>
+            )}
+
+            <div className="chat-header hidden">
                 <div className="header-title">
                     <Sparkles size={18} className="text-accent" />
                     <h3>Chat con {book.title}</h3>
                 </div>
-                <button className="close-btn" onClick={onClose}>
-                    <X size={18} />
-                </button>
+                {/* Close button removed for tab usage */}
             </div>
 
             <div className="messages-list" ref={scrollRef}>
@@ -187,8 +204,33 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
                     height: 100%;
                     width: 100%;
                     background: var(--color-bg-secondary);
-                    border-left: 1px solid var(--color-border);
+                    /* border-left removed */
+                    border-radius: 12px;
+                    overflow: hidden;
+                    border: 1px solid var(--color-border);
                 }
+
+                .indexing-banner {
+                    background: rgba(168, 85, 247, 0.1);
+                    border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+                    padding: 8px 16px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    font-size: 13px;
+                }
+                .banner-content { display: flex; align-items: center; gap: 8px; color: var(--color-accent); }
+                .index-btn {
+                    background: var(--color-accent);
+                    color: white;
+                    border: none;
+                    padding: 4px 12px;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    cursor: pointer;
+                }
+                .index-btn:disabled { opacity: 0.7; cursor: wait; }
 
                 .chat-header {
                     padding: 16px;
@@ -198,6 +240,7 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
                     align-items: center;
                     background: var(--color-bg-tertiary);
                 }
+                .chat-header.hidden { display: none; }
 
                 .header-title {
                     display: flex;
