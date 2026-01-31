@@ -77,20 +77,27 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
             let chunkIdCounter = 0;
 
             sections.forEach((sec, idx) => {
-                // Split content by paragraphs approx 500-1000 chars
-                const paragraphs = sec.content.split(/\n\n+/);
+                // Split content by paragraphs
+                const paragraphs = sec.content.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0);
                 let currentChunk = '';
 
                 paragraphs.forEach(p => {
+                    // Check if adding this paragraph exceeds limit
                     if ((currentChunk.length + p.length) > 1000) {
-                        chunks.push(currentChunk);
-                        chunkMeta.push({ chapterIndex: idx, chapterTitle: sec.title, text: currentChunk });
+                        // Only push if we actually have content accumulated
+                        if (currentChunk.length > 0) {
+                            chunks.push(currentChunk);
+                            chunkMeta.push({ chapterIndex: idx, chapterTitle: sec.title, text: currentChunk });
+                        }
+                        // Start new chunk with current paragraph
                         currentChunk = p;
                     } else {
                         currentChunk += (currentChunk ? '\n\n' : '') + p;
                     }
                 });
-                if (currentChunk) {
+
+                // Push remaining
+                if (currentChunk.length > 0) {
                     chunks.push(currentChunk);
                     chunkMeta.push({ chapterIndex: idx, chapterTitle: sec.title, text: currentChunk });
                 }
