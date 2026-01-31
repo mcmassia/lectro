@@ -240,6 +240,35 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
 
                     {activeSection === 'overview' && (
                         <div className="content-slide animate-slide-up">
+                            {/* Indexing Status Card - Prominent Action */}
+                            <div className="content-card flex justify-between items-center mb-6" style={{ background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}>
+                                <div className="flex items-center gap-4">
+                                    <div className={`p-3 rounded-full ${isIndexed ? 'bg-green-500/10 text-green-500' : 'bg-purple-500/10 text-purple-500'}`}>
+                                        <BrainCircuit size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold flex items-center gap-2">
+                                            {isIndexed ? 'Indexación Profunda Activa' : 'Habilitar Indexación Profunda'}
+                                        </h3>
+                                        <p className="text-sm text-gray-400">
+                                            {isIndexed
+                                                ? 'La IA tiene acceso al contenido completo del libro.'
+                                                : 'Permite a la IA leer el libro completo para respuestas precisas.'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleIndexBook}
+                                    disabled={isIndexing}
+                                    className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${isIndexed
+                                            ? 'bg-transparent text-gray-400 border border-gray-700 hover:text-white hover:border-white'
+                                            : 'bg-purple-600 text-white hover:bg-purple-500 shadow-lg hover:shadow-purple-500/20'
+                                        }`}
+                                >
+                                    {isIndexing ? 'Indexando...' : (isIndexed ? 'Actualizar' : 'Indexar Ahora')}
+                                </button>
+                            </div>
+
                             {/* Summary Card */}
                             <div className="content-card featured">
                                 <div className="card-header">

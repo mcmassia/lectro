@@ -219,6 +219,20 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
                     align-items: center;
                     font-size: 13px;
                 }
+                .indexing-banner.indexed {
+                    background: rgba(34, 197, 94, 0.1);
+                    border-color: rgba(34, 197, 94, 0.2);
+                }
+                .indexing-banner.indexed .banner-content { color: #22c55e; }
+                .indexing-banner.indexed .index-btn {
+                    background: transparent;
+                    border: 1px solid #22c55e;
+                    color: #22c55e;
+                }
+                .indexing-banner.indexed .index-btn:hover {
+                    background: rgba(34, 197, 94, 0.1);
+                }
+
                 .banner-content { display: flex; align-items: center; gap: 8px; color: var(--color-accent); }
                 .index-btn {
                     background: var(--color-accent);
