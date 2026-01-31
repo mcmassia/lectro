@@ -334,6 +334,24 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
                     from { opacity: 0; transform: translateY(10px); }
                     to { opacity: 1; transform: translateY(0); }
                 }
+
+                .markdown-content p {
+                    margin-bottom: 8px;
+                }
+                .markdown-content p:last-child {
+                    margin-bottom: 0;
+                }
+                .markdown-content ul, .markdown-content ol {
+                    padding-left: 20px;
+                    margin-bottom: 8px;
+                }
+                .markdown-content li {
+                    margin-bottom: 4px;
+                }
+                .markdown-content strong {
+                    font-weight: 700;
+                    color: inherit;
+                }
             `}</style>
         </div>
     );

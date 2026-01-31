@@ -2,10 +2,10 @@
 
 import { XRayData, Book } from '@/lib/db';
 import { useLibraryStore } from '@/stores/appStore';
-import { ArrowLeft, BrainCircuit, Users, MapPin, BookOpen, FileText, Sparkles, Zap, Library, Globe, X } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, Users, MapPin, BookOpen, FileText, Sparkles, Zap, Library, Globe, X, MessageSquare } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BookCard } from './BookCard';
-import { BookChat } from '../ai/BookChat';
+import { BookChat, Message } from '../ai/BookChat';
 import { GoogleBook, searchBooks } from '@/lib/services/googleBooks';
 
 interface XRayViewProps {
@@ -400,6 +400,21 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     )}
 
                 </div>
+
+                {/* Right Chat Panel */}
+                {showChat && (
+                    <div className="dashboard-chat-panel border-l border-border bg-bg-secondary w-[400px] flex flex-col h-full animate-slide-in-right">
+                        <BookChat
+                            book={book}
+                            xrayData={data}
+                            onClose={() => setShowChat(false)}
+                            messages={chatMessages}
+                            setMessages={setChatMessages}
+                            input={chatInput}
+                            setInput={setChatInput}
+                        />
+                    </div>
+                )}
             </div>
 
             <style jsx>{`
@@ -409,7 +424,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     height: 100%;
                     background: var(--color-bg-primary);
                     color: var(--color-text-primary);
-                    overflow: auto;
+                    overflow: hidden; /* Changed from auto to hidden to utilize flex height */
                 }
 
                 .dashboard-header {
@@ -419,10 +434,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     padding: 16px 40px;
                     border-bottom: 1px solid var(--color-border);
                     background: var(--color-bg-secondary);
-                    position: sticky;
-                    top: 0;
-                    z-index: 10;
-                    backdrop-filter: blur(10px);
+                    flex-shrink: 0;
                     height: auto;
                     min-height: 100px;
                 }
@@ -479,10 +491,11 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     color: var(--color-text-secondary);
                 }
 
-                .action-btn.primary {
-                    background: var(--color-accent);
-                    color: white;
-                    border: none;
+                .action-btn {
+                    /* Default style, removed primary class dependency */
+                    background: var(--color-bg-tertiary);
+                    color: var(--color-text-secondary);
+                    border: 1px solid var(--color-border);
                     padding: 8px 16px;
                     border-radius: 100px;
                     display: flex;
@@ -490,18 +503,34 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     gap: 8px;
                     font-weight: 600;
                     cursor: pointer;
-                    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
                     transition: all 0.2s;
                 }
+                .action-btn:hover { background: var(--color-bg-elevated); color: var(--color-text-primary); }
+                
+                .action-btn.primary {
+                    background: var(--color-accent);
+                    color: white;
+                    border: none;
+                    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+                }
                 .action-btn.primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(168, 85, 247, 0.4); }
+
+                .action-btn.active {
+                    background: var(--color-bg-elevated);
+                    color: var(--color-accent);
+                    border-color: var(--color-accent);
+                }
 
                 .dashboard-grid {
                     display: grid;
                     grid-template-columns: 260px 1fr;
                     flex: 1;
-                    max-width: 1600px;
                     width: 100%;
-                    margin: 0 auto;
+                    overflow: hidden; /* Contain scroll */
+                }
+                
+                .dashboard-grid.with-chat {
+                    grid-template-columns: 260px 1fr auto;
                 }
 
                 .dashboard-sidebar {
@@ -510,6 +539,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     display: flex;
                     flex-direction: column;
                     gap: 32px;
+                    overflow-y: auto;
                 }
 
                 .nav-menu {
@@ -585,6 +615,9 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                 .dashboard-content {
                     padding: 40px 60px;
                     overflow-y: auto;
+                    max-width: 1600px;
+                    margin: 0 auto;
+                    width: 100%;
                 }
 
                 .content-slide {
@@ -592,6 +625,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     flex-direction: column;
                     gap: 32px;
                     max-width: 1000px;
+                    margin: 0 auto;
                 }
                 
                 .section-header { margin-bottom: 16px; }
@@ -727,6 +761,12 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     border-radius: 16px;
                     color: var(--color-text-secondary);
                 }
+
+                @keyframes slideInRight {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                .animate-slide-in-right { animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 
                 @keyframes slideUp {
                     from { opacity: 0; transform: translateY(20px); }
