@@ -5,24 +5,22 @@ import { useLibraryStore } from '@/stores/appStore';
 import { ArrowLeft, BrainCircuit, Users, MapPin, BookOpen, FileText, Sparkles, Zap, Library, Globe, X, MessageSquare } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { BookCard } from './BookCard';
-import { BookChat, Message } from '../ai/BookChat';
-import { GoogleBook, searchBooks } from '@/lib/services/googleBooks';
-
-interface XRayViewProps {
-    data: XRayData;
-    book: Book;
-    onBack: () => void;
-}
+import { generateBatchEmbeddingsAction } from '@/app/actions/ai';
+import { extractBookText } from '@/lib/utils/extractBookText';
+import { db, VectorChunk, updateBook } from '@/lib/db';
 
 export function XRayView({ data, book, onBack }: XRayViewProps) {
-    const [activeSection, setActiveSection] = useState<'overview' | 'characters' | 'world' | 'author_books' | 'recommendations' | 'web_info'>('overview');
-    const [showChat, setShowChat] = useState(false);
+    const [activeSection, setActiveSection] = useState<'overview' | 'characters' | 'world' | 'author_books' | 'recommendations' | 'web_info' | 'chat'>('overview');
     const [chatMessages, setChatMessages] = useState<Message[]>([]);
     const [chatInput, setChatInput] = useState('');
     const [webInfo, setWebInfo] = useState<GoogleBook | null>(null);
     const [isLoadingWeb, setIsLoadingWeb] = useState(false);
 
-    const { books, setSelectedBookId, setView, setSelectedAuthor } = useLibraryStore();
+    // Indexing state
+    const [isIndexing, setIsIndexing] = useState(false);
+    const [isIndexed, setIsIndexed] = useState(!!book.indexedAt);
+
+    const { books, setSelectedBookId, setView, setSelectedAuthor, updateBook: updateBookInStore } = useLibraryStore();
 
     // Data Filtering for Tabs
     const authorBooks = books.filter(b => b.author === book.author && b.id !== book.id);
@@ -48,6 +46,78 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                 .finally(() => setIsLoadingWeb(false));
         }
     }, [activeSection, book, webInfo, isLoadingWeb]);
+
+    const handleIndexBook = async () => {
+        setIsIndexing(true);
+        try {
+            // 1. Extract Text
+            const sections = await extractBookText(book);
+            if (sections.length === 0) throw new Error('No text extracted');
+
+            // 2. Prepare Chunks
+            const chunks: string[] = [];
+            const chunkMeta: { chapterIndex: number; chapterTitle: string; text: string }[] = [];
+
+            // Simple chunking strategy: split big sections, keep small ones
+            // For now, simpler: pass paragraph based chunks to embedder?
+            // Actually, extractBookText gives full content per section. We need to split it if it's too large.
+            // Gemini batch embedding limit is 100 texts.
+            // We should split by roughly 1000 characters or paragraphs?
+
+            let chunkIdCounter = 0;
+
+            sections.forEach((sec, idx) => {
+                // Split content by paragraphs approx 500-1000 chars
+                const paragraphs = sec.content.split(/\n\n+/);
+                let currentChunk = '';
+
+                paragraphs.forEach(p => {
+                    if ((currentChunk.length + p.length) > 1000) {
+                        chunks.push(currentChunk);
+                        chunkMeta.push({ chapterIndex: idx, chapterTitle: sec.title, text: currentChunk });
+                        currentChunk = p;
+                    } else {
+                        currentChunk += (currentChunk ? '\n\n' : '') + p;
+                    }
+                });
+                if (currentChunk) {
+                    chunks.push(currentChunk);
+                    chunkMeta.push({ chapterIndex: idx, chapterTitle: sec.title, text: currentChunk });
+                }
+            });
+
+            // 3. Generate Embeddings (Batching 100 at a time)
+            const BATCH_SIZE = 50;
+            for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+                const batch = chunks.slice(i, i + BATCH_SIZE);
+                const result = await generateBatchEmbeddingsAction(batch);
+
+                if (result.success && result.embeddings) {
+                    // Save to DB
+                    const vectorChunks: VectorChunk[] = result.embeddings.map((embedding, batchIdx) => ({
+                        id: crypto.randomUUID(),
+                        bookId: book.id,
+                        ...chunkMeta[i + batchIdx],
+                        embedding
+                    }));
+                    await db.vectorChunks.bulkAdd(vectorChunks);
+                }
+            }
+
+            // 4. Update Book Status
+            const now = new Date();
+            await updateBook(book.id, { indexedAt: now });
+            updateBookInStore(book.id, { indexedAt: now });
+            setIsIndexed(true);
+            alert('Libro indexado correctamente. Ahora puedes hacer preguntas profundas.');
+
+        } catch (error) {
+            console.error('Indexing failed:', error);
+            alert('Error durante la indexación: ' + (error as any).message);
+        } finally {
+            setIsIndexing(false);
+        }
+    };
 
     return (
         <div className="xray-dashboard animate-fade-in">
@@ -79,13 +149,7 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                 </div>
 
                 <div className="header-actions">
-                    <button
-                        className={`action-btn ${showChat ? 'active' : 'primary'}`}
-                        onClick={() => setShowChat(!showChat)}
-                    >
-                        <MessageSquare size={16} />
-                        <span>Chat con IA</span>
-                    </button>
+                    {/* Actions if needed */}
                 </div>
             </div>
 
@@ -101,6 +165,14 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                         >
                             <BrainCircuit size={18} />
                             <span>Visión General</span>
+                        </button>
+                        <button
+                            className={`nav-item ${activeSection === 'chat' ? 'active' : ''}`}
+                            onClick={() => setActiveSection('chat')}
+                        >
+                            <MessageSquare size={18} />
+                            <span>Chat con IA</span>
+                            {!isIndexed && <span className="nav-badge" style={{ background: 'var(--color-accent)', color: 'white' }}>New</span>}
                         </button>
                         <button
                             className={`nav-item ${activeSection === 'characters' ? 'active' : ''}`}
@@ -191,6 +263,23 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                                     </ul>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {activeSection === 'chat' && (
+                        <div className="h-full animate-slide-up" style={{ height: 'calc(100vh - 200px)' }}>
+                            <BookChat
+                                book={book}
+                                xrayData={data}
+                                onClose={() => setActiveSection('overview')}
+                                messages={chatMessages}
+                                setMessages={setChatMessages}
+                                input={chatInput}
+                                setInput={setChatInput}
+                                isIndexed={isIndexed}
+                                isIndexing={isIndexing}
+                                onIndexBook={handleIndexBook}
+                            />
                         </div>
                     )}
 
@@ -286,8 +375,6 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                             )}
                         </div>
                     )}
-
-
 
                     {activeSection === 'web_info' && (
                         <div className="content-slide animate-slide-up">
@@ -387,21 +474,6 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                     )}
 
                 </div>
-
-                {/* Right Chat Panel */}
-                {showChat && (
-                    <div className="dashboard-chat-panel border-l border-border bg-bg-secondary w-[400px] flex flex-col h-full animate-slide-in-right">
-                        <BookChat
-                            book={book}
-                            xrayData={data}
-                            onClose={() => setShowChat(false)}
-                            messages={chatMessages}
-                            setMessages={setChatMessages}
-                            input={chatInput}
-                            setInput={setChatInput}
-                        />
-                    </div>
-                )}
             </div>
 
             <style jsx>{`
