@@ -6,7 +6,7 @@ import { useLibraryStore, useAppStore } from '@/stores/appStore';
 import { getAllBooks, Book } from '@/lib/db';
 import { BookCard } from '@/components/library/BookCard';
 import { ImportModal } from '@/components/library/ImportModal';
-import { BookDetailsModal } from '@/components/library/BookDetailsModal';
+import { BookDetailsView } from '@/components/library/BookDetailsView';
 import { XRayView } from '@/components/library/XRayView';
 import { db } from '@/lib/db';
 const SortIcon = () => (
@@ -161,6 +161,17 @@ export default function LibraryPage() {
             }
         }
     }, [currentView, selectedBookId, books, selectedBook]);
+
+    if (currentView === 'book-details' && selectedBookId) {
+        const book = books.find(b => b.id === selectedBookId);
+        if (book) {
+            return (
+                <div className="h-full w-full">
+                    <BookDetailsView book={book} onBack={() => setView('library')} />
+                </div>
+            );
+        }
+    }
 
     if (currentView === 'xray') {
         if (!selectedBookId) {
@@ -411,8 +422,8 @@ export default function LibraryPage() {
                                         // But if NOT in selection mode, we select standard way AND set ID for Sidebar
                                         // BUT, maybe user wants sidebar even without modal?
                                         // For now, keep modal behavior + sidebar update
-                                        setSelectedBook(bk);
                                         setSelectedBookId(bk.id);
+                                        setView('book-details');
                                     }}
                                 />
                             ))}
@@ -462,12 +473,7 @@ export default function LibraryPage() {
                 <ImportModal onClose={() => setShowImport(false)} />
             )}
 
-            {selectedBook && (
-                <BookDetailsModal
-                    book={selectedBook}
-                    onClose={() => setSelectedBook(null)}
-                />
-            )}
+
 
             <style jsx>{`
                 .page-container {

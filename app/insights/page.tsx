@@ -7,7 +7,8 @@ import { getRagResponseAction } from '@/app/actions/ai';
 import { getAllVectorChunks, getAllBooks, Book, db } from '@/lib/db';
 import { v4 as uuid } from 'uuid';
 import ReactMarkdown from 'react-markdown';
-import { BookDetailsModal } from '@/components/library/BookDetailsModal';
+import { useRouter } from 'next/navigation';
+import { useLibraryStore } from '@/stores/appStore';
 
 const SendIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
@@ -33,6 +34,8 @@ export default function InsightsPage() {
     const [indexingFilter, setIndexingFilter] = useState<string>('all');
     const [deepIndexSearch, setDeepIndexSearch] = useState('');
     const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+    const router = useRouter();
+    const { setSelectedBookId, setView } = useLibraryStore();
     const indexerRef = useRef<any>(null); // To store indexer instance
     const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -293,7 +296,11 @@ export default function InsightsPage() {
                                                                             className="text-accent hover:underline font-medium inline-block mx-1"
                                                                             onClick={() => {
                                                                                 const book = books.find(b => b.id === bookId);
-                                                                                if (book) setSelectedBook(book);
+                                                                                if (book) {
+                                                                                    setSelectedBookId(book.id);
+                                                                                    setView('book-details');
+                                                                                    router.push('/');
+                                                                                }
                                                                             }}
                                                                         >
                                                                             {props.children}
@@ -330,7 +337,11 @@ export default function InsightsPage() {
                                                                 className="source-tag hover:bg-opacity-80 transition-colors cursor-pointer"
                                                                 onClick={() => {
                                                                     const book = books.find(b => b.id === bookId);
-                                                                    if (book) setSelectedBook(book);
+                                                                    if (book) {
+                                                                        setSelectedBookId(book.id);
+                                                                        setView('book-details');
+                                                                        router.push('/');
+                                                                    }
                                                                 }}
                                                             >
                                                                 <BookIcon />
@@ -526,12 +537,7 @@ export default function InsightsPage() {
                 </div>
             </div>
 
-            {selectedBook && (
-                <BookDetailsModal
-                    book={selectedBook}
-                    onClose={() => setSelectedBook(null)}
-                />
-            )}
+
 
             <style jsx>{`
          .status-dot {
