@@ -59,7 +59,9 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
         setIsIndexing(true);
         try {
             // 1. Extract Text
+            console.log('Starting Deep Indexing...');
             const sections = await extractBookText(book);
+            console.log(`Extracted ${sections.length} sections.`);
             if (sections.length === 0) throw new Error('No text extracted');
 
             // 2. Prepare Chunks
@@ -94,13 +96,17 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                 }
             });
 
+            console.log(`Generated ${chunks.length} chunks for embedding.`);
+
             // 3. Generate Embeddings (Batching 100 at a time)
             const BATCH_SIZE = 50;
             for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+                console.log(`Processing batch ${i / BATCH_SIZE + 1}...`);
                 const batch = chunks.slice(i, i + BATCH_SIZE);
                 const result = await generateBatchEmbeddingsAction(batch);
 
                 if (result.success && result.embeddings) {
+                    console.log(`Batch success. Saving ${result.embeddings.length} vectors.`);
                     // Save to DB
                     const vectorChunks: VectorChunk[] = result.embeddings.map((embedding, batchIdx) => ({
                         id: crypto.randomUUID(),
@@ -109,6 +115,8 @@ export function XRayView({ data, book, onBack }: XRayViewProps) {
                         embedding
                     }));
                     await db.vectorChunks.bulkAdd(vectorChunks);
+                } else {
+                    console.error('Batch failed:', result.error);
                 }
             }
 
