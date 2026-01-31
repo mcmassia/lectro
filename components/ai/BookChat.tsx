@@ -117,18 +117,18 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
 
     return (
         <div className="book-chat-container animate-fade-in">
-            {!isIndexed && onIndexBook && (
-                <div className="indexing-banner">
+            {onIndexBook && (
+                <div className={`indexing-banner ${isIndexed ? 'indexed' : ''}`}>
                     <div className="banner-content">
                         <Sparkles size={16} />
-                        <span>Este chat solo usa el resumen X-Ray. Para respuestas precisas sobre todo el contenido:</span>
+                        <span>{isIndexed ? 'Libro indexado para respuestas profundas.' : 'Este chat solo usa el resumen X-Ray. Para respuestas precisas sobre todo el contenido:'}</span>
                     </div>
                     <button
                         onClick={onIndexBook}
                         disabled={isIndexing}
                         className="index-btn"
                     >
-                        {isIndexing ? 'Indexando...' : 'Indexar Profundo'}
+                        {isIndexing ? 'Indexando...' : (isIndexed ? 'Actualizar Índice' : 'Indexar Profundo')}
                     </button>
                 </div>
             )}
