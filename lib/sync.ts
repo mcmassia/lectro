@@ -350,11 +350,15 @@ function getTime(date?: Date | string): number {
 }
 
 function hydrateBookDates(book: any): Book {
+    // STRIP USER SPECIFIC FIELDS from Book Object
+    // These should only exist in UserBookData to prevent "fossilized" progress overwriting actual progress during sync
+    const { progress, currentPage, currentPosition, lastReadAt, status, ...cleanBook } = book;
+
     return {
-        ...book,
+        ...cleanBook,
         addedAt: new Date(book.addedAt),
         updatedAt: book.updatedAt ? new Date(book.updatedAt) : undefined,
-        lastReadAt: book.lastReadAt ? new Date(book.lastReadAt) : undefined,
+        // Remove lastReadAt from here entirely, it belongs in UserBookData
     };
 }
 
