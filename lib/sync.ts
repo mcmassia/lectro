@@ -331,7 +331,7 @@ export async function pushLocalData(lastSync?: Date) {
             // No XRay push for now
         };
 
-        const res = await fetch('/api/library/sync', {
+        const res = await fetch('/api/library/metadata', {
             method: 'POST',
             headers,
             body: JSON.stringify(payload)
