@@ -300,16 +300,25 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
             let readingBooks: Book[] = [];
 
             if (currentUser) {
+                console.log(`[loadRecentBooks] Current User: ${currentUser.id} (${currentUser.username})`);
+
                 // 1. Get Reading Books specifically (for Continue Reading section)
                 readingBooks = await getReadingBooksForUser(currentUser.id);
+                console.log(`[loadRecentBooks] Found ${readingBooks.length} reading books for user.`);
 
                 // 2. Hydrate recent books with user data
                 const allUserData = await db.userBookData.where('userId').equals(currentUser.id).toArray();
+                console.log(`[loadRecentBooks] Found ${allUserData.length} UserBookData entries.`);
+
                 const userDataMap = new Map(allUserData.map(d => [d.bookId, d]));
 
                 booksWithUser = recentBooks.map(book => {
                     const data = userDataMap.get(book.id);
                     if (data) {
+                        // Debug specific book if needed
+                        if (book.title.includes('Madre patria')) {
+                            console.log(`[loadRecentBooks] Hydrating 'Madre patria' with progress: ${data.progress}%, status: ${data.status} (User ID in data: ${data.userId})`);
+                        }
                         return {
                             ...book,
                             progress: data.progress,
@@ -324,14 +333,28 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
                                 manualCategories: data.manualCategories
                             }
                         };
+                    } else {
+                        if (book.title.includes('Madre patria')) {
+                            console.log(`[loadRecentBooks] 'Madre patria' found in recentBooks but NO UserBookData found for user ${currentUser.id}`);
+                        }
                     }
                     return book;
                 });
+            } else {
+                console.log('[loadRecentBooks] No current user.');
             }
 
             // Merge Lists: recentBooks + readingBooks (deduplicated)
             const combinedMap = new Map<string, Book>();
-            [...readingBooks, ...booksWithUser].forEach(b => combinedMap.set(b.id, b));
+            // Add booksWithUser FIRST, then readingBooks. 
+            // readingBooks comes from 'getReadingBooksForUser' which logic uses `where('userId')...`
+            // So readingBooks IS the user data.
+            // booksWithUser IS ALSO the user data (hydrated).
+            // Logic seems redundant but safe IF hydration works.
+            // Let's swap order to prioritize readingBooks just in case? 
+            // No, if hydration worked they should be identical.
+
+            [...booksWithUser, ...readingBooks].forEach(b => combinedMap.set(b.id, b));
             const finalBooks = Array.from(combinedMap.values())
                 .sort((a, b) => (new Date(b.lastReadAt || b.updatedAt || 0).getTime() - new Date(a.lastReadAt || a.updatedAt || 0).getTime()))
                 .slice(0, 40); // Increased limit slightly to accommodate both
