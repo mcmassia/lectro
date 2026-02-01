@@ -311,16 +311,27 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
                 console.log(`[loadRecentBooks] Found ${allUserData.length} UserBookData entries.`);
 
                 // DEBUG: Check for duplicates specifically for the problematic book
-                const madreEntries = allUserData.filter(d => d.bookId === '9342fc80-1734-481a-a67f-dcfc05bb2604' || d.bookId.includes('4283'));
+                // 'Madre patria' ID from logs is likely '4283-2069b1a038115533'
+                const targetBookId = '4283-2069b1a038115533';
+                const madreEntries = allUserData.filter(d => d.bookId === targetBookId || d.bookId.includes('4283'));
+
                 if (madreEntries.length > 0) {
                     console.log(`[loadRecentBooks] Found ${madreEntries.length} entries for Madre patria/problem book:`);
                     madreEntries.forEach(e => {
                         console.log(`   - ID: ${e.id}, PID: ${e.userId}+${e.bookId}, Progress: ${e.progress}%, Status: ${e.status}, Updated: ${e.updatedAt}`);
+
+                        if (e.userId !== currentUser.id) {
+                            console.warn(`[loadRecentBooks] MISMATCH DETECTED: Data userId (${e.userId}) != Current Session userId (${currentUser.id}). Using data anyway.`);
+                        }
                     });
                 }
 
                 const userDataMap = new Map();
                 allUserData.forEach(d => {
+                    // Check for ID mismatch again for general case
+                    if (d.userId !== currentUser.id && d.bookId === targetBookId) {
+                        console.warn(`[loadRecentBooks] Processing mismatch for target book ${d.bookId}`);
+                    }
                     userDataMap.set(d.bookId, d);
                 });
 

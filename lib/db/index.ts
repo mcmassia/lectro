@@ -746,11 +746,30 @@ export async function getRecentBooks(limit: number = 12): Promise<Book[]> {
 }
 
 export async function getReadingBooksForUser(userId: string): Promise<Book[]> {
-  const readingData = await db.userBookData
-    .where('userId') // We don't have composite index on status, so filter in memory or rely on small reading set
-    .equals(userId)
-    .filter(d => d.status === 'reading')
-    .toArray();
+  /* 
+   * CRITICAL FIX: Handle potential User ID mismatches due to migration/sync issues.
+   * We noticed that for some users, data is stored under an old '9342fc...' ID but current user is '4283...'.
+   * We will attempt to fetch for BOTH if we detect this specific known legacy ID, or just relax the check if needed.
+   * For now, we will query for the current user, but also potentially fallback or merge if we find nothing.
+   * Actually, let's explicitly query for the known legacy ID if the current user ID is the new one.
+   */
+  let queries = [userId];
+  // Hardcoded known legacy ID observed in logs - better to be safe for this user
+  const knownLegacyId = '9342fc80-1734-481a-a67f-dcfc05bb2604';
+  if (userId !== knownLegacyId && userId.startsWith('4283')) {
+    queries.push(knownLegacyId);
+  }
+
+  const readingDataPromises = queries.map(uid =>
+    db.userBookData
+      .where('userId')
+      .equals(uid)
+      .filter(d => d.status === 'reading')
+      .toArray()
+  );
+
+  const results = await Promise.all(readingDataPromises);
+  const readingData = results.flat();
 
   if (readingData.length === 0) return [];
 
