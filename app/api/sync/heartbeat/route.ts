@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-
-const CONFIG_FILE = path.join(process.cwd(), 'server-config.json');
-
-function getLibraryPath(): string {
-    if (process.env.LECTRO_LIBRARY_PATH) return process.env.LECTRO_LIBRARY_PATH;
-    try {
-        if (fs.existsSync(CONFIG_FILE)) {
-            const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-            if (config.libraryPath) return config.libraryPath;
-        }
-    } catch (e) { }
-    return path.join(process.cwd(), 'library');
-}
+import { getLibraryPath } from '@/lib/server/config';
 
 export async function POST(req: NextRequest) {
     try {
@@ -25,6 +13,7 @@ export async function POST(req: NextRequest) {
 
         const libraryPath = getLibraryPath();
         const dbPath = path.join(libraryPath, 'lectro_data.json');
+        console.log(`[Heartbeat] Using DB path: ${dbPath}`);
 
         if (!fs.existsSync(dbPath)) {
             return NextResponse.json({ error: 'Library DB not found' }, { status: 404 });
@@ -87,6 +76,7 @@ export async function POST(req: NextRequest) {
 
         // Write Back
         fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+        console.log(`[Heartbeat] Successfully updated DB at ${dbPath} for book ${bookId} user ${userId || 'guest'}`);
 
         return NextResponse.json({ success: true, timestamp: now });
 
