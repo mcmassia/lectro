@@ -17,7 +17,7 @@ function getLibraryPath(): string {
 
 export async function POST(req: NextRequest) {
     try {
-        const { bookId, cfi, progress, totalPages, currentPage } = await req.json();
+        const { bookId, userId, cfi, progress, totalPages, currentPage } = await req.json();
 
         if (!bookId || !cfi) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -31,31 +31,58 @@ export async function POST(req: NextRequest) {
         }
 
         // Read DB
-        // Lock mechanism would be ideal here but file system locking is complex in Node. 
-        // For personal use, conflict risk is low.
         const fileContent = fs.readFileSync(dbPath, 'utf8');
         const data = JSON.parse(fileContent);
+        const now = new Date().toISOString();
 
-        const bookIndex = data.books?.findIndex((b: any) => b.id === bookId);
+        if (userId) {
+            // Update User-Specific Data (UserBookData)
+            if (!data.userBookData) data.userBookData = [];
 
-        if (bookIndex === -1) {
-            return NextResponse.json({ error: 'Book not found' }, { status: 404 });
+            const userBookIndex = data.userBookData.findIndex((d: any) => d.userId === userId && d.bookId === bookId);
+
+            if (userBookIndex !== -1) {
+                // Update existing
+                data.userBookData[userBookIndex] = {
+                    ...data.userBookData[userBookIndex],
+                    currentPosition: cfi,
+                    progress: progress ?? data.userBookData[userBookIndex].progress,
+                    totalPages: totalPages ?? data.userBookData[userBookIndex].totalPages,
+                    currentPage: currentPage ?? data.userBookData[userBookIndex].currentPage,
+                    lastReadAt: now,
+                    updatedAt: now
+                };
+            } else {
+                // Create new
+                data.userBookData.push({
+                    userId,
+                    bookId,
+                    currentPosition: cfi,
+                    progress: progress ?? 0,
+                    status: 'reading',
+                    lastReadAt: now,
+                    updatedAt: now
+                });
+            }
+
+            // Also update the book global lastReadAt just for activity tracking if needed?
+            // Actually, better to leave global book untouched if using users.
+        } else {
+            // Legacy / Single User Mode: Update Global Book
+            const bookIndex = data.books?.findIndex((b: any) => b.id === bookId);
+
+            if (bookIndex !== -1) {
+                data.books[bookIndex] = {
+                    ...data.books[bookIndex],
+                    currentPosition: cfi,
+                    progress: progress ?? data.books[bookIndex].progress,
+                    totalPages: totalPages ?? data.books[bookIndex].totalPages,
+                    lastReadAt: now,
+                };
+            }
         }
 
-        // Update Book
-        const now = new Date().toISOString();
-        data.books[bookIndex] = {
-            ...data.books[bookIndex],
-            currentPosition: cfi,
-            progress: progress ?? data.books[bookIndex].progress,
-            totalPages: totalPages ?? data.books[bookIndex].totalPages,
-            lastReadAt: new Date(now), // Ensure it's a Date object if using a library that handles it, or string
-            // JSON serialization will make it a string anyway
-        };
-        // Normalize date just in case
-        data.books[bookIndex].lastReadAt = now;
-
-        // Also update Last Sync time?
+        // Always update Last Sync timestamp to indicate change
         data.lastSync = now;
 
         // Write Back

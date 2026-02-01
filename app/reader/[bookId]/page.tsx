@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useReaderStore, useAppStore } from '@/stores/appStore';
-import { getBook, updateBook, getAnnotationsForUserBook, addAnnotation, updateAnnotation, deleteAnnotation, Annotation, Book, HighlightColor } from '@/lib/db';
+import { useReaderStore, useAppStore, useLibraryStore } from '@/stores/appStore';
+import { getBook, updateBook, updateUserBookData, getAnnotationsForUserBook, addAnnotation, updateAnnotation, deleteAnnotation, Annotation, Book, HighlightColor } from '@/lib/db';
 import { EpubReader, TocItem } from '@/components/reader/EpubReader';
 import { WebPubReader, WebPubReaderRef } from '@/components/reader/WebPubReader';
 import dynamic from 'next/dynamic';
@@ -100,32 +100,43 @@ export default function ReaderPage() {
         if (book) {
             const progress = Math.round((page / total) * 100);
 
-            // Local update (IndexedDB)
-            await updateBook(bookId, {
-                currentPosition: cfi,
-                currentPage: page,
-                totalPages: total,
-                progress,
-            });
+            // Local update (IndexedDB): Use UserBookData if logged in
+            if (currentUser) {
+                await updateUserBookData(currentUser.id, bookId, {
+                    currentPosition: cfi,
+                    currentPage: page,
+                    progress,
+                    lastReadAt: new Date(),
+                    status: 'reading'
+                });
+            } else {
+                // Fallback for no user
+                await updateBook(bookId, {
+                    currentPosition: cfi,
+                    currentPage: page,
+                    totalPages: total,
+                    progress,
+                });
+            }
 
             // Server Heartbeat (Fire and forget)
-            // No await to avoid blocking UI
             if (navigator.onLine) {
                 fetch('/api/sync/heartbeat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         bookId,
+                        userId: currentUser?.id,
                         cfi,
                         progress,
                         totalPages: total,
                         currentPage: page
                     }),
-                    keepalive: true // Ensure request finishes even if page unloads
+                    keepalive: true
                 }).catch(e => console.warn('Heartbeat failed:', e));
             }
         }
-    }, [book, bookId, setCurrentCfi, setCurrentPage, setTotalPages, setChapterTitle]);
+    }, [book, bookId, currentUser, setCurrentCfi, setCurrentPage, setTotalPages, setChapterTitle]);
 
     const handleTextSelect = useCallback((text: string, cfi: string, rect: { x: number; y: number }) => {
         setSelection(text, cfi);
@@ -167,6 +178,9 @@ export default function ReaderPage() {
         setShowAnnotationPopover(false);
         setNoteText('');
         clearSelection();
+
+        // Trigger background sync to push annotation to server
+        useLibraryStore.getState().syncMetadata().catch(e => console.error('BG Sync failed:', e));
     }, [selectedText, selectionCfi, book, currentUser, annotations, setAnnotations, clearSelection, noteText, selectedColor, chapterTitle, currentPage]);
 
     const handleClosePopover = useCallback(() => {
@@ -202,12 +216,16 @@ export default function ReaderPage() {
                 ? { ...a, ...updates, updatedAt: new Date() }
                 : a
         ));
+        // Trigger background sync
+        useLibraryStore.getState().syncMetadata().catch(e => console.error('BG Sync failed:', e));
     }, [annotations, setAnnotations]);
 
     // Delete annotation
     const handleDeleteAnnotation = useCallback(async (id: string) => {
         await deleteAnnotation(id);
         setAnnotations(annotations.filter(a => a.id !== id));
+        // Trigger background sync
+        useLibraryStore.getState().syncMetadata().catch(e => console.error('BG Sync failed:', e));
     }, [annotations, setAnnotations]);
 
     if (isLoading || !book) {
