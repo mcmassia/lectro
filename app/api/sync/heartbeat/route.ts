@@ -5,7 +5,10 @@ import { getLibraryPath } from '@/lib/server/config';
 
 export async function POST(req: NextRequest) {
     try {
-        const { bookId, userId, cfi, progress, totalPages, currentPage } = await req.json();
+        const body = await req.json();
+        const { bookId, userId, cfi, progress, totalPages, currentPage } = body;
+
+        console.log(`[Heartbeat] Received for book: ${bookId}, user: ${userId}, progress: ${progress}%`);
 
         if (!bookId || !cfi) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -13,9 +16,10 @@ export async function POST(req: NextRequest) {
 
         const libraryPath = getLibraryPath();
         const dbPath = path.join(libraryPath, 'lectro_data.json');
-        console.log(`[Heartbeat] Using DB path: ${dbPath}`);
+        console.log(`[Heartbeat] DB Path: ${dbPath}`);
 
         if (!fs.existsSync(dbPath)) {
+            console.error('[Heartbeat] DB not found!');
             return NextResponse.json({ error: 'Library DB not found' }, { status: 404 });
         }
 
@@ -23,6 +27,7 @@ export async function POST(req: NextRequest) {
         const fileContent = fs.readFileSync(dbPath, 'utf8');
         const data = JSON.parse(fileContent);
         const now = new Date().toISOString();
+        let updated = false;
 
         if (userId) {
             // Update User-Specific Data (UserBookData)
@@ -32,6 +37,7 @@ export async function POST(req: NextRequest) {
 
             if (userBookIndex !== -1) {
                 // Update existing
+                console.log(`[Heartbeat] Updating existing UserBookData for user ${userId}`);
                 data.userBookData[userBookIndex] = {
                     ...data.userBookData[userBookIndex],
                     currentPosition: cfi,
@@ -43,6 +49,7 @@ export async function POST(req: NextRequest) {
                 };
             } else {
                 // Create new
+                console.log(`[Heartbeat] Creating NEW UserBookData for user ${userId}`);
                 data.userBookData.push({
                     userId,
                     bookId,
@@ -53,11 +60,10 @@ export async function POST(req: NextRequest) {
                     updatedAt: now
                 });
             }
-
-            // Also update the book global lastReadAt just for activity tracking if needed?
-            // Actually, better to leave global book untouched if using users.
+            updated = true;
         } else {
             // Legacy / Single User Mode: Update Global Book
+            console.log(`[Heartbeat] No userId provided. Updating Legacy Book Object.`);
             const bookIndex = data.books?.findIndex((b: any) => b.id === bookId);
 
             if (bookIndex !== -1) {
@@ -68,6 +74,9 @@ export async function POST(req: NextRequest) {
                     totalPages: totalPages ?? data.books[bookIndex].totalPages,
                     lastReadAt: now,
                 };
+                updated = true;
+            } else {
+                console.error('[Heartbeat] Book not found in legacy mode');
             }
         }
 
@@ -76,7 +85,7 @@ export async function POST(req: NextRequest) {
 
         // Write Back
         fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
-        console.log(`[Heartbeat] Successfully updated DB at ${dbPath} for book ${bookId} user ${userId || 'guest'}`);
+        console.log(`[Heartbeat] Write complete. Updated: ${updated}`);
 
         return NextResponse.json({ success: true, timestamp: now });
 
