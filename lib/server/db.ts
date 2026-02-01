@@ -11,16 +11,22 @@ class Mutex {
     private mutex = Promise.resolve();
 
     lock(): Promise<() => void> {
-        let begin: (unlock: () => void) => void = () => { };
+        // Capture the state of the chain at the moment of request
+        const begin = this.mutex;
 
-        this.mutex = this.mutex.then(() => {
-            return new Promise<void>(resolve => {
-                begin = resolve;
-            });
+        // Prepare the signal for the NEXT person in line
+        let unlockNext: () => void = () => { };
+        const nextPromise = new Promise<void>(resolve => {
+            unlockNext = resolve;
         });
 
-        return new Promise<() => void>(resolve => {
-            resolve(begin as unknown as () => void); // Type assertion to bypass strict check for function passing
+        // Update the mutex to wait for the next promise
+        this.mutex = this.mutex.then(() => nextPromise);
+
+        // Return a promise that resolves when it's our turn (when 'begin' resolves)
+        // and provides the 'unlockNext' function to release the hold.
+        return new Promise(resolve => {
+            begin.then(() => resolve(unlockNext));
         });
     }
 
