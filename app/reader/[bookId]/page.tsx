@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useReaderStore, useAppStore, useLibraryStore } from '@/stores/appStore';
-import { getBook, updateBook, updateUserBookData, getAnnotationsForUserBook, addAnnotation, updateAnnotation, deleteAnnotation, Annotation, Book, HighlightColor } from '@/lib/db';
+import { getBook, getBookForUser, updateBook, updateUserBookData, getAnnotationsForUserBook, addAnnotation, updateAnnotation, deleteAnnotation, Annotation, Book, HighlightColor } from '@/lib/db';
 import { EpubReader, TocItem } from '@/components/reader/EpubReader';
 import { WebPubReader, WebPubReaderRef } from '@/components/reader/WebPubReader';
 import dynamic from 'next/dynamic';
@@ -53,7 +53,14 @@ export default function ReaderPage() {
         async function loadBook() {
             try {
                 setIsLoading(true);
-                const bookData = await getBook(bookId);
+                let bookData;
+
+                if (currentUser) {
+                    bookData = await getBookForUser(bookId, currentUser.id);
+                } else {
+                    bookData = await getBook(bookId);
+                }
+
                 if (!bookData) {
                     router.push('/');
                     return;

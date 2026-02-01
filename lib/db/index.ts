@@ -644,6 +644,32 @@ export async function getAllBooksIncludingDeleted(): Promise<Book[]> {
   return db.books.toArray();
 }
 
+export async function getBookForUser(bookId: string, userId: string): Promise<Book | undefined> {
+  const book = await getBook(bookId);
+  if (!book) return undefined;
+
+  const userData = await db.userBookData.where('[userId+bookId]').equals([userId, bookId]).first();
+
+  if (userData) {
+    return {
+      ...book,
+      progress: userData.progress,
+      status: userData.status,
+      lastReadAt: userData.lastReadAt,
+      currentPosition: userData.currentPosition,
+      currentPage: userData.currentPage,
+      isFavorite: userData.isFavorite,
+      metadata: {
+        ...book.metadata,
+        userRating: userData.userRating,
+        manualCategories: userData.manualCategories
+      }
+    };
+  }
+
+  return book;
+}
+
 export async function getBooksForUser(userId: string): Promise<Book[]> {
   const books = await getAllBooks(); // Now optimized
   const userData = await db.userBookData.where('userId').equals(userId).toArray();
