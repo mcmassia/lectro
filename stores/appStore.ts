@@ -310,7 +310,19 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
                 const allUserData = await db.userBookData.where('userId').equals(currentUser.id).toArray();
                 console.log(`[loadRecentBooks] Found ${allUserData.length} UserBookData entries.`);
 
-                const userDataMap = new Map(allUserData.map(d => [d.bookId, d]));
+                // DEBUG: Check for duplicates specifically for the problematic book
+                const madreEntries = allUserData.filter(d => d.bookId === '9342fc80-1734-481a-a67f-dcfc05bb2604' || d.bookId.includes('4283'));
+                if (madreEntries.length > 0) {
+                    console.log(`[loadRecentBooks] Found ${madreEntries.length} entries for Madre patria/problem book:`);
+                    madreEntries.forEach(e => {
+                        console.log(`   - ID: ${e.id}, PID: ${e.userId}+${e.bookId}, Progress: ${e.progress}%, Status: ${e.status}, Updated: ${e.updatedAt}`);
+                    });
+                }
+
+                const userDataMap = new Map();
+                allUserData.forEach(d => {
+                    userDataMap.set(d.bookId, d);
+                });
 
                 booksWithUser = recentBooks.map(book => {
                     const data = userDataMap.get(book.id);

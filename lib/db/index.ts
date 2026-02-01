@@ -754,13 +754,23 @@ export async function getReadingBooksForUser(userId: string): Promise<Book[]> {
 
   if (readingData.length === 0) return [];
 
-  const bookIds = readingData.map(d => d.bookId);
+  // Deduplicate: Keep latest updated per bookId
+  const uniqueDataMap = new Map<string, UserBookData>();
+  readingData.forEach(d => {
+    const existing = uniqueDataMap.get(d.bookId);
+    if (!existing || (new Date(d.updatedAt).getTime() > new Date(existing.updatedAt).getTime())) {
+      uniqueDataMap.set(d.bookId, d);
+    }
+  });
+
+  const finalReadingData = Array.from(uniqueDataMap.values());
+  const bookIds = finalReadingData.map(d => d.bookId);
   const books = await db.books.where('id').anyOf(bookIds).toArray();
 
   // Merge data and STRIP BLOBS
   const booksMap = new Map(books.map(b => [b.id, b]));
 
-  return readingData.map(data => {
+  return finalReadingData.map(data => {
     const book = booksMap.get(data.bookId);
     if (!book) return null;
 
