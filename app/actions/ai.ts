@@ -8,7 +8,8 @@ export async function getRagResponseAction(
     contexts: RagContext[],
     conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [],
     modelName: string = 'gemini-2.5-flash',
-    libraryContext?: { totalBooks: number; indexedBooks: number }
+    libraryContext?: { totalBooks: number; indexedBooks: number },
+    systemPrompt?: string
 ) {
     // Check if API key is configured
     if (!process.env.GEMINI_API_KEY) {
@@ -17,7 +18,7 @@ export async function getRagResponseAction(
     }
 
     try {
-        const result = await generateRagResponse(query, contexts, conversationHistory, modelName, libraryContext);
+        const result = await generateRagResponse(query, contexts, conversationHistory, modelName, libraryContext, systemPrompt);
         return { success: true, data: result };
     } catch (error: any) {
         console.error('Error in getRagResponseAction:', error);

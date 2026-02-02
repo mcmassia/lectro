@@ -222,7 +222,8 @@ export async function generateRagResponse(
     contexts: RagContext[],
     conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [],
     modelName: string = 'gemini-2.5-flash',
-    libraryContext?: { totalBooks: number; indexedBooks: number }
+    libraryContext?: { totalBooks: number; indexedBooks: number },
+    systemPrompt?: string
 ): Promise<{ response: string; usedSources: RagContext[] }> {
     const gemini = genAI.getGenerativeModel({ model: modelName });
     const contextText = contexts.map((ctx, i) =>
@@ -237,7 +238,9 @@ export async function generateRagResponse(
         ? `Library Context: You are analyzing a library with ${libraryContext.totalBooks} total books, of which ${libraryContext.indexedBooks} are currently indexed and searchable.`
         : '';
 
-    const prompt = `You are a knowledgeable assistant helping a user explore their personal book library. Answer questions by synthesizing information from the provided book excerpts.
+    const defaultSystemPrompt = `You are a knowledgeable assistant helping a user explore their personal book library. Answer questions by synthesizing information from the provided book excerpts.`;
+
+    const prompt = `${systemPrompt || defaultSystemPrompt}
 
 ${libStats}
 
