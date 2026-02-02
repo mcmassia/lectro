@@ -274,11 +274,9 @@ export async function pushLocalData(lastSync?: Date) {
     const userBookData = await db.userBookData.toArray();
     const modifiedUserBookData = lastSync ? userBookData.filter(d => !d.updatedAt || new Date(d.updatedAt) > lastSync) : userBookData;
 
+    // X-Ray data is shared across all users and is small/static - always sync all
     const xrayData = await getAllXRayData();
-    // X-Ray data is shared across all users (book-level), so sync all of it
-    const modifiedXray = lastSync
-        ? xrayData.filter(x => !x.generatedAt || new Date(x.generatedAt) > lastSync)
-        : xrayData;
+    const modifiedXray = xrayData;
 
     console.log(`[Sync] Pushing changes: ${books.length} books, ${modifiedAnnotations.length} annotations, ${modifiedXray.length} X-Ray items...`);
 
