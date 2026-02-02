@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Annotation } from '@/lib/db';
-import { BookOpen, Edit2, Check, X } from 'lucide-react';
+import { BookOpen, Edit2, Check, X, Trash2 } from 'lucide-react';
 
 interface NoteCardProps {
     note: Annotation;
@@ -162,6 +162,17 @@ export function NoteCard({
                     >
                         <Edit2 size={14} />
                         <span>Editar</span>
+                    </button>
+                    <button
+                        onClick={() => {
+                            if (confirm('¿Eliminar esta nota?')) {
+                                onDelete(note.id);
+                            }
+                        }}
+                        className="flex items-center gap-2 text-xs font-medium text-[var(--color-text-secondary)] hover:text-red-500 transition-colors"
+                    >
+                        <Trash2 size={14} />
+                        <span>Eliminar</span>
                     </button>
                 </div>
             </div>

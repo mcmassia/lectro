@@ -180,7 +180,7 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
             bookId: book.id,
             userId: currentUser.id,
             cfi: '',
-            text: messageContent.slice(0, 200) + (messageContent.length > 200 ? '...' : ''),
+            text: '',
             note: messageContent,
             color: 'yellow',
             chapterTitle: 'Respuesta IA',
