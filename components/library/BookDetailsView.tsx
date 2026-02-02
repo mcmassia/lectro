@@ -211,9 +211,8 @@ export function BookDetailsView({ book: initialBook, onBack }: BookDetailsViewPr
     };
 
     const handleViewXRay = () => {
-        useLibraryStore.getState().setView('xray');
-        useLibraryStore.getState().setSelectedBookId(book.id);
-        // No onClose logic needed, view switch handles it
+        // Navigate to dedicated X-Ray page
+        router.push(`/book/${book.id}/xray`);
     };
 
     const handleGenerateXRay = async () => {
