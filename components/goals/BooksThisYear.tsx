@@ -14,9 +14,11 @@ export function BooksThisYear() {
   const [yearlyGoal, setYearlyGoal] = useState(12);
   const currentYear = new Date().getFullYear();
 
-  const handleBookClick = (bookId: string) => {
-    setSelectedBookId(bookId);
+  const handleBookClick = (book: Book) => {
+    // Set the book ID and view first
+    setSelectedBookId(book.id);
     setView('book-details');
+    // Then navigate - the home page will render BookDetailsView
     router.push('/');
   };
 
@@ -51,7 +53,7 @@ export function BooksThisYear() {
           <div
             key={book.id}
             className="book-slot completed clickable"
-            onClick={() => handleBookClick(book.id)}
+            onClick={() => handleBookClick(book)}
             title={book.title}
           >
             {book.cover ? (
