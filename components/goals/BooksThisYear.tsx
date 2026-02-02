@@ -1,79 +1,93 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAppStore } from '@/stores/appStore';
+import { useRouter } from 'next/navigation';
+import { useAppStore, useLibraryStore } from '@/stores/appStore';
 import { getCompletedBooksForYear, getReadingGoals, Book } from '@/lib/db';
 import { Check } from 'lucide-react';
 
 export function BooksThisYear() {
-    const { currentUser } = useAppStore();
-    const [completedBooks, setCompletedBooks] = useState<{ book: Book; completedAt: Date }[]>([]);
-    const [yearlyGoal, setYearlyGoal] = useState(12);
-    const currentYear = new Date().getFullYear();
+  const { currentUser } = useAppStore();
+  const { setSelectedBookId, setView } = useLibraryStore();
+  const router = useRouter();
+  const [completedBooks, setCompletedBooks] = useState<{ book: Book; completedAt: Date }[]>([]);
+  const [yearlyGoal, setYearlyGoal] = useState(12);
+  const currentYear = new Date().getFullYear();
 
-    useEffect(() => {
-        async function loadData() {
-            if (!currentUser) return;
+  const handleBookClick = (bookId: string) => {
+    setSelectedBookId(bookId);
+    setView('book-details');
+    router.push('/');
+  };
 
-            const [books, goals] = await Promise.all([
-                getCompletedBooksForYear(currentUser.id, currentYear),
-                getReadingGoals(currentUser.id),
-            ]);
+  useEffect(() => {
+    async function loadData() {
+      if (!currentUser) return;
 
-            setCompletedBooks(books);
-            setYearlyGoal(goals.yearlyBooksGoal);
-        }
+      const [books, goals] = await Promise.all([
+        getCompletedBooksForYear(currentUser.id, currentYear),
+        getReadingGoals(currentUser.id),
+      ]);
 
-        loadData();
-    }, [currentUser, currentYear]);
+      setCompletedBooks(books);
+      setYearlyGoal(goals.yearlyBooksGoal);
+    }
 
-    const booksLeft = Math.max(0, yearlyGoal - completedBooks.length);
+    loadData();
+  }, [currentUser, currentYear]);
 
-    // Create display slots (completed + remaining placeholders)
-    const displaySlots = [...completedBooks];
-    const placeholdersNeeded = Math.min(3, booksLeft); // Show max 3 placeholders
+  const booksLeft = Math.max(0, yearlyGoal - completedBooks.length);
 
-    return (
-        <div className="books-this-year">
-            <h2 className="section-title">Libros leídos en {currentYear}</h2>
+  // Create display slots (completed + remaining placeholders)
+  const displaySlots = [...completedBooks];
+  const placeholdersNeeded = Math.min(3, booksLeft); // Show max 3 placeholders
 
-            <div className="books-grid">
-                {displaySlots.map(({ book }, index) => (
-                    <div key={book.id} className="book-slot completed">
-                        {book.cover ? (
-                            <img src={book.cover} alt={book.title} className="book-cover" />
-                        ) : (
-                            <div className="book-cover-placeholder">
-                                <span>{book.title.charAt(0)}</span>
-                            </div>
-                        )}
-                        <div className="check-badge">
-                            <Check size={12} strokeWidth={3} />
-                        </div>
-                    </div>
-                ))}
+  return (
+    <div className="books-this-year">
+      <h2 className="section-title">Libros leídos en {currentYear}</h2>
 
-                {/* Placeholder slots */}
-                {Array.from({ length: placeholdersNeeded }).map((_, index) => (
-                    <div key={`placeholder-${index}`} className="book-slot placeholder">
-                        <span className="slot-number">{completedBooks.length + index + 1}</span>
-                    </div>
-                ))}
+      <div className="books-grid">
+        {displaySlots.map(({ book }, index) => (
+          <div
+            key={book.id}
+            className="book-slot completed clickable"
+            onClick={() => handleBookClick(book.id)}
+            title={book.title}
+          >
+            {book.cover ? (
+              <img src={book.cover} alt={book.title} className="book-cover" />
+            ) : (
+              <div className="book-cover-placeholder">
+                <span>{book.title.charAt(0)}</span>
+              </div>
+            )}
+            <div className="check-badge">
+              <Check size={12} strokeWidth={3} />
             </div>
+          </div>
+        ))}
 
-            <p className="progress-text">
-                {booksLeft > 0 ? (
-                    <>
-                        <strong>{booksLeft} {booksLeft === 1 ? 'libro más' : 'libros más'}</strong> para alcanzar tu meta
-                    </>
-                ) : (
-                    <>
-                        <strong>¡Meta cumplida!</strong> Has leído {completedBooks.length} libros
-                    </>
-                )}
-            </p>
+        {/* Placeholder slots */}
+        {Array.from({ length: placeholdersNeeded }).map((_, index) => (
+          <div key={`placeholder-${index}`} className="book-slot placeholder">
+            <span className="slot-number">{completedBooks.length + index + 1}</span>
+          </div>
+        ))}
+      </div>
 
-            <style jsx>{`
+      <p className="progress-text">
+        {booksLeft > 0 ? (
+          <>
+            <strong>{booksLeft} {booksLeft === 1 ? 'libro más' : 'libros más'}</strong> para alcanzar tu meta
+          </>
+        ) : (
+          <>
+            <strong>¡Meta cumplida!</strong> Has leído {completedBooks.length} libros
+          </>
+        )}
+      </p>
+
+      <style jsx>{`
         .books-this-year {
           display: flex;
           flex-direction: column;
@@ -103,8 +117,13 @@ export function BooksThisYear() {
           transition: transform 0.2s;
         }
 
-        .book-slot:hover {
-          transform: scale(1.05);
+        .book-slot.clickable {
+          cursor: pointer;
+        }
+
+        .book-slot.clickable:hover {
+          transform: scale(1.08);
+          box-shadow: var(--shadow-lg);
         }
 
         .book-slot.completed {
@@ -168,6 +187,6 @@ export function BooksThisYear() {
           color: var(--color-text-primary);
         }
       `}</style>
-        </div>
-    );
+    </div>
+  );
 }
