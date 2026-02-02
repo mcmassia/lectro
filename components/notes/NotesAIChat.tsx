@@ -133,7 +133,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
     ];
 
     return (
-        <aside className="notes-chat-panel">
+        <div className="notes-chat-panel">
             {/* Header */}
             <div className="chat-header">
                 <div className="header-title">
@@ -191,7 +191,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 )}
             </div>
 
-            {/* Input Area - Always visible */}
+            {/* Input Area - Fixed at bottom */}
             <div className="input-area">
                 <input
                     type="text"
@@ -212,14 +212,15 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
 
             <style jsx>{`
                 .notes-chat-panel {
-                    width: 380px;
-                    min-width: 380px;
-                    max-width: 380px;
+                    width: 420px;
+                    min-width: 420px;
                     background: var(--color-bg-secondary);
                     border-left: 1px solid var(--color-border);
                     display: flex;
                     flex-direction: column;
                     height: 100%;
+                    max-height: 100%;
+                    overflow: hidden;
                     flex-shrink: 0;
                 }
 
@@ -257,7 +258,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 }
 
                 .messages-container {
-                    flex: 1;
+                    flex: 1 1 auto;
                     overflow-y: auto;
                     padding: 20px;
                     display: flex;
@@ -362,22 +363,23 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 }
 
                 .input-area {
-                    padding: 16px;
+                    padding: 16px 20px;
                     border-top: 1px solid var(--color-border);
                     display: flex;
-                    gap: 10px;
-                    background: var(--color-bg-secondary);
+                    gap: 12px;
+                    background: var(--color-bg-tertiary);
                     flex-shrink: 0;
+                    flex-grow: 0;
                 }
 
                 .input-area input {
                     flex: 1;
                     padding: 12px 16px;
-                    border-radius: 20px;
+                    border-radius: 24px;
                     border: 1px solid var(--color-border);
-                    background: var(--color-bg-tertiary);
+                    background: var(--color-bg-secondary);
                     color: var(--color-text-primary);
-                    font-size: 13px;
+                    font-size: 14px;
                 }
 
                 .input-area input:focus {
@@ -387,6 +389,10 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
 
                 .input-area input:disabled {
                     opacity: 0.5;
+                }
+
+                .input-area input::placeholder {
+                    color: var(--color-text-tertiary);
                 }
 
                 .send-btn {
@@ -400,7 +406,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     align-items: center;
                     justify-content: center;
                     cursor: pointer;
-                    transition: transform 0.2s;
+                    transition: transform 0.2s, opacity 0.2s;
                     flex-shrink: 0;
                 }
 
@@ -448,12 +454,12 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 .markdown-content :global(li) { margin-bottom: 4px; }
                 .markdown-content :global(strong) { font-weight: 700; }
 
-                @media (max-width: 1024px) {
+                @media (max-width: 1100px) {
                     .notes-chat-panel {
                         display: none;
                     }
                 }
             `}</style>
-        </aside>
+        </div>
     );
 }
