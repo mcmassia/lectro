@@ -315,6 +315,7 @@ export function TopBar() {
                     border-radius: 8px;
                     padding: 0 12px;
                     height: 40px;
+                    width: 100%;
                     transition: all 0.2s;
                     border: 1px solid transparent;
                 }
