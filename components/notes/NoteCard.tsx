@@ -138,12 +138,28 @@ export function NoteCard({
                     </div>
                 </div>
             ) : note.note ? (
-                <div className="px-5 pb-4">
-                    <span className="block text-xs font-bold text-[var(--color-accent)] uppercase tracking-wider mb-2">Mi Nota</span>
-                    <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
-                        {note.note}
-                    </p>
-                </div>
+                isQuote ? (
+                    /* If there's a quote, show "Mi Nota" as secondary section */
+                    <div className="px-5 pb-4">
+                        <span className="block text-xs font-bold text-[var(--color-accent)] uppercase tracking-wider mb-2">Mi Nota</span>
+                        <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
+                            {note.note}
+                        </p>
+                    </div>
+                ) : (
+                    /* If there's no quote, show the note content in a styled block like quotes */
+                    <div className="px-5 pb-4">
+                        <span className="block text-xs font-bold text-[var(--color-accent)] uppercase tracking-wider mb-3">Mi Nota</span>
+                        <div
+                            className="p-5 rounded-xl border-l-4 border-l-[var(--color-accent)]"
+                            style={{ backgroundColor: 'color-mix(in oklab, var(--color-accent) 10%, transparent)' }}
+                        >
+                            <p className="text-base leading-relaxed text-[var(--color-text-primary)]">
+                                {note.note}
+                            </p>
+                        </div>
+                    </div>
+                )
             ) : null}
 
             {/* Action Footer - Only left actions now */}
