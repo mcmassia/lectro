@@ -60,13 +60,14 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
         return contextParts.slice(0, 5).join('\n\n'); // Limit to 5 books
     };
 
-    const handleSend = async () => {
-        if (!input.trim() || isSending) return;
+    const handleSend = async (messageText?: string) => {
+        const textToSend = messageText || input.trim();
+        if (!textToSend || isSending) return;
 
         const userMsg: Message = {
             id: crypto.randomUUID(),
             role: 'user',
-            content: input.trim(),
+            content: textToSend,
             timestamp: new Date()
         };
 
@@ -121,6 +122,10 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
         }
     };
 
+    const handleSuggestionClick = (suggestion: string) => {
+        handleSend(suggestion);
+    };
+
     const suggestions = [
         "¿Cuáles son los temas recurrentes en mis notas?",
         "¿Qué conexiones hay entre mis lecturas?",
@@ -150,8 +155,9 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                             {suggestions.map((suggestion, i) => (
                                 <button
                                     key={i}
-                                    onClick={() => setInput(suggestion)}
+                                    onClick={() => handleSuggestionClick(suggestion)}
                                     className="suggestion-btn"
+                                    disabled={isSending || notes.length === 0}
                                 >
                                     {suggestion}
                                 </button>
@@ -185,7 +191,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 )}
             </div>
 
-            {/* Input Area */}
+            {/* Input Area - Always visible */}
             <div className="input-area">
                 <input
                     type="text"
@@ -197,7 +203,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 />
                 <button
                     className="send-btn"
-                    onClick={handleSend}
+                    onClick={() => handleSend()}
                     disabled={!input.trim() || isSending || notes.length === 0}
                 >
                     <Send size={18} />
@@ -207,12 +213,14 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
             <style jsx>{`
                 .notes-chat-panel {
                     width: 380px;
+                    min-width: 380px;
+                    max-width: 380px;
                     background: var(--color-bg-secondary);
                     border-left: 1px solid var(--color-border);
                     display: flex;
                     flex-direction: column;
                     height: 100%;
-                    overflow: hidden;
+                    flex-shrink: 0;
                 }
 
                 .chat-header {
@@ -222,6 +230,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     justify-content: space-between;
                     align-items: center;
                     background: var(--color-bg-tertiary);
+                    flex-shrink: 0;
                 }
 
                 .header-title {
@@ -254,6 +263,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     display: flex;
                     flex-direction: column;
                     gap: 16px;
+                    min-height: 0;
                 }
 
                 .empty-state {
@@ -261,7 +271,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     flex-direction: column;
                     align-items: center;
                     justify-content: center;
-                    height: 100%;
+                    flex: 1;
                     text-align: center;
                     padding: 20px;
                 }
@@ -305,9 +315,14 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     text-align: left;
                 }
 
-                .suggestion-btn:hover {
+                .suggestion-btn:hover:not(:disabled) {
                     background: var(--color-bg-elevated);
                     border-color: var(--color-accent);
+                }
+
+                .suggestion-btn:disabled {
+                    opacity: 0.5;
+                    cursor: not-allowed;
                 }
 
                 .message {
@@ -352,11 +367,12 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     display: flex;
                     gap: 10px;
                     background: var(--color-bg-secondary);
+                    flex-shrink: 0;
                 }
 
                 .input-area input {
                     flex: 1;
-                    padding: 10px 16px;
+                    padding: 12px 16px;
                     border-radius: 20px;
                     border: 1px solid var(--color-border);
                     background: var(--color-bg-tertiary);
@@ -374,8 +390,8 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 }
 
                 .send-btn {
-                    width: 40px;
-                    height: 40px;
+                    width: 44px;
+                    height: 44px;
                     border-radius: 50%;
                     background: var(--color-accent);
                     color: white;

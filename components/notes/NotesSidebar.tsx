@@ -87,26 +87,6 @@ export function NotesSidebar({
                 </div>
 
             </div>
-
-            {/* Daily Review Card (Fixed Bottom) */}
-            <div className="p-5 mt-auto border-t border-[var(--color-border)]">
-                <div className="rounded-xl p-4 bg-gradient-to-r from-[var(--color-accent)]/20 to-[var(--color-bg-elevated)] border border-[var(--color-accent)]/30 relative overflow-hidden group cursor-pointer hover:border-[var(--color-accent)]/50 transition-all">
-                    <div className="relative z-10 flex items-start justify-between">
-                        <div className="p-2 bg-[var(--color-accent)] rounded-lg text-white mb-3 shadow-md">
-                            <Calendar size={18} />
-                        </div>
-                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                    </div>
-
-                    <div className="relative z-10">
-                        <h3 className="font-semibold text-[var(--color-text-primary)] mb-0.5">Repaso Diario</h3>
-                        <p className="text-xs text-[var(--color-text-secondary)]">15 destacados para hoy</p>
-                    </div>
-
-                    {/* Decorative Icon Background */}
-                    <Calendar className="absolute -bottom-4 -right-4 text-[var(--color-accent)]/10 rotate-[-15deg]" size={80} />
-                </div>
-            </div>
         </aside>
     );
 }
