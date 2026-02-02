@@ -672,8 +672,31 @@ export async function getBookForUser(bookId: string, userId: string): Promise<Bo
 
 export async function getBooksForUser(userId: string): Promise<Book[]> {
   const books = await getAllBooks(); // Now optimized
-  const userData = await db.userBookData.where('userId').equals(userId).toArray();
-  const userDataMap = new Map(userData.map(d => [d.bookId, d]));
+
+  /* 
+   * CRITICAL FIX: Handle potential User ID mismatches due to migration/sync issues.
+   * Query for both current user ID AND known legacy ID if applicable.
+   */
+  let queries = [userId];
+  const knownLegacyId = '9342fc80-1734-481a-a67f-dcfc05bb2604';
+  if (userId !== knownLegacyId && userId.startsWith('4283')) {
+    queries.push(knownLegacyId);
+  }
+
+  const userDataPromises = queries.map(uid =>
+    db.userBookData.where('userId').equals(uid).toArray()
+  );
+  const results = await Promise.all(userDataPromises);
+  const allUserData = results.flat();
+
+  // Deduplicate: Keep latest updated per bookId
+  const userDataMap = new Map<string, UserBookData>();
+  allUserData.forEach(d => {
+    const existing = userDataMap.get(d.bookId);
+    if (!existing || (new Date(d.updatedAt).getTime() > new Date(existing.updatedAt).getTime())) {
+      userDataMap.set(d.bookId, d);
+    }
+  });
 
   return books.map(book => {
     const data = userDataMap.get(book.id);
