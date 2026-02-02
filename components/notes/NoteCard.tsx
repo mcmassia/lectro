@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Annotation } from '@/lib/db';
 import { BookOpen, Edit2, Check, X, Trash2 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 
 interface NoteCardProps {
     note: Annotation;
@@ -142,9 +143,9 @@ export function NoteCard({
                     /* If there's a quote, show "Mi Nota" as secondary section */
                     <div className="px-5 pb-4">
                         <span className="block text-xs font-bold text-[var(--color-accent)] uppercase tracking-wider mb-2">Mi Nota</span>
-                        <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
-                            {note.note}
-                        </p>
+                        <div className="text-sm text-[var(--color-text-secondary)] leading-relaxed prose prose-invert prose-sm max-w-none">
+                            <ReactMarkdown>{note.note}</ReactMarkdown>
+                        </div>
                     </div>
                 ) : (
                     /* If there's no quote, show the note content in a styled block like quotes */
@@ -154,9 +155,9 @@ export function NoteCard({
                             className="p-5 rounded-xl border-l-4 border-l-[var(--color-accent)]"
                             style={{ backgroundColor: 'color-mix(in oklab, var(--color-accent) 10%, transparent)' }}
                         >
-                            <p className="text-base leading-relaxed text-[var(--color-text-primary)]">
-                                {note.note}
-                            </p>
+                            <div className="text-base leading-relaxed text-[var(--color-text-primary)] prose prose-invert prose-sm max-w-none">
+                                <ReactMarkdown>{note.note}</ReactMarkdown>
+                            </div>
                         </div>
                     </div>
                 )
