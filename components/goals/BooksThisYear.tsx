@@ -2,21 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAppStore, useLibraryStore } from '@/stores/appStore';
+import { useAppStore } from '@/stores/appStore';
 import { getCompletedBooksForYear, getReadingGoals, Book } from '@/lib/db';
 import { Check } from 'lucide-react';
 
 export function BooksThisYear() {
   const { currentUser } = useAppStore();
-  const { setSelectedBookId, setView } = useLibraryStore();
   const router = useRouter();
   const [completedBooks, setCompletedBooks] = useState<{ book: Book; completedAt: Date }[]>([]);
   const [yearlyGoal, setYearlyGoal] = useState(12);
   const currentYear = new Date().getFullYear();
 
   const handleBookClick = (book: Book) => {
-    // Navigate using query params to preserve state across page navigation
-    router.push(`/?view=book-details&bookId=${book.id}`);
+    // Navigate to dedicated book details page
+    router.push(`/book/${book.id}`);
   };
 
   useEffect(() => {
