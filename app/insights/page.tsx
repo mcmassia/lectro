@@ -9,6 +9,7 @@ import { v4 as uuid } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import { useRouter } from 'next/navigation';
 import { useLibraryStore } from '@/stores/appStore';
+import { AIModelSelector } from '@/components/ai/AIModelSelector';
 
 const SendIcon = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
@@ -27,6 +28,7 @@ const BookIcon = () => (
 export default function InsightsPage() {
     const { ragMessages, addRagMessage, isGenerating, setIsGenerating, clearRagMessages, aiModel } = useAIStore();
     const [input, setInput] = useState('');
+    const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
     const [books, setBooks] = useState<Book[]>([]);
     const [chunkCount, setChunkCount] = useState<number>(0);
     const [indexingStatus, setIndexingStatus] = useState<any>(null); // Use proper type
@@ -181,7 +183,7 @@ export default function InsightsPage() {
                 userMessage.content,
                 contexts,
                 history,
-                aiModel || 'gemini-2.5-flash',
+                selectedModel,
                 {
                     totalBooks: books.length,
                     indexedBooks: chunkCount
@@ -238,7 +240,7 @@ export default function InsightsPage() {
     return (
         <div className="page-container animate-fade-in">
             <div className="page-header">
-                <h1 className="page-title">Insights</h1>
+                <h1 className="page-title">Análisis IA</h1>
                 <p className="page-subtitle">
                     Chat con tu biblioteca usando inteligencia artificial
                 </p>
@@ -370,6 +372,11 @@ export default function InsightsPage() {
                     </div>
 
                     <form className="chat-input-container" onSubmit={handleSubmit}>
+                        <AIModelSelector
+                            selectedModel={selectedModel}
+                            onModelChange={setSelectedModel}
+                            compact={true}
+                        />
                         <input
                             type="text"
                             className="input chat-input"

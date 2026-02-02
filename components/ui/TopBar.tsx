@@ -255,7 +255,7 @@ export function TopBar() {
 
                 .search-section {
                     flex: 1;
-                    max-width: 600px;
+                    max-width: 800px;
                     margin: 0 24px;
                 }
 
