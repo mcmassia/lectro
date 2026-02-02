@@ -34,10 +34,10 @@ export default function NotesPage() {
     // Global Search integration
     const { searchQuery } = useLibraryStore();
 
-    // Filters
+    // Filters - Now supports multiple selections
     const [selectedBookId, setSelectedBookId] = useState<string | undefined>(undefined);
-    const [filterBookId, setFilterBookId] = useState<string | undefined>(undefined);
-    const [filterAuthor, setFilterAuthor] = useState<string | undefined>(undefined);
+    const [filterBookIds, setFilterBookIds] = useState<string[]>([]);
+    const [filterAuthors, setFilterAuthors] = useState<string[]>([]);
     const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     // Sort
@@ -135,19 +135,36 @@ export default function NotesPage() {
         router.push(`/reader/${bookId}?cfi=${encodeURIComponent(cfi)}`);
     };
 
-    // Filter Logic
+    // Toggle functions for multi-select
+    const toggleBookFilter = (bookId: string) => {
+        setFilterBookIds(prev =>
+            prev.includes(bookId)
+                ? prev.filter(id => id !== bookId)
+                : [...prev, bookId]
+        );
+    };
+
+    const toggleAuthorFilter = (author: string) => {
+        setFilterAuthors(prev =>
+            prev.includes(author)
+                ? prev.filter(a => a !== author)
+                : [...prev, author]
+        );
+    };
+
+    // Filter Logic - Updated for multiple selections
     const filteredNotes = useMemo(() => {
         let result = notes.filter(note => {
-            // Sidebar Book Filter
+            // Sidebar Book Filter (single select from sidebar)
             if (selectedBookId && note.bookId !== selectedBookId) return false;
 
-            // Header Book Filter
-            if (filterBookId && note.bookId !== filterBookId) return false;
+            // Header Book Filter (multi-select)
+            if (filterBookIds.length > 0 && !filterBookIds.includes(note.bookId)) return false;
 
-            // Author Filter
-            if (filterAuthor) {
+            // Author Filter (multi-select)
+            if (filterAuthors.length > 0) {
                 const book = books.find(b => b.id === note.bookId);
-                if (!book || book.author !== filterAuthor) return false;
+                if (!book || !filterAuthors.includes(book.author || '')) return false;
             }
 
             // Search Query Filter
@@ -183,7 +200,7 @@ export default function NotesPage() {
         });
 
         return result;
-    }, [notes, selectedBookId, filterBookId, filterAuthor, searchQuery, sortBy, sortDirection, books]);
+    }, [notes, selectedBookId, filterBookIds, filterAuthors, searchQuery, sortBy, sortDirection, books]);
 
     const handleExport = (format: 'json' | 'csv' | 'markdown' | 'pdf') => {
         const bookTitle = selectedBookId ? books.find(b => b.id === selectedBookId)?.title : undefined;
@@ -191,12 +208,12 @@ export default function NotesPage() {
     };
 
     const clearFilters = () => {
-        setFilterBookId(undefined);
-        setFilterAuthor(undefined);
-        setIsFilterOpen(false);
+        setFilterBookIds([]);
+        setFilterAuthors([]);
     };
 
-    const hasActiveFilters = filterBookId || filterAuthor;
+    const hasActiveFilters = filterBookIds.length > 0 || filterAuthors.length > 0;
+    const activeFiltersCount = filterBookIds.length + filterAuthors.length;
 
     // Stats
     const notesCount = filteredNotes.length;
@@ -239,51 +256,69 @@ export default function NotesPage() {
                                 >
                                     <Filter size={14} />
                                     Filtrar
-                                    {hasActiveFilters && <span className="ml-1 w-2 h-2 rounded-full bg-[var(--color-accent)]"></span>}
+                                    {hasActiveFilters && (
+                                        <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[var(--color-accent)] text-white text-[10px] font-bold">
+                                            {activeFiltersCount}
+                                        </span>
+                                    )}
                                     <ChevronDown size={12} />
                                 </button>
                                 {isFilterOpen && (
                                     <>
                                         <div className="fixed inset-0 z-10" onClick={() => setIsFilterOpen(false)} />
-                                        <div className="absolute top-full right-0 mt-2 w-64 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl shadow-xl z-20 overflow-hidden">
+                                        <div className="absolute top-full right-0 mt-2 w-72 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl shadow-xl z-20 overflow-hidden">
                                             <div className="p-3 border-b border-[var(--color-border)] flex items-center justify-between">
                                                 <span className="text-xs font-semibold text-[var(--color-text-primary)]">Filtros</span>
                                                 {hasActiveFilters && (
                                                     <button onClick={clearFilters} className="text-[10px] text-[var(--color-accent)] hover:underline flex items-center gap-1">
-                                                        <X size={10} /> Limpiar
+                                                        <X size={10} /> Limpiar todo
                                                     </button>
                                                 )}
                                             </div>
 
-                                            {/* Filter by Book */}
+                                            {/* Filter by Book - Multi-select */}
                                             <div className="p-3 border-b border-[var(--color-border)]">
-                                                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] mb-2">Por Libro</h4>
-                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)]">Por Libro</h4>
+                                                    {filterBookIds.length > 0 && (
+                                                        <span className="text-[9px] text-[var(--color-accent)]">{filterBookIds.length} seleccionados</span>
+                                                    )}
+                                                </div>
+                                                <div className="max-h-40 overflow-y-auto space-y-1 custom-scrollbar">
                                                     {booksWithNotes.map(({ book }) => (
                                                         <button
                                                             key={book.id}
-                                                            onClick={() => { setFilterBookId(filterBookId === book.id ? undefined : book.id); }}
-                                                            className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors flex items-center justify-between ${filterBookId === book.id ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]' : 'hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)]'}`}
+                                                            onClick={() => toggleBookFilter(book.id)}
+                                                            className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors flex items-center justify-between gap-2 ${filterBookIds.includes(book.id) ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]' : 'hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)]'}`}
                                                         >
-                                                            <span className="truncate">{book.title}</span>
-                                                            {filterBookId === book.id && <Check size={12} />}
+                                                            <span className="truncate flex-1">{book.title}</span>
+                                                            <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${filterBookIds.includes(book.id) ? 'bg-[var(--color-accent)] border-[var(--color-accent)]' : 'border-[var(--color-border)]'}`}>
+                                                                {filterBookIds.includes(book.id) && <Check size={10} className="text-white" />}
+                                                            </div>
                                                         </button>
                                                     ))}
                                                 </div>
                                             </div>
 
-                                            {/* Filter by Author */}
+                                            {/* Filter by Author - Multi-select */}
                                             <div className="p-3">
-                                                <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)] mb-2">Por Autor</h4>
-                                                <div className="max-h-32 overflow-y-auto space-y-1">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)]">Por Autor</h4>
+                                                    {filterAuthors.length > 0 && (
+                                                        <span className="text-[9px] text-[var(--color-accent)]">{filterAuthors.length} seleccionados</span>
+                                                    )}
+                                                </div>
+                                                <div className="max-h-40 overflow-y-auto space-y-1 custom-scrollbar">
                                                     {authorsWithNotes.map(author => (
                                                         <button
                                                             key={author}
-                                                            onClick={() => { setFilterAuthor(filterAuthor === author ? undefined : author); }}
-                                                            className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors flex items-center justify-between ${filterAuthor === author ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]' : 'hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)]'}`}
+                                                            onClick={() => toggleAuthorFilter(author)}
+                                                            className={`w-full text-left px-2 py-1.5 rounded-lg text-xs transition-colors flex items-center justify-between gap-2 ${filterAuthors.includes(author) ? 'bg-[var(--color-accent)]/10 text-[var(--color-accent)]' : 'hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-primary)]'}`}
                                                         >
-                                                            <span className="truncate">{author}</span>
-                                                            {filterAuthor === author && <Check size={12} />}
+                                                            <span className="truncate flex-1">{author}</span>
+                                                            <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${filterAuthors.includes(author) ? 'bg-[var(--color-accent)] border-[var(--color-accent)]' : 'border-[var(--color-border)]'}`}>
+                                                                {filterAuthors.includes(author) && <Check size={10} className="text-white" />}
+                                                            </div>
                                                         </button>
                                                     ))}
                                                 </div>

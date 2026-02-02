@@ -432,7 +432,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 .markdown-content :global(li) { margin-bottom: 4px; }
                 .markdown-content :global(strong) { font-weight: 700; }
 
-                @media (max-width: 1280px) {
+                @media (max-width: 1024px) {
                     .notes-chat-panel {
                         display: none;
                     }
