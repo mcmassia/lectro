@@ -274,13 +274,15 @@ export async function pushLocalData(lastSync?: Date) {
     const userBookData = await db.userBookData.toArray();
     const modifiedUserBookData = lastSync ? userBookData.filter(d => !d.updatedAt || new Date(d.updatedAt) > lastSync) : userBookData;
 
-    const xrayData = await getAllXRayData(); // Xray likely large, assume static? Or delta?
-    // Skip Xray delta for now to save complexity, or sync all if small.
-    const modifiedXray = []; // Disable XRay push for now unless explicit match
+    const xrayData = await getAllXRayData();
+    // X-Ray data is shared across all users (book-level), so sync all of it
+    const modifiedXray = lastSync
+        ? xrayData.filter(x => !x.generatedAt || new Date(x.generatedAt) > lastSync)
+        : xrayData;
 
-    console.log(`[Sync] Pushing changes: ${books.length} books, ${modifiedAnnotations.length} annotations...`);
+    console.log(`[Sync] Pushing changes: ${books.length} books, ${modifiedAnnotations.length} annotations, ${modifiedXray.length} X-Ray items...`);
 
-    if (books.length === 0 && modifiedTags.length === 0 && modifiedAnnotations.length === 0 && modifiedUserBookData.length === 0) {
+    if (books.length === 0 && modifiedTags.length === 0 && modifiedAnnotations.length === 0 && modifiedUserBookData.length === 0 && modifiedXray.length === 0) {
         console.log('[Sync] No local changes to push.');
         return;
     }
@@ -325,10 +327,10 @@ export async function pushLocalData(lastSync?: Date) {
             books: chunk,
             tags: isLastChunk ? modifiedTags : [],
             annotations: isLastChunk ? modifiedAnnotations : [],
-            readingSessions: isLastChunk ? readingSessions : [], // Sync all sessions for safe measure? Or filter?
+            readingSessions: isLastChunk ? readingSessions : [],
             users: isLastChunk ? modifiedUsers : [],
             userBookData: isLastChunk ? modifiedUserBookData : [],
-            // No XRay push for now
+            xrayData: isLastChunk ? modifiedXray : [], // Sync X-Ray data for all users
         };
 
         const res = await fetch('/api/library/metadata', {
