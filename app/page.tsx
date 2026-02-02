@@ -48,7 +48,7 @@ const CheckSquareIcon = () => (
   </svg>
 );
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 // ... (previous imports)
 
@@ -63,6 +63,20 @@ export default function Home() {
   } = useLibraryStore();
   const { onboardingComplete, currentUser } = useAppStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Handle URL query params for deep linking (e.g., from Goals page)
+  useEffect(() => {
+    const view = searchParams.get('view');
+    const bookId = searchParams.get('bookId');
+
+    if (view === 'book-details' && bookId) {
+      setSelectedBookId(bookId);
+      setView('book-details');
+      // Clean up URL without triggering navigation
+      window.history.replaceState({}, '', '/');
+    }
+  }, [searchParams, setSelectedBookId, setView]);
 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showImport, setShowImport] = useState(false);

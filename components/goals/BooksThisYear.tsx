@@ -15,11 +15,8 @@ export function BooksThisYear() {
   const currentYear = new Date().getFullYear();
 
   const handleBookClick = (book: Book) => {
-    // Set the book ID and view first
-    setSelectedBookId(book.id);
-    setView('book-details');
-    // Then navigate - the home page will render BookDetailsView
-    router.push('/');
+    // Navigate using query params to preserve state across page navigation
+    router.push(`/?view=book-details&bookId=${book.id}`);
   };
 
   useEffect(() => {
