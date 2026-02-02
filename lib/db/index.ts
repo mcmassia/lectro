@@ -221,6 +221,19 @@ export interface CoverEntry {
   coverBlob: string; // Base64
 }
 
+// Metas de lectura del usuario
+export interface ReadingGoals {
+  id?: number;
+  userId: string;
+  dailyTimeGoalMinutes: number;      // Meta diaria en minutos (ej: 15)
+  yearlyBooksGoal: number;           // Meta anual de libros (ej: 12)
+  streakRecord: number;              // Récord de racha de días
+  streakRecordDate?: Date;           // Cuándo se logró el récord
+  longestReadingSessionMinutes?: number; // Sesión más larga en minutos
+  goalCompletedDays: number;         // Días con objetivo completado
+  updatedAt: Date;
+}
+
 // ===================================
 // Default Values
 // ===================================
@@ -261,6 +274,7 @@ export class LectroDB extends Dexie {
   tags!: Table<Tag, string>;
   files!: Table<FileEntry, string>; // New table for blobs
   covers!: Table<CoverEntry, string>; // New table for covers
+  readingGoals!: Table<ReadingGoals, number>; // Reading goals per user
 
   constructor() {
     super('LectroDB');
@@ -459,6 +473,11 @@ export class LectroDB extends Dexie {
 
     this.version(14).stores({
       books: 'id, title, author, format, addedAt, lastReadAt, updatedAt, progress, status, fileName, filePath, isOnServer, isFavorite, deletedAt, indexedAt, deepIndexedAt'
+    });
+
+    // Version 15: Reading Goals
+    this.version(15).stores({
+      readingGoals: '++id, &userId'
     });
 
   }
@@ -1193,3 +1212,226 @@ export async function recoverLegacyData(targetUserId?: string): Promise<{ annota
 
   return { annotations: migratedAnnotations, sessions: migratedSessions, userBookData: migratedUserBookData };
 }
+
+// ===================================
+// Reading Goals Operations
+// ===================================
+
+const defaultReadingGoals: Omit<ReadingGoals, 'id' | 'userId' | 'updatedAt'> = {
+  dailyTimeGoalMinutes: 15,
+  yearlyBooksGoal: 12,
+  streakRecord: 0,
+  goalCompletedDays: 0,
+};
+
+export async function getReadingGoals(userId: string): Promise<ReadingGoals> {
+  const existing = await db.readingGoals.where('userId').equals(userId).first();
+  if (existing) return existing;
+
+  // Create default goals for user
+  const newGoals: ReadingGoals = {
+    userId,
+    ...defaultReadingGoals,
+    updatedAt: new Date(),
+  };
+  await db.readingGoals.add(newGoals);
+  return newGoals;
+}
+
+export async function updateReadingGoals(userId: string, updates: Partial<ReadingGoals>): Promise<number> {
+  const existing = await db.readingGoals.where('userId').equals(userId).first();
+
+  if (existing) {
+    return db.readingGoals.update(existing.id!, { ...updates, updatedAt: new Date() });
+  } else {
+    const newGoals: ReadingGoals = {
+      userId,
+      ...defaultReadingGoals,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    await db.readingGoals.add(newGoals);
+    return 1;
+  }
+}
+
+// Get time-focused stats for the user
+export async function getTimeStatsForUser(userId: string, days: number = 30) {
+  const startDate = new Date();
+  startDate.setHours(0, 0, 0, 0);
+  startDate.setDate(startDate.getDate() - days + 1);
+
+  const sessions = await db.readingSessions
+    .where('userId')
+    .equals(userId)
+    .filter(s => s.startTime >= startDate)
+    .toArray();
+
+  // Daily time stats in minutes
+  const dailyTimeMinutes: Record<string, number> = {};
+  sessions.forEach(s => {
+    const dateKey = s.startTime.toISOString().split('T')[0];
+    const duration = (s.endTime.getTime() - s.startTime.getTime()) / 60000;
+    dailyTimeMinutes[dateKey] = (dailyTimeMinutes[dateKey] || 0) + duration;
+  });
+
+  // Today's reading time
+  const today = new Date().toISOString().split('T')[0];
+  const todayMinutes = dailyTimeMinutes[today] || 0;
+
+  // This week's reading time (last 7 days)
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const thisWeekMinutes = sessions
+    .filter(s => s.startTime >= weekAgo)
+    .reduce((sum, s) => sum + (s.endTime.getTime() - s.startTime.getTime()) / 60000, 0);
+
+  // This month's reading time
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const thisMonthMinutes = sessions
+    .filter(s => s.startTime >= monthStart)
+    .reduce((sum, s) => sum + (s.endTime.getTime() - s.startTime.getTime()) / 60000, 0);
+
+  // Total time in range
+  const totalMinutes = sessions.reduce((sum, s) => {
+    const duration = (s.endTime.getTime() - s.startTime.getTime()) / 60000;
+    return sum + duration;
+  }, 0);
+
+  return {
+    todayMinutes: Math.round(todayMinutes),
+    thisWeekMinutes: Math.round(thisWeekMinutes),
+    thisMonthMinutes: Math.round(thisMonthMinutes),
+    totalMinutes: Math.round(totalMinutes),
+    dailyTimeMinutes,
+    activeDays: Object.keys(dailyTimeMinutes).length,
+  };
+}
+
+// Get books completed in a specific year
+export async function getCompletedBooksForYear(userId: string, year: number): Promise<{ book: Book; completedAt: Date }[]> {
+  const startOfYear = new Date(year, 0, 1);
+  const endOfYear = new Date(year, 11, 31, 23, 59, 59);
+
+  // Get user book data that's completed
+  const completedData = await db.userBookData
+    .where('userId')
+    .equals(userId)
+    .filter(d => d.status === 'completed' && d.updatedAt >= startOfYear && d.updatedAt <= endOfYear)
+    .toArray();
+
+  if (completedData.length === 0) return [];
+
+  // Get the actual books
+  const result: { book: Book; completedAt: Date }[] = [];
+  for (const data of completedData) {
+    const book = await db.books.get(data.bookId);
+    if (book && !book.deletedAt) {
+      // Get cover for the book
+      const coverEntry = await db.covers.get(data.bookId);
+      if (coverEntry) {
+        book.cover = coverEntry.coverBlob;
+      }
+      result.push({ book, completedAt: data.updatedAt });
+    }
+  }
+
+  return result.sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime());
+}
+
+// Calculate streak considering a goal (returns both reading days streak and goal-met streak)
+export async function getStreakStats(userId: string, dailyGoalMinutes: number) {
+  const sixtyDaysAgo = new Date();
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+  const sessions = await db.readingSessions
+    .where('userId')
+    .equals(userId)
+    .filter(s => s.startTime >= sixtyDaysAgo)
+    .toArray();
+
+  // Group by day with time in minutes
+  const dailyTimeMinutes: Record<string, number> = {};
+  sessions.forEach(s => {
+    const dateKey = s.startTime.toISOString().split('T')[0];
+    const duration = (s.endTime.getTime() - s.startTime.getTime()) / 60000;
+    dailyTimeMinutes[dateKey] = (dailyTimeMinutes[dateKey] || 0) + duration;
+  });
+
+  // Calculate current reading streak (just any reading)
+  let currentReadingStreak = 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < 60; i++) {
+    const checkDate = new Date(today);
+    checkDate.setDate(checkDate.getDate() - i);
+    const dateKey = checkDate.toISOString().split('T')[0];
+
+    if (dailyTimeMinutes[dateKey] && dailyTimeMinutes[dateKey] > 0) {
+      currentReadingStreak++;
+    } else if (i > 0) {
+      // Allow today to be missing (user might not have read yet today)
+      break;
+    }
+  }
+
+  // Calculate goal-met streak
+  let currentGoalStreak = 0;
+  for (let i = 0; i < 60; i++) {
+    const checkDate = new Date(today);
+    checkDate.setDate(checkDate.getDate() - i);
+    const dateKey = checkDate.toISOString().split('T')[0];
+
+    if (dailyTimeMinutes[dateKey] && dailyTimeMinutes[dateKey] >= dailyGoalMinutes) {
+      currentGoalStreak++;
+    } else if (i > 0) {
+      break;
+    }
+  }
+
+  // Count total days where goal was met
+  const goalMetDays = Object.values(dailyTimeMinutes).filter(m => m >= dailyGoalMinutes).length;
+
+  return {
+    currentReadingStreak,
+    currentGoalStreak,
+    goalMetDays,
+    dailyTimeMinutes,
+  };
+}
+
+// Check and update records after a reading session
+export async function checkAndUpdateRecords(userId: string, sessionMinutes?: number): Promise<{ newStreakRecord: boolean; newSessionRecord: boolean }> {
+  const goals = await getReadingGoals(userId);
+  const streakStats = await getStreakStats(userId, goals.dailyTimeGoalMinutes);
+
+  let newStreakRecord = false;
+  let newSessionRecord = false;
+  const updates: Partial<ReadingGoals> = {};
+
+  // Check streak record
+  if (streakStats.currentReadingStreak > goals.streakRecord) {
+    updates.streakRecord = streakStats.currentReadingStreak;
+    updates.streakRecordDate = new Date();
+    newStreakRecord = true;
+  }
+
+  // Check longest session record
+  if (sessionMinutes && (!goals.longestReadingSessionMinutes || sessionMinutes > goals.longestReadingSessionMinutes)) {
+    updates.longestReadingSessionMinutes = sessionMinutes;
+    newSessionRecord = true;
+  }
+
+  // Update goal completed days
+  updates.goalCompletedDays = streakStats.goalMetDays;
+
+  if (Object.keys(updates).length > 0) {
+    await updateReadingGoals(userId, updates);
+  }
+
+  return { newStreakRecord, newSessionRecord };
+}
+

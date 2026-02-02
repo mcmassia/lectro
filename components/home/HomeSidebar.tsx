@@ -134,6 +134,17 @@ export function RightSidebar() {
                         </div>
                     </div>
 
+                    <Link href="/goals" className="filter-card-wrapper full-width">
+                        <div className={`filter-card yellow full-width ${pathname === '/goals' ? 'active' : ''}`}>
+                            <div className="filter-icon">
+                                <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" /><circle cx="12" cy="12" r="6" stroke="currentColor" strokeWidth="2" fill="none" /><circle cx="12" cy="12" r="2" fill="currentColor" /></svg>
+                            </div>
+                            <div className="filter-info">
+                                <span className="filter-label">Metas</span>
+                            </div>
+                        </div>
+                    </Link>
+
                     <Link href="/stats" className="filter-card-wrapper full-width">
                         <div className={`filter-card green full-width ${pathname === '/stats' ? 'active' : ''}`}>
                             <div className="filter-icon">
@@ -290,6 +301,7 @@ export function RightSidebar() {
         .filter-card.purple { background-color: #af52de !important; }
         .filter-card.green { background-color: #34c759 !important; }
         .filter-card.blue { background-color: #007aff !important; }
+        .filter-card.yellow { background-color: #f59e0b !important; }
         
         .filter-icon {
             opacity: 0.9;
