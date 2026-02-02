@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useLibraryStore, useAppStore } from '@/stores/appStore';
-import { ActivityRings } from '@/components/dashboard/ActivityRings';
+import { SidebarGoalsWidget } from '@/components/goals/SidebarGoalsWidget';
 import { ChevronRight, ChevronLeft, Info, BrainCircuit, Eye, Sparkles, PanelRightClose } from 'lucide-react';
 import { getAllTags, db, XRayData, Book } from '@/lib/db';
 import { usePathname, useRouter } from 'next/navigation';
 import { generateXRayAction } from '@/app/actions/ai';
+
 
 
 export function RightSidebar() {
@@ -197,17 +198,16 @@ export function RightSidebar() {
 
                 <div className="sidebar-content">
 
-                    {/* Insights Section */}
-                    <div className="sidebar-section">
-                        <div className="section-header">
-                            <h3 className="heading-4">Insights de Lectura</h3>
-                            <Info size={14} className="info-icon" />
+                    {/* Metas de Lectura Section */}
+                    <div className="sidebar-section goals-section">
+                        <div className="section-header clickable" onClick={() => router.push('/goals')}>
+                            <h3 className="heading-4">Metas de Lectura</h3>
+                            <ChevronRight size={14} className="link-icon" />
                         </div>
-                        <div className="section-subheader">Objetivo Semanal</div>
 
                         {!isCollapsed && (
-                            <div className="rings-wrapper">
-                                <ActivityRings size="sm" />
+                            <div className="goals-compact">
+                                <SidebarGoalsWidget />
                             </div>
                         )}
                     </div>
@@ -394,6 +394,35 @@ export function RightSidebar() {
                     display: flex;
                     justify-content: center;
                     padding: 12px 0;
+                }
+
+                .section-header.clickable {
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    padding: 4px 0;
+                    margin: -4px 0;
+                }
+
+                .section-header.clickable:hover {
+                    color: var(--color-accent);
+                }
+
+                .section-header.clickable:hover .heading-4 {
+                    color: var(--color-accent);
+                }
+
+                .link-icon {
+                    color: var(--color-text-tertiary);
+                    transition: transform 0.2s;
+                }
+
+                .section-header.clickable:hover .link-icon {
+                    color: var(--color-accent);
+                    transform: translateX(2px);
+                }
+
+                .goals-compact {
+                    padding: var(--space-2) 0;
                 }
 
                 .stats-grid {

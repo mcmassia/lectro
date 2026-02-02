@@ -117,11 +117,14 @@ export function LeftSidebar() {
                             {!isCollapsed && <span>Biblioteca</span>}
                         </button>
 
-                        <button className="nav-item">
+                        <Link
+                            href="/goals"
+                            className={`nav-item ${pathname === '/goals' ? 'active' : ''}`}
+                            onClick={() => mobileMenuOpen && setMobileMenuOpen(false)}
+                        >
                             <Target size={20} />
                             {!isCollapsed && <span>Metas de Lectura</span>}
-                            {!isCollapsed && <span className="badge-coming-soon">Próx</span>}
-                        </button>
+                        </Link>
 
                         <Link
                             href="/notes"
