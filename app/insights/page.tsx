@@ -8,7 +8,7 @@ import { getAllVectorChunks, getAllBooks, Book, db } from '@/lib/db';
 import { v4 as uuid } from 'uuid';
 import ReactMarkdown from 'react-markdown';
 import { useRouter } from 'next/navigation';
-import { useLibraryStore } from '@/stores/appStore';
+import { useLibraryStore, useAppStore } from '@/stores/appStore';
 import { AIModelSelector } from '@/components/ai/AIModelSelector';
 
 const SendIcon = () => (
@@ -27,6 +27,7 @@ const BookIcon = () => (
 
 export default function InsightsPage() {
     const { ragMessages, addRagMessage, isGenerating, setIsGenerating, clearRagMessages, aiModel } = useAIStore();
+    const { currentUser } = useAppStore();
     const [input, setInput] = useState('');
     const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
     const [books, setBooks] = useState<Book[]>([]);
@@ -453,72 +454,79 @@ export default function InsightsPage() {
 
                             {!isIndexing ? (
                                 <>
-                                    {/* Section 1: Quick Metadata Indexing */}
-                                    <div style={{ marginTop: 'var(--space-3)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--color-border)' }}>
-                                        <div style={{ marginBottom: 'var(--space-2)' }}>
-                                            <h4 className="label">Indexación Rápida (Metadatos)</h4>
-                                            <p className="body-xs" style={{ color: 'var(--color-text-tertiary)' }}>Recomendado. Procesa toda la biblioteca en segundos.</p>
-                                        </div>
-                                        <label className="body-xs" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--color-text-secondary)' }}>
-                                            Lote (letra inicial):
-                                        </label>
-                                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                                            <select
-                                                className="input"
-                                                style={{ flex: 1, fontSize: 'var(--text-sm)', padding: 'var(--space-1) var(--space-2)' }}
-                                                value={indexingFilter}
-                                                onChange={(e) => setIndexingFilter(e.target.value)}
-                                            >
-                                                <option value="all">Todo el catálogo</option>
-                                                {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(char => (
-                                                    <option key={char} value={char}>{char}</option>
-                                                ))}
-                                            </select>
-                                            <button
-                                                className="btn btn-primary btn-sm"
-                                                onClick={() => startIndexing('metadata', { type: 'startsWith', value: indexingFilter })}
-                                            >
-                                                Indexar M.
-                                            </button>
-                                        </div>
-                                    </div>
+                                    {/* Indexing controls only visible to admins */}
+                                    {currentUser?.isAdmin && (
+                                        <>
+                                            {/* Section 1: Quick Metadata Indexing */}
+                                            <div style={{ marginTop: 'var(--space-3)', paddingBottom: 'var(--space-3)', borderBottom: '1px solid var(--color-border)' }}>
+                                                <div style={{ marginBottom: 'var(--space-2)' }}>
+                                                    <h4 className="label">Indexación Rápida (Metadatos)</h4>
+                                                    <p className="body-xs" style={{ color: 'var(--color-text-tertiary)' }}>Recomendado. Procesa toda la biblioteca en segundos.</p>
+                                                </div>
+                                                <label className="body-xs" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--color-text-secondary)' }}>
+                                                    Lote (letra inicial):
+                                                </label>
+                                                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                                    <select
+                                                        className="input"
+                                                        style={{ flex: 1, fontSize: 'var(--text-sm)', padding: 'var(--space-1) var(--space-2)' }}
+                                                        value={indexingFilter}
+                                                        onChange={(e) => setIndexingFilter(e.target.value)}
+                                                    >
+                                                        <option value="all">Todo el catálogo</option>
+                                                        {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(char => (
+                                                            <option key={char} value={char}>{char}</option>
+                                                        ))}
+                                                    </select>
+                                                    <button
+                                                        className="btn btn-primary btn-sm"
+                                                        onClick={() => startIndexing('metadata', { type: 'startsWith', value: indexingFilter })}
+                                                    >
+                                                        Indexar M.
+                                                    </button>
+                                                </div>
+                                            </div>
 
-                                    {/* Section 2: Deep Full Indexing */}
-                                    <div style={{ marginTop: 'var(--space-3)' }}>
-                                        <div style={{ marginBottom: 'var(--space-2)' }}>
-                                            <h4 className="label">Indexación Profunda (Texto)</h4>
-                                            <p className="body-xs" style={{ color: 'var(--color-text-tertiary)' }}>Lento. Úsalo solo para libros específicos que quieras consultar a fondo.</p>
-                                        </div>
-                                        <label className="body-xs" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--color-text-secondary)' }}>
-                                            Buscar libro:
-                                        </label>
-                                        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                                            <input
-                                                type="text"
-                                                className="input"
-                                                style={{ flex: 1, fontSize: 'var(--text-sm)', padding: 'var(--space-1) var(--space-2)' }}
-                                                placeholder="Título del libro..."
-                                                value={deepIndexSearch}
-                                                onChange={(e) => setDeepIndexSearch(e.target.value)}
-                                            />
-                                            <button
-                                                className="btn btn-secondary btn-sm"
-                                                disabled={!deepIndexSearch.trim()}
-                                                onClick={() => startIndexing('full', { type: 'titleMatch', value: deepIndexSearch })}
-                                            >
-                                                Indexar T.
-                                            </button>
-                                        </div>
-                                    </div>
+                                            {/* Section 2: Deep Full Indexing */}
+                                            <div style={{ marginTop: 'var(--space-3)' }}>
+                                                <div style={{ marginBottom: 'var(--space-2)' }}>
+                                                    <h4 className="label">Indexación Profunda (Texto)</h4>
+                                                    <p className="body-xs" style={{ color: 'var(--color-text-tertiary)' }}>Lento. Úsalo solo para libros específicos que quieras consultar a fondo.</p>
+                                                </div>
+                                                <label className="body-xs" style={{ display: 'block', marginBottom: 'var(--space-1)', color: 'var(--color-text-secondary)' }}>
+                                                    Buscar libro:
+                                                </label>
+                                                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                                    <input
+                                                        type="text"
+                                                        className="input"
+                                                        style={{ flex: 1, fontSize: 'var(--text-sm)', padding: 'var(--space-1) var(--space-2)' }}
+                                                        placeholder="Título del libro..."
+                                                        value={deepIndexSearch}
+                                                        onChange={(e) => setDeepIndexSearch(e.target.value)}
+                                                    />
+                                                    <button
+                                                        className="btn btn-secondary btn-sm"
+                                                        disabled={!deepIndexSearch.trim()}
+                                                        onClick={() => startIndexing('full', { type: 'titleMatch', value: deepIndexSearch })}
+                                                    >
+                                                        Indexar T.
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
                                 </>
                             ) : (
-                                <button
-                                    className="btn btn-danger btn-sm"
-                                    style={{ width: '100%', marginTop: 'var(--space-3)' }}
-                                    onClick={stopIndexing}
-                                >
-                                    Detener Indexación
-                                </button>
+                                currentUser?.isAdmin && (
+                                    <button
+                                        className="btn btn-danger btn-sm"
+                                        style={{ width: '100%', marginTop: 'var(--space-3)' }}
+                                        onClick={stopIndexing}
+                                    >
+                                        Detener Indexación
+                                    </button>
+                                )
                             )}
                         </div>
 
