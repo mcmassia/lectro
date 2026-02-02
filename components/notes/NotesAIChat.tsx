@@ -33,7 +33,6 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
 
     // Build context from user's notes
     const buildNotesContext = () => {
-        // Group notes by book
         const notesByBook = new Map<string, { book: Book; notes: Annotation[] }>();
 
         notes.forEach(note => {
@@ -46,18 +45,17 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
             notesByBook.get(book.id)!.notes.push(note);
         });
 
-        // Create context string
         const contextParts: string[] = [];
         notesByBook.forEach(({ book, notes: bookNotes }) => {
             const notesText = bookNotes
-                .slice(0, 10) // Limit notes per book
+                .slice(0, 10)
                 .map(n => `- "${n.text}"${n.note ? ` (Nota del usuario: ${n.note})` : ''}`)
                 .join('\n');
 
             contextParts.push(`## ${book.title} (${book.author})\n${notesText}`);
         });
 
-        return contextParts.slice(0, 5).join('\n\n'); // Limit to 5 books
+        return contextParts.slice(0, 5).join('\n\n');
     };
 
     const handleSend = async (messageText?: string) => {
@@ -133,21 +131,21 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
     ];
 
     return (
-        <div className="notes-chat-panel">
+        <div className="notes-chat-wrapper">
             {/* Header */}
             <div className="chat-header">
                 <div className="header-title">
-                    <Sparkles size={18} className="text-accent" />
+                    <Sparkles size={18} style={{ color: 'var(--color-accent)' }} />
                     <span>Asistente de Notas</span>
                 </div>
                 <div className="badge-beta">Beta</div>
             </div>
 
-            {/* Messages Area */}
+            {/* Messages Area - with padding bottom for input */}
             <div className="messages-container" ref={scrollRef}>
                 {messages.length === 0 ? (
                     <div className="empty-state">
-                        <MessageCircle size={40} className="empty-icon" />
+                        <MessageCircle size={40} style={{ color: 'var(--color-text-tertiary)', opacity: 0.5, marginBottom: 16 }} />
                         <h3>Pregúntame sobre tus notas</h3>
                         <p>Puedo ayudarte a encontrar conexiones, identificar temas y reflexionar sobre tus lecturas.</p>
 
@@ -191,7 +189,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 )}
             </div>
 
-            {/* Input Area - Fixed at bottom */}
+            {/* Input Area - Positioned at bottom */}
             <div className="input-area">
                 <input
                     type="text"
@@ -211,17 +209,16 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
             </div>
 
             <style jsx>{`
-                .notes-chat-panel {
+                .notes-chat-wrapper {
                     width: 420px;
                     min-width: 420px;
                     background: var(--color-bg-secondary);
                     border-left: 1px solid var(--color-border);
+                    position: relative;
                     display: flex;
                     flex-direction: column;
-                    height: 100%;
-                    max-height: 100%;
-                    overflow: hidden;
-                    flex-shrink: 0;
+                    height: 100vh;
+                    max-height: 100vh;
                 }
 
                 .chat-header {
@@ -231,7 +228,6 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     justify-content: space-between;
                     align-items: center;
                     background: var(--color-bg-tertiary);
-                    flex-shrink: 0;
                 }
 
                 .header-title {
@@ -241,10 +237,6 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     font-weight: 600;
                     font-size: 14px;
                     color: var(--color-text-primary);
-                }
-
-                .text-accent {
-                    color: var(--color-accent);
                 }
 
                 .badge-beta {
@@ -258,13 +250,13 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 }
 
                 .messages-container {
-                    flex: 1 1 auto;
+                    flex: 1;
                     overflow-y: auto;
                     padding: 20px;
+                    padding-bottom: 100px;
                     display: flex;
                     flex-direction: column;
                     gap: 16px;
-                    min-height: 0;
                 }
 
                 .empty-state {
@@ -275,12 +267,6 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     flex: 1;
                     text-align: center;
                     padding: 20px;
-                }
-
-                .empty-icon {
-                    color: var(--color-text-tertiary);
-                    margin-bottom: 16px;
-                    opacity: 0.5;
                 }
 
                 .empty-state h3 {
@@ -363,13 +349,15 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 }
 
                 .input-area {
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
                     padding: 16px 20px;
                     border-top: 1px solid var(--color-border);
                     display: flex;
                     gap: 12px;
                     background: var(--color-bg-tertiary);
-                    flex-shrink: 0;
-                    flex-grow: 0;
                 }
 
                 .input-area input {
@@ -455,7 +443,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 .markdown-content :global(strong) { font-weight: 700; }
 
                 @media (max-width: 1100px) {
-                    .notes-chat-panel {
+                    .notes-chat-wrapper {
                         display: none;
                     }
                 }
