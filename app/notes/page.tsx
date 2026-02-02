@@ -16,9 +16,10 @@ import { NoteCard } from '@/components/notes/NoteCard';
 import { NotesSidebar } from '@/components/notes/NotesSidebar';
 import { NotesAIChat } from '@/components/notes/NotesAIChat';
 import { useRouter } from 'next/navigation';
-import { Download, Upload, Filter, ArrowUpDown, ChevronDown, Check, X } from 'lucide-react';
+import { Download, Upload, Filter, ArrowUpDown, ChevronDown, Check, X, Plus } from 'lucide-react';
 import { exportNotes } from '@/lib/notes/export';
 import { ImportNotesModal } from '@/components/notes/ImportNotesModal';
+import { AddNoteModal } from '@/components/notes/AddNoteModal';
 
 type SortBy = 'date' | 'book';
 type SortDirection = 'asc' | 'desc';
@@ -47,6 +48,7 @@ export default function NotesPage() {
 
     const [isExportOpen, setIsExportOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
+    const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
 
     // Compute books with notes, sorted by last note date
     const booksWithNotes = useMemo(() => {
@@ -248,6 +250,14 @@ export default function NotesPage() {
                             <p className="text-[var(--color-text-secondary)]">Tus últimas reflexiones y lecturas</p>
                         </div>
                         <div className="flex items-center gap-2">
+                            {/* Add Note Button */}
+                            <button
+                                onClick={() => setIsAddNoteOpen(true)}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--color-accent)] text-[var(--color-accent)] bg-[var(--color-accent)]/10 text-xs font-medium transition-colors hover:bg-[var(--color-accent)] hover:text-white"
+                            >
+                                <Plus size={14} />
+                                Añadir Nota
+                            </button>
                             {/* Filter Button */}
                             <div className="relative">
                                 <button
@@ -448,6 +458,15 @@ export default function NotesPage() {
                     books={books}
                     onClose={() => setIsImportOpen(false)}
                     onImportComplete={loadData}
+                />
+            )}
+
+            {/* Add Note Modal */}
+            {isAddNoteOpen && (
+                <AddNoteModal
+                    books={books}
+                    onClose={() => setIsAddNoteOpen(false)}
+                    onSave={loadData}
                 />
             )}
         </div>

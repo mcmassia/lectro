@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Book, XRayData } from '@/lib/db';
+import { Book, XRayData, addAnnotation, Annotation } from '@/lib/db';
 import { useAppStore } from '@/stores/appStore';
 import { db, VectorChunk } from '@/lib/db';
 import { generateEmbeddingAction, getRagResponseAction } from '@/app/actions/ai';
-import { Send, Sparkles, X } from 'lucide-react';
+import { Send, Sparkles, Bookmark, BookmarkCheck } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { AIModelSelector, AI_MODELS } from './AIModelSelector';
 
 export interface Message {
     id: string;
@@ -31,6 +32,8 @@ interface BookChatProps {
 
 export function BookChat({ book, xrayData, onClose, messages, setMessages, input, setInput, isIndexed, isIndexing, onIndexBook }: BookChatProps) {
     const [isSending, setIsSending] = useState(false);
+    const [savedMessageIds, setSavedMessageIds] = useState<Set<string>>(new Set());
+    const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
     const scrollRef = useRef<HTMLDivElement>(null);
     const { currentUser } = useAppStore();
 
@@ -126,7 +129,8 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
             const result = await getRagResponseAction(
                 userMsg.content,
                 contexts,
-                history
+                history,
+                selectedModel
             );
 
             if (result.success && result.data) {
@@ -167,6 +171,26 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
         }
         return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
     }
+
+    const handleSaveAsNote = async (messageId: string, messageContent: string) => {
+        if (!currentUser) return;
+
+        const newAnnotation: Annotation = {
+            id: crypto.randomUUID(),
+            bookId: book.id,
+            userId: currentUser.id,
+            cfi: '',
+            text: messageContent.slice(0, 200) + (messageContent.length > 200 ? '...' : ''),
+            note: messageContent,
+            color: 'yellow',
+            chapterTitle: 'Respuesta IA',
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+
+        await addAnnotation(newAnnotation);
+        setSavedMessageIds(prev => new Set(prev).add(messageId));
+    };
 
     return (
         <div className="book-chat-container animate-fade-in">
@@ -218,6 +242,16 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
                                 msg.content
                             )}
                         </div>
+                        {msg.role === 'assistant' && (
+                            <button
+                                className={`save-note-btn ${savedMessageIds.has(msg.id) ? 'saved' : ''}`}
+                                onClick={() => handleSaveAsNote(msg.id, msg.content)}
+                                disabled={savedMessageIds.has(msg.id)}
+                                title={savedMessageIds.has(msg.id) ? 'Guardado como nota' : 'Guardar como nota'}
+                            >
+                                {savedMessageIds.has(msg.id) ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+                            </button>
+                        )}
                     </div>
                 ))}
 
@@ -233,6 +267,11 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
             </div>
 
             <div className="input-area">
+                <AIModelSelector
+                    selectedModel={selectedModel}
+                    onModelChange={setSelectedModel}
+                    compact={true}
+                />
                 <input
                     type="text"
                     value={input}
@@ -341,7 +380,32 @@ Characters: ${xrayData.characters.map(c => `${c.name}: ${c.description}`).join('
                     max-width: 85%;
                 }
                 .message.user { align-self: flex-end; align-items: flex-end; }
-                .message.assistant { align-self: flex-start; align-items: flex-start; }
+                .message.assistant { align-self: flex-start; align-items: flex-start; position: relative; }
+
+                .save-note-btn {
+                    position: absolute;
+                    top: 8px;
+                    right: -32px;
+                    background: transparent;
+                    border: none;
+                    color: var(--color-text-tertiary);
+                    cursor: pointer;
+                    padding: 4px;
+                    border-radius: 4px;
+                    transition: all 0.2s;
+                    opacity: 0;
+                }
+                .message.assistant:hover .save-note-btn {
+                    opacity: 1;
+                }
+                .save-note-btn:hover {
+                    color: var(--color-accent);
+                    background: var(--color-bg-tertiary);
+                }
+                .save-note-btn.saved {
+                    color: var(--color-accent);
+                    opacity: 1;
+                }
 
                 .message-content {
                     padding: 12px 16px;

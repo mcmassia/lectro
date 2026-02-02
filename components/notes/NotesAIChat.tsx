@@ -5,6 +5,7 @@ import { Annotation, Book } from '@/lib/db';
 import { Send, Sparkles, MessageCircle } from 'lucide-react';
 import { getRagResponseAction } from '@/app/actions/ai';
 import ReactMarkdown from 'react-markdown';
+import { AIModelSelector } from '../ai/AIModelSelector';
 
 interface Message {
     id: string;
@@ -22,6 +23,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isSending, setIsSending] = useState(false);
+    const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -87,7 +89,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 userMsg.content,
                 contexts,
                 history,
-                'gemini-2.5-flash',
+                selectedModel,
                 undefined,
                 'Eres un asistente de análisis literario. El usuario te hace preguntas sobre sus notas de lectura. Responde en español, de forma clara y concisa. Ayuda al usuario a encontrar conexiones entre sus notas, identificar temas recurrentes y profundizar en sus reflexiones.'
             );
@@ -189,6 +191,11 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
 
             {/* Input Area */}
             <div className="input-area">
+                <AIModelSelector
+                    selectedModel={selectedModel}
+                    onModelChange={setSelectedModel}
+                    compact={true}
+                />
                 <input
                     type="text"
                     value={input}
