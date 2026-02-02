@@ -24,14 +24,12 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
     const [isSending, setIsSending] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
-    // Auto-scroll to bottom when messages change
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [messages]);
 
-    // Build context from user's notes
     const buildNotesContext = () => {
         const notesByBook = new Map<string, { book: Book; notes: Annotation[] }>();
 
@@ -141,7 +139,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 <div className="badge-beta">Beta</div>
             </div>
 
-            {/* Messages Area - with padding bottom for input */}
+            {/* Messages Area */}
             <div className="messages-container" ref={scrollRef}>
                 {messages.length === 0 ? (
                     <div className="empty-state">
@@ -189,7 +187,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 )}
             </div>
 
-            {/* Input Area - Positioned at bottom */}
+            {/* Input Area */}
             <div className="input-area">
                 <input
                     type="text"
@@ -214,11 +212,11 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     min-width: 420px;
                     background: var(--color-bg-secondary);
                     border-left: 1px solid var(--color-border);
-                    position: relative;
                     display: flex;
                     flex-direction: column;
-                    height: 100vh;
-                    max-height: 100vh;
+                    height: calc(100vh - 64px);
+                    max-height: calc(100vh - 64px);
+                    overflow: hidden;
                 }
 
                 .chat-header {
@@ -228,6 +226,7 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     justify-content: space-between;
                     align-items: center;
                     background: var(--color-bg-tertiary);
+                    flex-shrink: 0;
                 }
 
                 .header-title {
@@ -253,10 +252,10 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     flex: 1;
                     overflow-y: auto;
                     padding: 20px;
-                    padding-bottom: 100px;
                     display: flex;
                     flex-direction: column;
                     gap: 16px;
+                    min-height: 0;
                 }
 
                 .empty-state {
@@ -349,15 +348,12 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                 }
 
                 .input-area {
-                    position: absolute;
-                    bottom: 0;
-                    left: 0;
-                    right: 0;
                     padding: 16px 20px;
                     border-top: 1px solid var(--color-border);
                     display: flex;
                     gap: 12px;
                     background: var(--color-bg-tertiary);
+                    flex-shrink: 0;
                 }
 
                 .input-area input {
@@ -435,7 +431,6 @@ export function NotesAIChat({ notes, books }: NotesAIChatProps) {
                     to { opacity: 1; transform: translateY(0); }
                 }
 
-                /* Markdown Styles */
                 .markdown-content :global(p) { margin-bottom: 8px; }
                 .markdown-content :global(p:last-child) { margin-bottom: 0; }
                 .markdown-content :global(ul), .markdown-content :global(ol) { padding-left: 20px; margin-bottom: 8px; }
