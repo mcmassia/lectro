@@ -658,15 +658,19 @@ export async function getAllBooks(): Promise<Book[]> {
   // Now that blobs are in a separate table, we can safely use toArray() again
   const books = await db.books.toArray();
 
-  // Get all book IDs that have covers (without loading the actual cover data)
+  // Get all book IDs that have covers in local IndexedDB (without loading the actual cover data)
   const coverEntries = await db.covers.toArray();
-  const bookIdsWithCovers = new Set(coverEntries.map(c => c.bookId));
+  const bookIdsWithLocalCovers = new Set(coverEntries.map(c => c.bookId));
 
   return books
     .filter(b => !b.deletedAt)
     .map(book => ({
       ...book,
-      hasCover: bookIdsWithCovers.has(book.id)
+      // hasCover is true if:
+      // 1. Book is on server (covers are served via /api/covers/[bookId])
+      // 2. Book has filePath (also served from server)
+      // 3. Book has a cover entry in local IndexedDB covers table
+      hasCover: !!(book.isOnServer || book.filePath || bookIdsWithLocalCovers.has(book.id))
     }));
 }
 
@@ -790,17 +794,18 @@ export async function getRecentBooks(limit: number = 12): Promise<Book[]> {
     .limit(limit)
     .toArray();
 
-  // Get cover status for these books
+  // Get cover status for these books (for local-only books)
   const bookIds = books.map(b => b.id);
   const coverEntries = await db.covers.where('bookId').anyOf(bookIds).toArray();
-  const bookIdsWithCovers = new Set(coverEntries.map(c => c.bookId));
+  const bookIdsWithLocalCovers = new Set(coverEntries.map(c => c.bookId));
 
   // Strip blobs and add hasCover flag
   return books.map(book => {
     const { fileBlob, ...rest } = book;
     return {
       ...rest,
-      hasCover: bookIdsWithCovers.has(book.id)
+      // hasCover: true if on server, has filePath, or has local cover entry
+      hasCover: !!(book.isOnServer || book.filePath || bookIdsWithLocalCovers.has(book.id))
     } as Book;
   });
 }
@@ -846,6 +851,10 @@ export async function getReadingBooksForUser(userId: string): Promise<Book[]> {
   const bookIds = finalReadingData.map(d => d.bookId);
   const books = await db.books.where('id').anyOf(bookIds).toArray();
 
+  // Get cover status for these books (for local-only books)
+  const coverEntries = await db.covers.where('bookId').anyOf(bookIds).toArray();
+  const bookIdsWithLocalCovers = new Set(coverEntries.map(c => c.bookId));
+
   // Merge data and STRIP BLOBS
   const booksMap = new Map(books.map(b => [b.id, b]));
 
@@ -857,6 +866,8 @@ export async function getReadingBooksForUser(userId: string): Promise<Book[]> {
 
     return {
       ...rest,
+      // hasCover: true if on server, has filePath, or has local cover entry
+      hasCover: !!(book.isOnServer || book.filePath || bookIdsWithLocalCovers.has(book.id)),
       progress: data.progress,
       status: data.status,
       lastReadAt: data.lastReadAt,
