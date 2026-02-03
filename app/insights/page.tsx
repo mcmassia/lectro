@@ -37,6 +37,9 @@ export default function InsightsPage() {
     const [indexingFilter, setIndexingFilter] = useState<string>('all');
     const [deepIndexSearch, setDeepIndexSearch] = useState('');
     const [selectedBook, setSelectedBook] = useState<Book | null>(null);
+    const [coverCleanupPreview, setCoverCleanupPreview] = useState<any>(null);
+    const [isCleaningCovers, setIsCleaningCovers] = useState(false);
+    const [coverCleanupResult, setCoverCleanupResult] = useState<any>(null);
     const router = useRouter();
     const { setSelectedBookId, setView } = useLibraryStore();
     const indexerRef = useRef<any>(null); // To store indexer instance
@@ -86,6 +89,36 @@ export default function InsightsPage() {
             indexerRef.current.cancel();
         }
         setIsIndexing(false);
+    };
+
+    // Cover cleanup functions
+    const previewCoverCleanup = async () => {
+        try {
+            const res = await fetch('/api/library/cleanup-covers');
+            if (res.ok) {
+                const data = await res.json();
+                setCoverCleanupPreview(data);
+            }
+        } catch (err) {
+            console.error('Error previewing cover cleanup:', err);
+        }
+    };
+
+    const executeCoverCleanup = async () => {
+        setIsCleaningCovers(true);
+        setCoverCleanupResult(null);
+        try {
+            const res = await fetch('/api/library/cleanup-covers', { method: 'POST' });
+            if (res.ok) {
+                const data = await res.json();
+                setCoverCleanupResult(data);
+                setCoverCleanupPreview(null); // Clear preview after cleanup
+            }
+        } catch (err) {
+            console.error('Error cleaning covers:', err);
+        } finally {
+            setIsCleaningCovers(false);
+        }
     };
 
     // Helper to enrich text with book links
@@ -539,6 +572,60 @@ export default function InsightsPage() {
                             ))}
                         </div>
                     </div>
+
+                    {/* Maintenance Section - Admin Only */}
+                    {currentUser?.isAdmin && (
+                        <div className="card" style={{ marginTop: 'var(--space-4)' }}>
+                            <h3 className="heading-4">Mantenimiento</h3>
+                            <p className="body-xs" style={{ marginTop: 'var(--space-2)', color: 'var(--color-text-tertiary)' }}>
+                                Herramientas de limpieza de la base de datos
+                            </p>
+
+                            <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3)', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+                                <h4 className="label" style={{ marginBottom: 'var(--space-2)' }}>Limpiar Portadas Base64</h4>
+                                <p className="body-xs" style={{ color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
+                                    Elimina las imágenes de portada embebidas en el JSON para reducir su tamaño.
+                                </p>
+
+                                {coverCleanupPreview && (
+                                    <div style={{ background: 'var(--color-bg-primary)', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', marginBottom: 'var(--space-2)' }}>
+                                        <p className="body-xs">
+                                            📊 <strong>{coverCleanupPreview.base64Count}</strong> portadas base64 encontradas
+                                        </p>
+                                        <p className="body-xs">
+                                            💾 Tamaño: <strong>{coverCleanupPreview.sizeMB} MB</strong>
+                                        </p>
+                                    </div>
+                                )}
+
+                                {coverCleanupResult && (
+                                    <div style={{ background: 'var(--color-success-subtle, rgba(34, 197, 94, 0.1))', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', marginBottom: 'var(--space-2)' }}>
+                                        <p className="body-xs" style={{ color: 'var(--color-success)' }}>
+                                            ✅ {coverCleanupResult.message}
+                                        </p>
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                                    <button
+                                        className="btn btn-ghost btn-sm"
+                                        onClick={previewCoverCleanup}
+                                        style={{ flex: 1 }}
+                                    >
+                                        Vista previa
+                                    </button>
+                                    <button
+                                        className="btn btn-danger btn-sm"
+                                        onClick={executeCoverCleanup}
+                                        disabled={isCleaningCovers}
+                                        style={{ flex: 1 }}
+                                    >
+                                        {isCleaningCovers ? 'Limpiando...' : 'Limpiar'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {ragMessages.length > 0 && (
                         <button
