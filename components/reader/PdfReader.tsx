@@ -322,7 +322,7 @@ export const PdfReader = forwardRef<PdfReaderRef, PdfReaderProps>(({ book, onLoc
 
             <div className={`pdf-document-wrapper ${isScrollMode ? 'scrolled' : 'paginated'}`} style={getThemeStyle()}>
                 <Document
-                    file={book.fileBlob || book.cover}
+                    file={book.fileBlob || pdfUrl}
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
                     className="pdf-document"
