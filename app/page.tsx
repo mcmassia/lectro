@@ -285,7 +285,7 @@ export default function Home() {
       );
     }
     else if (activeCategory === 'no-cover') {
-      booksToFilter = booksToFilter.filter(book => !book.cover);
+      booksToFilter = booksToFilter.filter(book => !book.hasCover);
     }
 
     if (searchQuery) {

@@ -58,6 +58,7 @@ export interface Book {
   title: string;
   author: string;
   cover?: string; // Base64 or blob URL
+  hasCover?: boolean; // Flag indicating if cover exists in covers table (for filtering without loading heavy data)
   format: 'epub' | 'pdf';
   fileName: string;
   filePath?: string; // Relative path on server (e.g. Author/Book/file.epub)
@@ -656,7 +657,17 @@ export async function getBookCover(id: string): Promise<string | undefined> {
 export async function getAllBooks(): Promise<Book[]> {
   // Now that blobs are in a separate table, we can safely use toArray() again
   const books = await db.books.toArray();
-  return books.filter(b => !b.deletedAt);
+
+  // Get all book IDs that have covers (without loading the actual cover data)
+  const coverEntries = await db.covers.toArray();
+  const bookIdsWithCovers = new Set(coverEntries.map(c => c.bookId));
+
+  return books
+    .filter(b => !b.deletedAt)
+    .map(book => ({
+      ...book,
+      hasCover: bookIdsWithCovers.has(book.id)
+    }));
 }
 
 export async function getAllBooksIncludingDeleted(): Promise<Book[]> {
@@ -779,11 +790,18 @@ export async function getRecentBooks(limit: number = 12): Promise<Book[]> {
     .limit(limit)
     .toArray();
 
-  // Check if we need to strip blobs? 
-  // Yes, cleaner for store.
+  // Get cover status for these books
+  const bookIds = books.map(b => b.id);
+  const coverEntries = await db.covers.where('bookId').anyOf(bookIds).toArray();
+  const bookIdsWithCovers = new Set(coverEntries.map(c => c.bookId));
+
+  // Strip blobs and add hasCover flag
   return books.map(book => {
     const { fileBlob, ...rest } = book;
-    return rest as Book;
+    return {
+      ...rest,
+      hasCover: bookIdsWithCovers.has(book.id)
+    } as Book;
   });
 }
 

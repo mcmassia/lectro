@@ -195,7 +195,7 @@ export function LeftSidebar() {
                         <button className={`nav-item ${activeCategory === 'no-cover' ? 'active-subtle' : ''}`} onClick={() => { setActiveCategory('no-cover' as any); setActiveUserRating(null); closeMobileMenu(); }}>
                             <ImageOff size={18} color="#EF4444" />
                             {!isCollapsed && <span>Sin Portada</span>}
-                            {!isCollapsed && <span className="count">{books.filter(b => !b.cover).length}</span>}
+                            {!isCollapsed && <span className="count">{books.filter(b => !b.hasCover).length}</span>}
                         </button>
                     </div>
 
