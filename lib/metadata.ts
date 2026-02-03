@@ -19,8 +19,34 @@ export interface MetadataResult {
 
 export async function searchGoogleBooks(query: string): Promise<MetadataResult[]> {
     try {
-        const response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${encodeURIComponent(query)}&maxResults=10`);
-        const data = await response.json();
+        // Parse title and author from query (format: "title author")
+        // Try smarter query first with intitle/inauthor, then fallback to simple query
+        const parts = query.split(' ');
+        let searchQuery = query;
+
+        // If query looks like "Title Author", try to build a smarter query
+        // Typical format from BookDetailsView: `${book.title} ${book.author}`
+        if (parts.length >= 2) {
+            // Try to detect if there's a clear author name (usually last 1-3 words)
+            // For "La Mirada de las Furias Javier Negrete", we want intitle:"La Mirada de las Furias" inauthor:"Javier Negrete"
+            // Simple heuristic: assume last 2-3 words are author name
+            const authorWords = parts.slice(-2).join(' ');
+            const titleWords = parts.slice(0, -2).join(' ');
+
+            if (titleWords.length > 2 && authorWords.length > 2) {
+                searchQuery = `intitle:${titleWords} inauthor:${authorWords}`;
+            }
+        }
+
+        // First attempt with smart query
+        let response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${encodeURIComponent(searchQuery)}&maxResults=10`);
+        let data = await response.json();
+
+        // Fallback to simple query if no results
+        if (!data.items || data.items.length === 0) {
+            response = await fetch(`${GOOGLE_BOOKS_API_URL}?q=${encodeURIComponent(query)}&maxResults=10`);
+            data = await response.json();
+        }
 
         if (!data.items) return [];
 
@@ -58,6 +84,7 @@ export async function searchGoogleBooks(query: string): Promise<MetadataResult[]
         return [];
     }
 }
+
 
 export async function searchOpenLibrary(query: string): Promise<MetadataResult[]> {
     try {
