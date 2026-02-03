@@ -543,21 +543,6 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Search Bar - styled as pill */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Título"
-                className="pl-3 pr-8 py-1.5 bg-secondary text-sm rounded-md border-none focus:ring-2 focus:ring-accent w-48 text-primary placeholder-text-tertiary"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-tertiary">
-                {/* <FilterIcon /> */}
-                {/* Sort Icon/Button could go here if needed separate */}
-              </div>
-            </div>
-
             {/* Sort Criteria Selector */}
             <select
               value={sortBy}
