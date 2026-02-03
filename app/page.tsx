@@ -558,6 +558,27 @@ export default function Home() {
               </div>
             </div>
 
+            {/* Sort Criteria Selector */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'title' | 'author' | 'addedDate' | 'progress')}
+              className="bg-secondary text-primary text-sm rounded-md border-none focus:ring-2 focus:ring-accent px-3 py-1.5 cursor-pointer"
+            >
+              <option value="title">Título</option>
+              <option value="author">Autor</option>
+              <option value="addedDate">Fecha</option>
+              <option value="progress">Progreso</option>
+            </select>
+
+            {/* Sort Order Toggle */}
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="p-2 rounded-lg bg-secondary text-secondary hover:text-primary transition-colors"
+              title={sortOrder === 'asc' ? 'Orden ascendente' : 'Orden descendente'}
+            >
+              {sortOrder === 'asc' ? <ArrowUpNarrowWide size={18} /> : <ArrowDownNarrowWide size={18} />}
+            </button>
+
             {/* View Toggles */}
             <div className="flex bg-secondary rounded-lg p-1">
               <button className={`p-2 rounded-md ${viewMode === 'grid' ? 'bg-elevated text-accent shadow-sm' : 'text-tertiary'}`} onClick={() => setViewMode('grid')}>
