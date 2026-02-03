@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useReaderStore, useAppStore, useLibraryStore } from '@/stores/appStore';
-import { getBook, getBookForUser, updateBook, updateUserBookData, getAnnotationsForUserBook, addAnnotation, updateAnnotation, deleteAnnotation, Annotation, Book, HighlightColor } from '@/lib/db';
+import { getBook, getBookForUser, updateBook, updateUserBookData, getAnnotationsForUserBook, addAnnotation, updateAnnotation, deleteAnnotation, addReadingSession, upsertReadingSession, Annotation, Book, HighlightColor } from '@/lib/db';
 import { EpubReader, TocItem } from '@/components/reader/EpubReader';
 import { WebPubReader, WebPubReaderRef } from '@/components/reader/WebPubReader';
 import dynamic from 'next/dynamic';
@@ -49,6 +49,11 @@ export default function ReaderPage() {
     const [noteText, setNoteText] = useState('');
     const [toc, setToc] = useState<TocItem[]>([]);
 
+    // Session tracking
+    const sessionStartRef = useRef<{ time: Date; cfi: string; page: number } | null>(null);
+    const latestProgressRef = useRef({ cfi: '', page: 1 });
+    const sessionIdRef = useRef<string>('');
+
     useEffect(() => {
         async function loadBook() {
             try {
@@ -67,6 +72,18 @@ export default function ReaderPage() {
                 }
                 setBook(bookData);
 
+                // Initialize session start
+                sessionStartRef.current = {
+                    time: new Date(),
+                    cfi: bookData.currentPosition || '',
+                    page: bookData.currentPage || 1
+                };
+                latestProgressRef.current = {
+                    cfi: bookData.currentPosition || '',
+                    page: bookData.currentPage || 1
+                };
+                sessionIdRef.current = uuid();
+
                 if (currentUser) {
                     const bookAnnotations = await getAnnotationsForUserBook(currentUser.id, bookId);
                     setAnnotations(bookAnnotations);
@@ -84,11 +101,42 @@ export default function ReaderPage() {
 
         loadBook();
 
+        // Periodic session save (every 1 minute)
+        const saveSession = () => {
+            if (sessionStartRef.current && currentUser && sessionIdRef.current) {
+                const endTime = new Date();
+                const startTime = sessionStartRef.current.time;
+                const durationMinutes = (endTime.getTime() - startTime.getTime()) / 60000;
+
+                // Save if duration is meaningful (> 30 seconds)
+                if (durationMinutes >= 0.5) {
+                    const session: any = {
+                        id: sessionIdRef.current,
+                        bookId: bookId,
+                        userId: currentUser?.id,
+                        startTime: startTime,
+                        endTime: endTime,
+                        pagesRead: Math.max(0, latestProgressRef.current.page - sessionStartRef.current.page),
+                        startPosition: sessionStartRef.current.cfi,
+                        endPosition: latestProgressRef.current.cfi,
+                    };
+
+                    // Use upsert to update the same session record
+                    upsertReadingSession(session).catch(e => console.error('Failed to save reading session:', e));
+                }
+            }
+        };
+
+        const intervalId = setInterval(saveSession, 60000); // Save every 1 minute
+
         return () => {
+            saveSession(); // Final save on unmount
+            clearInterval(intervalId);
             setBook(null);
             setAnnotations([]);
+            sessionStartRef.current = null;
         };
-    }, [bookId, router, setBook, setAnnotations, setIsLoading, currentUser]);
+    }, [bookId, router, setBook, setAnnotations, setIsLoading, currentUser]); // Removed book/currentPage/currentCfi from deps to avoid session reset on every page turn
 
     // Collapse sidebar by default on mobile
     useEffect(() => {
@@ -102,6 +150,9 @@ export default function ReaderPage() {
         setCurrentPage(page);
         setTotalPages(total);
         setChapterTitle(chapter);
+
+        // Update ref for session tracking
+        latestProgressRef.current = { cfi, page };
 
         // Save reading progress
         if (book) {

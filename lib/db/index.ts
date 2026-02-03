@@ -980,6 +980,10 @@ export async function addReadingSession(session: ReadingSession): Promise<string
   return db.readingSessions.add(session);
 }
 
+export async function upsertReadingSession(session: ReadingSession): Promise<string> {
+  return db.readingSessions.put(session);
+}
+
 export async function getReadingSessionsForUserBook(userId: string, bookId: string): Promise<ReadingSession[]> {
   return db.readingSessions.where('[userId+bookId]').equals([userId, bookId]).toArray();
 }

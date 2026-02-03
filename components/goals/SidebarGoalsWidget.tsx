@@ -1,99 +1,94 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useAppStore } from '@/stores/appStore';
-import { getTimeStatsForUser, getReadingGoals, getStreakStats, ReadingGoals } from '@/lib/db';
+import { getTimeStatsForUser, getReadingGoals, getStreakStats } from '@/lib/db';
 import { Flame, Clock } from 'lucide-react';
 
 export function SidebarGoalsWidget() {
-    const { currentUser } = useAppStore();
-    const [todayMinutes, setTodayMinutes] = useState(0);
-    const [goals, setGoals] = useState<ReadingGoals | null>(null);
-    const [streak, setStreak] = useState(0);
+  const { currentUser } = useAppStore();
 
-    useEffect(() => {
-        async function loadData() {
-            if (!currentUser) return;
+  const data = useLiveQuery(async () => {
+    if (!currentUser) return { todayMinutes: 0, streak: 0, goalMinutes: 15 };
 
-            const [timeStats, userGoals] = await Promise.all([
-                getTimeStatsForUser(currentUser.id, 1),
-                getReadingGoals(currentUser.id),
-            ]);
+    const [timeStats, userGoals] = await Promise.all([
+      getTimeStatsForUser(currentUser.id, 1),
+      getReadingGoals(currentUser.id),
+    ]);
 
-            setTodayMinutes(timeStats.todayMinutes);
-            setGoals(userGoals);
+    const streakStats = await getStreakStats(currentUser.id, userGoals.dailyTimeGoalMinutes);
 
-            const streakStats = await getStreakStats(currentUser.id, userGoals.dailyTimeGoalMinutes);
-            setStreak(streakStats.currentReadingStreak);
-        }
-
-        loadData();
-    }, [currentUser]);
-
-    const goalMinutes = goals?.dailyTimeGoalMinutes || 15;
-    const progress = Math.min((todayMinutes / goalMinutes) * 100, 100);
-
-    // Format time
-    const formatTime = (minutes: number) => {
-        const hours = Math.floor(minutes / 60);
-        const mins = Math.round(minutes % 60);
-        if (hours > 0) {
-            return `${hours}h ${mins}m`;
-        }
-        return `${mins}m`;
+    return {
+      todayMinutes: timeStats.todayMinutes,
+      streak: streakStats.currentReadingStreak,
+      goalMinutes: userGoals.dailyTimeGoalMinutes
     };
+  }, [currentUser]);
 
-    // SVG parameters for mini ring
-    const size = 48;
-    const strokeWidth = 4;
-    const radius = (size - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (progress / 100) * circumference;
-    const center = size / 2;
+  const { todayMinutes, streak, goalMinutes } = data || { todayMinutes: 0, streak: 0, goalMinutes: 15 };
+  const progress = Math.min((todayMinutes / goalMinutes) * 100, 100);
 
-    return (
-        <div className="sidebar-goals-widget">
-            <div className="goal-row">
-                <div className="mini-ring-container">
-                    <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size}>
-                        <circle
-                            className="ring-bg"
-                            cx={center}
-                            cy={center}
-                            r={radius}
-                            strokeWidth={strokeWidth}
-                        />
-                        <circle
-                            className="ring-progress"
-                            cx={center}
-                            cy={center}
-                            r={radius}
-                            strokeWidth={strokeWidth}
-                            strokeDasharray={circumference}
-                            strokeDashoffset={strokeDashoffset}
-                        />
-                    </svg>
-                    <div className="ring-center">
-                        <Clock size={16} />
-                    </div>
-                </div>
-                <div className="goal-info">
-                    <span className="goal-value">{formatTime(todayMinutes)}</span>
-                    <span className="goal-label">hoy de {goalMinutes}min</span>
-                </div>
-            </div>
+  // Format time
+  const formatTime = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
+  };
 
-            <div className="streak-row">
-                <div className="streak-icon">
-                    <Flame size={18} />
-                </div>
-                <div className="streak-info">
-                    <span className="streak-value">{streak}</span>
-                    <span className="streak-label">días racha</span>
-                </div>
-            </div>
+  // SVG parameters for mini ring
+  const size = 48;
+  const strokeWidth = 4;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+  const center = size / 2;
 
-            <style jsx>{`
+  return (
+    <div className="sidebar-goals-widget">
+      <div className="goal-row">
+        <div className="mini-ring-container">
+          <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size}>
+            <circle
+              className="ring-bg"
+              cx={center}
+              cy={center}
+              r={radius}
+              strokeWidth={strokeWidth}
+            />
+            <circle
+              className="ring-progress"
+              cx={center}
+              cy={center}
+              r={radius}
+              strokeWidth={strokeWidth}
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+            />
+          </svg>
+          <div className="ring-center">
+            <Clock size={16} />
+          </div>
+        </div>
+        <div className="goal-info">
+          <span className="goal-value">{formatTime(todayMinutes)}</span>
+          <span className="goal-label">hoy de {goalMinutes}min</span>
+        </div>
+      </div>
+
+      <div className="streak-row">
+        <div className="streak-icon">
+          <Flame size={18} />
+        </div>
+        <div className="streak-info">
+          <span className="streak-value">{streak}</span>
+          <span className="streak-label">días racha</span>
+        </div>
+      </div>
+
+      <style jsx>{`
         .sidebar-goals-widget {
           display: flex;
           flex-direction: column;
@@ -192,15 +187,15 @@ export function SidebarGoalsWidget() {
         }
       `}</style>
 
-            {/* SVG Gradient Definition */}
-            <svg width="0" height="0" style={{ position: 'absolute' }}>
-                <defs>
-                    <linearGradient id="sidebarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#3b82f6" />
-                        <stop offset="100%" stopColor="#8b5cf6" />
-                    </linearGradient>
-                </defs>
-            </svg>
-        </div>
-    );
+      {/* SVG Gradient Definition */}
+      <svg width="0" height="0" style={{ position: 'absolute' }}>
+        <defs>
+          <linearGradient id="sidebarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#3b82f6" />
+            <stop offset="100%" stopColor="#8b5cf6" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+  );
 }
