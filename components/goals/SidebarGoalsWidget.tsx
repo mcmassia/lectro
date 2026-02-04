@@ -13,7 +13,7 @@ export function SidebarGoalsWidget() {
 
     const [timeStats, userGoals] = await Promise.all([
       getTimeStatsForUser(currentUser.id, 1),
-      getReadingGoals(currentUser.id),
+      getReadingGoals(currentUser.id, false),
     ]);
 
     const streakStats = await getStreakStats(currentUser.id, userGoals.dailyTimeGoalMinutes);

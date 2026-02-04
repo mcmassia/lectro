@@ -1257,9 +1257,18 @@ const defaultReadingGoals: Omit<ReadingGoals, 'id' | 'userId' | 'updatedAt'> = {
   goalCompletedDays: 0,
 };
 
-export async function getReadingGoals(userId: string): Promise<ReadingGoals> {
+export async function getReadingGoals(userId: string, createIfMissing: boolean = true): Promise<ReadingGoals> {
   const existing = await db.readingGoals.where('userId').equals(userId).first();
   if (existing) return existing;
+
+  if (!createIfMissing) {
+    // Return default without saving
+    return {
+      userId,
+      ...defaultReadingGoals,
+      updatedAt: new Date(),
+    };
+  }
 
   // Create default goals for user
   const newGoals: ReadingGoals = {
