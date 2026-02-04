@@ -1325,19 +1325,26 @@ export async function getTimeStatsForUser(userId: string, days: number = 30) {
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
   const thisWeekMinutes = sessions
-    .filter(s => s.startTime >= weekAgo)
-    .reduce((sum, s) => sum + (s.endTime.getTime() - s.startTime.getTime()) / 60000, 0);
+    .filter(s => s && s.startTime && s.endTime && s.startTime >= weekAgo)
+    .reduce((sum, s) => {
+      if (!s || !s.startTime || !s.endTime) return sum;
+      return sum + (s.endTime.getTime() - s.startTime.getTime()) / 60000;
+    }, 0);
 
   // This month's reading time
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
   const thisMonthMinutes = sessions
-    .filter(s => s.startTime >= monthStart)
-    .reduce((sum, s) => sum + (s.endTime.getTime() - s.startTime.getTime()) / 60000, 0);
+    .filter(s => s && s.startTime && s.endTime && s.startTime >= monthStart)
+    .reduce((sum, s) => {
+      if (!s || !s.startTime || !s.endTime) return sum;
+      return sum + (s.endTime.getTime() - s.startTime.getTime()) / 60000;
+    }, 0);
 
   // Total time in range
   const totalMinutes = sessions.reduce((sum, s) => {
+    if (!s || !s.startTime || !s.endTime) return sum;
     const duration = (s.endTime.getTime() - s.startTime.getTime()) / 60000;
     return sum + duration;
   }, 0);
