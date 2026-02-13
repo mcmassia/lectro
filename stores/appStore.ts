@@ -497,18 +497,56 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
             filtered = filtered.filter((b) => b.metadata?.userRating === activeUserRating);
         }
 
-        // Filter by search
+        // Filter by search with Relevance Scoring
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
-            filtered = filtered.filter((b) =>
-                b.title.toLowerCase().includes(query) ||
-                b.author.toLowerCase().includes(query) ||
-                b.metadata?.categories?.some(c => c.toLowerCase().includes(query)) ||
-                b.metadata?.userRating?.toLowerCase().includes(query)
-            );
+            
+            // Calculate relevance and filter
+            const scoredBooks = filtered.map(b => {
+                let score = 0;
+                const title = b.title.toLowerCase();
+                const author = b.author?.toLowerCase() || '';
+                
+                // Exact matches
+                if (title === query) score += 100;
+                if (author === query) score += 100;
+                
+                // Starts with
+                if (title.startsWith(query)) score += 80;
+                if (author.startsWith(query)) score += 80;
+                
+                // Contains
+                if (title.includes(query)) score += 60;
+                if (author.includes(query)) score += 60;
+                
+                // Categories / Tags / Rating
+                if (b.metadata?.categories?.some(c => c.toLowerCase().includes(query))) score += 40;
+                if (b.metadata?.userRating?.toLowerCase().includes(query)) score += 40;
+                if (b.metadata?.tags?.some(t => t.toLowerCase().includes(query))) score += 30;
+
+                // Word match (for multi-word queries)
+                const queryWords = query.split(/\s+/).filter(w => w.length > 2);
+                if (queryWords.length > 1) {
+                    let wordMatches = 0;
+                    queryWords.forEach(word => {
+                        if (title.includes(word) || author.includes(word)) wordMatches++;
+                    });
+                     // Bonus for matching multiple words
+                    score += (wordMatches * 10);
+                }
+
+                return { book: b, score };
+            }).filter(item => item.score > 0);
+
+            // Sort by Score Descending
+            scoredBooks.sort((a, b) => b.score - a.score);
+
+            return scoredBooks.map(item => item.book);
         }
 
-        // Sort
+        // Standard Sort (Only if no search query active, or if we want to fallback)
+        // If search is active, we already returned above.
+        
         filtered = [...filtered].sort((a, b) => {
             let comparison = 0;
 
@@ -517,7 +555,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
                     comparison = a.title.localeCompare(b.title);
                     break;
                 case 'author':
-                    comparison = a.author.localeCompare(b.author);
+                    comparison = (a.author || '').localeCompare(b.author || '');
                     break;
                 case 'lastRead':
                     const aTime = a.lastReadAt?.getTime() || 0;
@@ -525,14 +563,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
                     comparison = aTime - bTime;
                     break;
                 case 'addedDate':
-                    comparison = a.addedAt.getTime() - b.addedAt.getTime();
+                    comparison = (a.addedAt?.getTime() || 0) - (b.addedAt?.getTime() || 0);
                     break;
                 case 'progress':
                     // Safe access if undefined
                     comparison = (a.progress || 0) - (b.progress || 0);
                     break;
                 case 'fileSize':
-                    comparison = a.fileSize - b.fileSize;
+                    comparison = (a.fileSize || 0) - (b.fileSize || 0);
                     break;
                 case 'relevance':
                     // Simple relevance fallback to last read
@@ -545,7 +583,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
             return sortOrder === 'asc' ? comparison : -comparison;
         });
 
-        // Limit to 12 for 'recientes'
+        // Limit to 12 for 'recientes' ONLY if no search query (already handled above)
         if (activeCategory === 'recientes') {
             return filtered.slice(0, 12);
         }
