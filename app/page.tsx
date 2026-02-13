@@ -60,8 +60,11 @@ export default function Home() {
     activeFormat, sortOrder, setSortOrder, currentView, setView,
     syncMetadata, loadRecentBooks, loadBooks, searchQuery, setSearchQuery,
     activeThematicCategory, activeUserRating, setActiveThematicCategory, setActiveUserRating, xrayKeywords,
-    setSelectedBookId, selectedBookId, selectedAuthor, setSelectedAuthor
+    setSelectedBookId, selectedBookId, selectedAuthor, setSelectedAuthor, filteredBooks: getFilteredBooks
   } = useLibraryStore();
+
+  const filteredBooks = getFilteredBooks();
+
   const { onboardingComplete, currentUser } = useAppStore();
   const router = useRouter();
 
@@ -71,7 +74,6 @@ export default function Home() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResults, setSyncResults] = useState<{ added: number; removed: number; errors: string[] } | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
-  const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
 
   // AI Search State
   const [aiSearchResults, setAiSearchResults] = useState<string[] | null>(null);
@@ -143,7 +145,8 @@ export default function Home() {
     if (el) setScrollParent(el);
   }, []);
 
-  // AI Search Trigger
+  // AI Search Trigger - DISABLED/COMMENTED OUT to prioritize text relevance
+  /*
   useEffect(() => {
     if (!searchQuery) {
       setAiSearchResults(null);
@@ -171,6 +174,7 @@ export default function Home() {
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
+  */
 
   // Handlers
   const handleSync = async () => {
@@ -252,90 +256,6 @@ export default function Home() {
     }
   }, [searchQuery, activeThematicCategory, activeUserRating, activeCategory, setActiveThematicCategory, setActiveUserRating, setActiveCategory]);
 
-  useEffect(() => {
-    let booksToFilter = books;
-    if (activeFormat !== 'all') booksToFilter = booksToFilter.filter(book => book.format === activeFormat);
-
-    // Thematic Category filtering
-    if (activeThematicCategory) {
-      booksToFilter = booksToFilter.filter(book => book.metadata?.categories?.includes(activeThematicCategory));
-    }
-
-    // User Rating filtering
-    if (activeUserRating) {
-      booksToFilter = booksToFilter.filter(book => book.metadata?.userRating === activeUserRating);
-    }
-
-    // Category filtering (Tabs)
-    if (activeCategory === 'favorites') booksToFilter = booksToFilter.filter(book => book.isFavorite || book.metadata?.userRating === 'favorito');
-    else if (activeCategory === 'planToRead') booksToFilter = booksToFilter.filter(book => book.status === 'planToRead');
-    else if (activeCategory === 'interesting') booksToFilter = booksToFilter.filter(book => book.status === 'interesting');
-    else if (activeCategory === 'completed') booksToFilter = booksToFilter.filter(book => book.status === 'completed');
-    else if (activeCategory === 'unread') booksToFilter = booksToFilter.filter(book => !book.status || book.status === 'unread');
-    else if (activeCategory === 'reading') booksToFilter = booksToFilter.filter(book => book.status === 'reading');
-    else if (activeCategory === 're_read') booksToFilter = booksToFilter.filter(book => book.status === 're_read');
-    else if (activeCategory === 'recientes') {
-      booksToFilter = [...booksToFilter].sort((a, b) => (new Date(b.updatedAt || b.addedAt || 0).getTime() - new Date(a.updatedAt || a.addedAt || 0).getTime()));
-      booksToFilter = booksToFilter.slice(0, 12);
-    }
-    else if (activeCategory === 'no-metadata') {
-      booksToFilter = booksToFilter.filter(book =>
-        !book.author || book.author === 'Unknown Author' ||
-        !book.metadata?.description || book.metadata.description.length < 10
-      );
-    }
-    else if (activeCategory === 'no-cover') {
-      booksToFilter = booksToFilter.filter(book => !book.hasCover);
-    }
-
-    if (searchQuery) {
-      // Hybrid Search: Combine AI Results (Semantic) + Local Text Match (Deterministic)
-      const aiIds = new Set(aiSearchResults || []);
-      const terms = searchQuery.toLowerCase().split(/\s+/).filter(t => t.length > 0);
-
-      booksToFilter = booksToFilter.filter(book => {
-        // 1. Check AI Match
-        if (aiIds.has(book.id)) return true;
-
-        // 2. Check Local Text Match
-        const searchableText = [
-          book.title,
-          book.author,
-          ...(book.metadata?.categories || []),
-          book.metadata?.userRating || '',
-          ...(book.metadata?.subjects || []),
-          xrayKeywords[book.id] || ''
-        ].join(' ').toLowerCase();
-
-        return terms.every(term => searchableText.includes(term));
-      });
-
-      // Sort: AI matches first, then text matches
-      // Note: We need a stable sort. Ideally we rank by AI confidence then others.
-      // For now, if AI results exist, we prioritize them?
-      if (aiSearchResults) {
-        const rankMap = new Map(aiSearchResults.map((id, index) => [id, index]));
-        booksToFilter.sort((a, b) => {
-          const rankA = rankMap.get(a.id) ?? 9999;
-          const rankB = rankMap.get(b.id) ?? 9999;
-          return rankA - rankB;
-        });
-      }
-    }
-
-    // Sort
-    booksToFilter.sort((a, b) => {
-      let comparison = 0;
-      if (sortBy === 'title') comparison = a.title.localeCompare(b.title);
-      else if (sortBy === 'author') comparison = a.author.localeCompare(b.author);
-      else if (sortBy === 'addedDate') comparison = (new Date(a.addedAt || 0).getTime() - new Date(b.addedAt || 0).getTime());
-      else if (sortBy === 'progress') comparison = (a.progress || 0) - (b.progress || 0);
-
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
-
-    setFilteredBooks(booksToFilter);
-  }, [books, searchQuery, activeCategory, activeFormat, sortBy, sortOrder, activeThematicCategory, activeUserRating, aiSearchResults]);
 
   // Auth Check & Init
   useEffect(() => {
